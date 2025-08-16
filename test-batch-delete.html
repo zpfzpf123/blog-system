@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试批量删除分类API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .danger {
+            background: #dc3545;
+        }
+        .danger:hover {
+            background: #c82333;
+        }
+        .success {
+            background: #28a745;
+        }
+        .success:hover {
+            background: #218838;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <h1>测试批量删除分类API</h1>
+    
+    <div class="test-section">
+        <h3>1. 创建测试分类</h3>
+        <input type="text" id="categoryName" placeholder="输入分类名称">
+        <button onclick="createCategory()">创建分类</button>
+        <button onclick="getAllCategories()">获取所有分类</button>
+        <div id="createResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>2. 批量删除分类</h3>
+        <input type="text" id="categoryIds" placeholder="输入分类ID，用逗号分隔，如: 1,2,3">
+        <button class="danger" onclick="batchDeleteCategories()">批量删除</button>
+        <div id="deleteResult"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>3. 测试结果</h3>
+        <pre id="result"></pre>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4567/api';
+
+        function log(message) {
+            document.getElementById('result').textContent = JSON.stringify(message, null, 2);
+        }
+
+        async function createCategory() {
+            const name = document.getElementById('categoryName').value;
+            if (!name) {
+                alert('请输入分类名称');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/categories`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    document.getElementById('createResult').innerHTML = `<p style="color: green;">创建成功: ${result.name}</p>`;
+                    log({ action: 'create', success: true, data: result });
+                } else {
+                    document.getElementById('createResult').innerHTML = `<p style="color: red;">创建失败: ${result.message}</p>`;
+                    log({ action: 'create', success: false, error: result });
+                }
+            } catch (error) {
+                document.getElementById('createResult').innerHTML = `<p style="color: red;">请求失败: ${error.message}</p>`;
+                log({ action: 'create', success: false, error: error.message });
+            }
+        }
+
+        async function getAllCategories() {
+            try {
+                const response = await fetch(`${API_BASE}/categories`);
+                const categories = await response.json();
+                log({ action: 'getAll', success: true, data: categories });
+            } catch (error) {
+                log({ action: 'getAll', success: false, error: error.message });
+            }
+        }
+
+        async function batchDeleteCategories() {
+            const idsText = document.getElementById('categoryIds').value;
+            if (!idsText) {
+                alert('请输入要删除的分类ID');
+                return;
+            }
+
+            const ids = idsText.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+            if (ids.length === 0) {
+                alert('请输入有效的分类ID');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/categories/batch`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ids })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    document.getElementById('deleteResult').innerHTML = `<p style="color: green;">删除成功: ${result.message}</p>`;
+                    log({ action: 'batchDelete', success: true, data: result });
+                } else {
+                    document.getElementById('deleteResult').innerHTML = `<p style="color: red;">删除失败: ${result.message}</p>`;
+                    log({ action: 'batchDelete', success: false, error: result });
+                }
+            } catch (error) {
+                document.getElementById('deleteResult').innerHTML = `<p style="color: red;">请求失败: ${error.message}</p>`;
+                log({ action: 'batchDelete', success: false, error: error.message });
+            }
+        }
+
+        // 页面加载时获取所有分类
+        window.onload = function() {
+            getAllCategories();
+        };
+    </script>
+</body>
+</html>

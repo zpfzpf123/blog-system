@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fetch Test</title>
+</head>
+<body>
+    <h1>Fetch Test Page</h1>
+    <button onclick="testFetch()">Test Fetch Request</button>
+    <div id="result"></div>
+
+    <script>
+        function testFetch() {
+            document.getElementById('result').innerText = 'Loading...';
+
+            // 使用fetch API发送请求
+            fetch('http://localhost:3000/api/categories', {
+                method: 'GET',
+                credentials: 'include', // 包含凭证
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                timeout: 10000
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                document.getElementById('result').innerText = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                document.getElementById('result').innerText = `Error: ${error.message}`;
+                console.error('Fetch error:', error);
+            });
+        }
+    </script>
+</body>
+</html>

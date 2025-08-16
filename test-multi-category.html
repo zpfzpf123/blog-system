@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>多分类选择测试</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/element-plus/dist/index.full.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <div style="padding: 20px">
+        <h2>多分类选择测试</h2>
+
+        <el-form :model="form" label-width="100px" style="max-width: 500px">
+          <el-form-item label="网站名称">
+            <el-input v-model="form.name" placeholder="请输入网站名称"></el-input>
+          </el-form-item>
+
+          <el-form-item label="所属分类">
+            <el-select
+              v-model="form.categoryIds"
+              placeholder="请选择分类"
+              multiple
+              collapse-tags
+              collapse-tags-tooltip
+              style="width: 100%"
+            >
+              <el-option
+                v-for="category in categories"
+                :key="category.id"
+                :label="category.name"
+                :value="category.id"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item>
+            <el-button type="primary" @click="showSelected">显示选择结果</el-button>
+          </el-form-item>
+        </el-form>
+
+        <div v-if="form.categoryIds.length > 0" style="margin-top: 20px">
+          <h3>已选择的分类：</h3>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <el-tag
+              v-for="categoryId in form.categoryIds"
+              :key="categoryId"
+              :color="getCategoryColor(categoryId)"
+              effect="dark"
+            >
+              {{ getCategoryName(categoryId) }}
+            </el-tag>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref } = Vue
+      const { ElMessage } = ElementPlus
+
+      createApp({
+        setup() {
+          const form = ref({
+            name: '',
+            categoryIds: [],
+          })
+
+          const categories = ref([
+            { id: 1, name: '技术博客', description: '技术相关的博客网站', color: '#409EFF' },
+            { id: 2, name: '设计资源', description: '设计相关的资源网站', color: '#67C23A' },
+            { id: 3, name: '学习平台', description: '在线学习平台', color: '#E6A23C' },
+            { id: 4, name: '工具软件', description: '实用的工具软件', color: '#F56C6C' },
+            { id: 5, name: '新闻资讯', description: '新闻资讯网站', color: '#909399' },
+          ])
+
+          const getCategoryName = (categoryId) => {
+            const category = categories.value.find((c) => c.id === categoryId)
+            return category ? category.name : '未知分类'
+          }
+
+          const getCategoryColor = (categoryId) => {
+            const category = categories.value.find((c) => c.id === categoryId)
+            return category ? category.color : '#909399'
+          }
+
+          const showSelected = () => {
+            if (form.value.categoryIds.length === 0) {
+              ElMessage.warning('请先选择分类')
+              return
+            }
+
+            const selectedNames = form.value.categoryIds.map((id) => getCategoryName(id))
+            ElMessage.success(`已选择分类：${selectedNames.join(', ')}`)
+          }
+
+          return {
+            form,
+            categories,
+            getCategoryName,
+            getCategoryColor,
+            showSelected,
+          }
+        },
+      })
+        .use(ElementPlus)
+        .mount('#app')
+    </script>
+  </body>
+</html>

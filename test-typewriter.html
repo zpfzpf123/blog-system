@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>打字机效果测试</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .test-area {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+        background: #f9f9f9;
+      }
+      .typewriter-text {
+        font-size: 18px;
+        line-height: 1.6;
+        min-height: 100px;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 15px;
+        background: white;
+      }
+      .typing-cursor {
+        display: inline-block;
+        width: 2px;
+        height: 1.2em;
+        background: #007bff;
+        margin-left: 2px;
+        animation: blink 1s infinite;
+      }
+      @keyframes blink {
+        0%,
+        50% {
+          opacity: 1;
+        }
+        51%,
+        100% {
+          opacity: 0;
+        }
+      }
+      .controls {
+        display: flex;
+        gap: 10px;
+        margin: 20px 0;
+        flex-wrap: wrap;
+      }
+      button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.3s;
+      }
+      .start-btn {
+        background: #007bff;
+        color: white;
+      }
+      .start-btn:hover {
+        background: #0056b3;
+        transform: translateY(-2px);
+      }
+      .reset-btn {
+        background: #6c757d;
+        color: white;
+      }
+      .reset-btn:hover {
+        background: #5a6268;
+      }
+      .speed-control {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      input[type='range'] {
+        width: 100px;
+      }
+      .speed-value {
+        font-weight: bold;
+        color: #007bff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>打字机效果测试</h1>
+
+      <div class="test-area">
+        <h3>测试文本</h3>
+        <div class="typewriter-text" id="typewriterText"></div>
+
+        <div class="controls">
+          <button class="start-btn" onclick="startTypewriter()">开始打字</button>
+          <button class="reset-btn" onclick="resetTypewriter()">重置</button>
+
+          <div class="speed-control">
+            <label>打字速度:</label>
+            <input
+              type="range"
+              id="speedSlider"
+              min="10"
+              max="200"
+              value="50"
+              onchange="updateSpeed()"
+            />
+            <span class="speed-value" id="speedValue">50ms</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-area">
+        <h3>测试内容</h3>
+        <p>
+          这里是一些测试内容，可以用来验证打字机效果是否正常工作。打字机效果应该能够逐字显示文本，并且有闪烁的光标效果。
+        </p>
+        <p>如果打字机效果只显示一个字就停止了，说明存在定时器或逻辑问题。</p>
+      </div>
+    </div>
+
+    <script>
+      let typingTimer = null
+      let currentIndex = 0
+      let fullText = ''
+      let typingSpeed = 50
+
+      const testTexts = [
+        '这是一个测试文本，用来验证打字机效果是否正常工作。',
+        'Hello, this is a test message for the typewriter effect.',
+        '人工智能（AI）是计算机科学的一个分支，它企图了解智能的实质，并生产出一种新的能以人类智能相似的方式做出反应的智能机器。',
+        'The quick brown fox jumps over the lazy dog. This pangram contains every letter of the English alphabet at least once.',
+      ]
+
+      function startTypewriter() {
+        if (typingTimer) {
+          clearTimeout(typingTimer)
+          typingTimer = null
+        }
+
+        // 随机选择一个测试文本
+        fullText = testTexts[Math.floor(Math.random() * testTexts.length)]
+        currentIndex = 0
+
+        const textElement = document.getElementById('typewriterText')
+        textElement.innerHTML = ''
+
+        console.log('开始打字机效果，文本长度:', fullText.length)
+        typeNextChar()
+      }
+
+      function typeNextChar() {
+        const textElement = document.getElementById('typewriterText')
+
+        if (currentIndex < fullText.length) {
+          textElement.innerHTML += fullText[currentIndex]
+          currentIndex++
+          console.log(`打字进度: ${currentIndex}/${fullText.length} - "${textElement.innerHTML}"`)
+          typingTimer = setTimeout(typeNextChar, typingSpeed)
+        } else {
+          console.log('打字机效果完成')
+          // 添加闪烁光标
+          textElement.innerHTML += '<span class="typing-cursor"></span>'
+        }
+      }
+
+      function resetTypewriter() {
+        if (typingTimer) {
+          clearTimeout(typingTimer)
+          typingTimer = null
+        }
+        currentIndex = 0
+        document.getElementById('typewriterText').innerHTML = ''
+      }
+
+      function updateSpeed() {
+        const slider = document.getElementById('speedSlider')
+        const valueDisplay = document.getElementById('speedValue')
+        typingSpeed = parseInt(slider.value)
+        valueDisplay.textContent = typingSpeed + 'ms'
+      }
+
+      // 页面加载完成后自动开始一次测试
+      window.onload = function () {
+        setTimeout(() => {
+          startTypewriter()
+        }, 1000)
+      }
+    </script>
+  </body>
+</html>

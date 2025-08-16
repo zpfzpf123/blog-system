@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试网站API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .result {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>网站API测试</h1>
+    
+    <div class="test-section">
+        <h3>测试获取网站列表</h3>
+        <button onclick="testGetWebsites()">获取网站列表</button>
+        <div id="websitesResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>测试获取分类列表</h3>
+        <button onclick="testGetCategories()">获取分类列表</button>
+        <div id="categoriesResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>测试创建网站</h3>
+        <button onclick="testCreateWebsite()">创建测试网站</button>
+        <div id="createResult" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        
+        async function testGetWebsites() {
+            const resultDiv = document.getElementById('websitesResult');
+            resultDiv.textContent = '正在获取网站列表...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/websites?page=1&size=5`);
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="success">✅ 获取成功</div>
+                    <strong>响应状态:</strong> ${response.status}<br>
+                    <strong>响应头:</strong> ${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}<br>
+                    <strong>响应数据:</strong><br>
+                    ${JSON.stringify(data, null, 2)}
+                `;
+                
+                // 检查数据结构
+                if (data.websites && Array.isArray(data.websites)) {
+                    console.log('网站数据结构:', data.websites[0]);
+                    if (data.websites[0]) {
+                        console.log('标签字段:', data.websites[0].tags);
+                        console.log('标签类型:', typeof data.websites[0].tags);
+                    }
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ 获取失败: ${error.message}</div>`;
+            }
+        }
+        
+        async function testGetCategories() {
+            const resultDiv = document.getElementById('categoriesResult');
+            resultDiv.textContent = '正在获取分类列表...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/websites/categories`);
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="success">✅ 获取成功</div>
+                    <strong>响应状态:</strong> ${response.status}<br>
+                    <strong>响应数据:</strong><br>
+                    ${JSON.stringify(data, null, 2)}
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ 获取失败: ${error.message}</div>`;
+            }
+        }
+        
+        async function testCreateWebsite() {
+            const resultDiv = document.getElementById('createResult');
+            resultDiv.textContent = '正在创建测试网站...';
+            
+            try {
+                const testWebsite = {
+                    name: '测试网站',
+                    url: 'https://example.com',
+                    description: '这是一个测试网站',
+                    categoryId: 1,
+                    tags: ['测试', '示例']
+                };
+                
+                const response = await fetch(`${API_BASE}/websites`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testWebsite)
+                });
+                
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="success">✅ 创建成功</div>
+                    <strong>响应状态:</strong> ${response.status}<br>
+                    <strong>响应数据:</strong><br>
+                    ${JSON.stringify(data, null, 2)}
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ 创建失败: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

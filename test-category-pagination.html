@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分类分页API测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        .input-group label {
+            display: inline-block;
+            width: 80px;
+        }
+        .input-group input {
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>分类分页API测试</h1>
+    
+    <div class="test-section">
+        <h3>分页查询分类</h3>
+        <div class="input-group">
+            <label>页码:</label>
+            <input type="number" id="page" value="1" min="1">
+        </div>
+        <div class="input-group">
+            <label>每页大小:</label>
+            <input type="number" id="size" value="5" min="1" max="100">
+        </div>
+        <button class="test-button" onclick="testPagination()">测试分页查询</button>
+        <div id="pagination-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>分页搜索分类</h3>
+        <div class="input-group">
+            <label>搜索名:</label>
+            <input type="text" id="searchName" placeholder="输入分类名称">
+        </div>
+        <div class="input-group">
+            <label>页码:</label>
+            <input type="number" id="searchPage" value="1" min="1">
+        </div>
+        <div class="input-group">
+            <label>每页大小:</label>
+            <input type="number" id="searchSize" value="5" min="1" max="100">
+        </div>
+        <button class="test-button" onclick="testSearchPagination()">测试分页搜索</button>
+        <div id="search-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>获取所有分类（不分页）</h3>
+        <button class="test-button" onclick="testGetAll()">获取所有分类</button>
+        <div id="all-result" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4567/api';
+        
+        async function testPagination() {
+            const page = document.getElementById('page').value;
+            const size = document.getElementById('size').value;
+            const resultDiv = document.getElementById('pagination-result');
+            
+            try {
+                resultDiv.textContent = '正在请求...';
+                const response = await fetch(`${API_BASE}/categories/page?page=${page}&size=${size}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.textContent = `请求成功!\n\n响应数据:\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    resultDiv.textContent = `请求失败: ${response.status}\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.textContent = `请求错误: ${error.message}`;
+            }
+        }
+        
+        async function testSearchPagination() {
+            const name = document.getElementById('searchName').value;
+            const page = document.getElementById('searchPage').value;
+            const size = document.getElementById('searchSize').value;
+            const resultDiv = document.getElementById('search-result');
+            
+            if (!name.trim()) {
+                resultDiv.textContent = '请输入搜索名称';
+                return;
+            }
+            
+            try {
+                resultDiv.textContent = '正在请求...';
+                const response = await fetch(`${API_BASE}/categories/search/page?name=${encodeURIComponent(name)}&page=${page}&size=${size}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.textContent = `请求成功!\n\n响应数据:\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    resultDiv.textContent = `请求失败: ${response.status}\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.textContent = `请求错误: ${error.message}`;
+            }
+        }
+        
+        async function testGetAll() {
+            const resultDiv = document.getElementById('all-result');
+            
+            try {
+                resultDiv.textContent = '正在请求...';
+                const response = await fetch(`${API_BASE}/categories`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.textContent = `请求成功!\n\n响应数据:\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    resultDiv.textContent = `请求失败: ${response.status}\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.textContent = `请求错误: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

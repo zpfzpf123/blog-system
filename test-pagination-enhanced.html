@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分页功能测试 - 增强版</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f7fa;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        
+        .demo-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e4e7ed;
+            border-radius: 8px;
+        }
+        
+        .demo-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #303133;
+        }
+        
+        .demo-description {
+            color: #606266;
+            margin-bottom: 16px;
+            line-height: 1.6;
+        }
+        
+        .pagination-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .pagination-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 20px;
+            padding: 0 20px;
+        }
+
+        .pagination-text {
+            font-size: 14px;
+            color: #606266;
+        }
+
+        .pagination-pages {
+            font-size: 14px;
+            color: #909399;
+            font-weight: 500;
+        }
+
+        .pagination-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            gap: 20px;
+        }
+
+        .page-size-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .page-size-label {
+            font-size: 14px;
+            color: #606266;
+            white-space: nowrap;
+        }
+
+        .pagination-navigation {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .page-jumper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .jumper-label {
+            font-size: 14px;
+            color: #606266;
+            white-space: nowrap;
+        }
+
+        .jumper-input {
+            width: 60px;
+        }
+
+        .jumper-text {
+            font-size: 14px;
+            color: #606266;
+        }
+
+        .main-pagination {
+            margin: 0;
+        }
+        
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .feature-list li:before {
+            content: "✓";
+            color: #67c23a;
+            font-weight: bold;
+            margin-right: 12px;
+        }
+        
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 16px;
+            margin: 16px 0;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+        
+        @media (max-width: 768px) {
+            .pagination-container {
+                padding: 16px;
+            }
+
+            .pagination-info {
+                flex-direction: column;
+                gap: 12px;
+                text-align: center;
+                padding: 0;
+            }
+
+            .pagination-controls {
+                flex-direction: column;
+                gap: 16px;
+                align-items: center;
+            }
+
+            .pagination-navigation {
+                flex-direction: column;
+                gap: 16px;
+                align-items: center;
+            }
+
+            .page-jumper {
+                order: 1;
+            }
+
+            .main-pagination {
+                order: 2;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>分页功能测试 - 增强版</h1>
+        
+        <div class="demo-section">
+            <div class="demo-title">功能特性</div>
+            <div class="demo-description">
+                这个增强版分页组件提供了以下功能：
+            </div>
+            <ul class="feature-list">
+                <li>分页信息显示：显示当前页的记录范围和总记录数</li>
+                <li>页码信息：显示当前页码和总页数</li>
+                <li>每页显示数量选择：支持12、24、48、96条记录的选择</li>
+                <li>页码快速跳转：输入页码直接跳转到指定页面</li>
+                <li>分页导航：上一页、页码、下一页按钮</li>
+                <li>响应式设计：移动端友好的布局适配</li>
+                <li>美观的UI设计：与现有页面风格保持一致</li>
+            </ul>
+        </div>
+        
+        <div class="demo-section">
+            <div class="demo-title">分页组件演示</div>
+            <div class="demo-description">
+                以下是增强版分页组件的完整演示，包含所有功能特性：
+            </div>
+            
+            <!-- 分页组件 -->
+            <div class="pagination-container">
+                <!-- 分页信息 -->
+                <div class="pagination-info">
+                    <span class="pagination-text">
+                        显示第 1-12 条，共 156 条记录
+                    </span>
+                    <span class="pagination-pages">
+                        第 1 页，共 13 页
+                    </span>
+                </div>
+                
+                <!-- 分页控件 -->
+                <div class="pagination-controls">
+                    <!-- 每页显示数量选择 -->
+                    <div class="page-size-selector">
+                        <span class="page-size-label">每页显示：</span>
+                        <select style="padding: 8px; border: 1px solid #dcdfe6; border-radius: 4px;">
+                            <option value="12">12 条</option>
+                            <option value="24">24 条</option>
+                            <option value="48">48 条</option>
+                            <option value="96">96 条</option>
+                        </select>
+                    </div>
+
+                    <!-- 分页导航 -->
+                    <div class="pagination-navigation">
+                        <!-- 快速跳转 -->
+                        <div class="page-jumper">
+                            <span class="jumper-label">跳转到：</span>
+                            <input type="number" min="1" max="13" value="1" class="jumper-input" style="padding: 8px; border: 1px solid #dcdfe6; border-radius: 4px;">
+                            <span class="jumper-text">页</span>
+                        </div>
+
+                        <!-- 分页按钮 -->
+                        <div class="main-pagination">
+                            <button style="padding: 8px 12px; margin: 0 4px; border: 1px solid #dcdfe6; background: white; border-radius: 4px; cursor: pointer;">上一页</button>
+                            <button style="padding: 8px 12px; margin: 0 4px; border: 1px solid #409eff; background: #409eff; color: white; border-radius: 4px; cursor: pointer;">1</button>
+                            <button style="padding: 8px 12px; margin: 0 4px; border: 1px solid #dcdfe6; background: white; border-radius: 4px; cursor: pointer;">2</button>
+                            <button style="padding: 8px 12px; margin: 0 4px; border: 1px solid #dcdfe6; background: white; border-radius: 4px; cursor: pointer;">3</button>
+                            <button style="padding: 8px 12px; margin: 0 4px; border: 1px solid #dcdfe6; background: white; border-radius: 4px; cursor: pointer;">4</button>
+                            <button style="padding: 8px 12px; margin: 0 4px; border: 1px solid #dcdfe6; background: white; border-radius: 4px; cursor: pointer;">5</button>
+                            <button style="padding: 8px 12px; margin: 0 4px; border: 1px solid #dcdfe6; background: white; border-radius: 4px; cursor: pointer;">...</button>
+                            <button style="padding: 8px 12px; margin: 0 4px; border: 1px solid #dcdfe6; background: white; border-radius: 4px; cursor: pointer;">13</button>
+                            <button style="padding: 8px 12px; margin: 0 4px; border: 1px solid #dcdfe6; background: white; border-radius: 4px; cursor: pointer;">下一页</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="demo-section">
+            <div class="demo-title">代码实现</div>
+            <div class="demo-description">
+                以下是Vue组件的关键代码实现：
+            </div>
+            
+            <div class="code-block">
+&lt;!-- 分页组件 --&gt;
+&lt;div class="pagination-container"&gt;
+  &lt;!-- 分页信息 --&gt;
+  &lt;div class="pagination-info"&gt;
+    &lt;span class="pagination-text"&gt;
+      显示第 {{ (currentPage - 1) * pageSize + 1 }}-{{ Math.min(currentPage * pageSize, total) }} 条，
+      共 {{ total }} 条记录
+    &lt;/span&gt;
+    &lt;span class="pagination-pages"&gt;
+      第 {{ currentPage }} 页，共 {{ totalPages }} 页
+    &lt;/span&gt;
+  &lt;/div&gt;
+  
+  &lt;!-- 分页控件 --&gt;
+  &lt;div class="pagination-controls"&gt;
+    &lt;!-- 每页显示数量选择 --&gt;
+    &lt;div class="page-size-selector"&gt;
+      &lt;span class="page-size-label"&gt;每页显示：&lt;/span&gt;
+      &lt;el-select v-model="pageSize" @change="handleSizeChange" size="small"&gt;
+        &lt;el-option v-for="size in [12, 24, 48, 96]" :key="size" :label="`${size} 条`" :value="size" /&gt;
+      &lt;/el-select&gt;
+    &lt;/div&gt;
+
+    &lt;!-- 分页导航 --&gt;
+    &lt;div class="pagination-navigation"&gt;
+      &lt;!-- 快速跳转 --&gt;
+      &lt;div class="page-jumper"&gt;
+        &lt;span class="jumper-label"&gt;跳转到：&lt;/span&gt;
+        &lt;el-input v-model="jumpPage" type="number" :min="1" :max="totalPages" size="small" 
+                  class="jumper-input" @keyup.enter="handleJumpPage" @blur="handleJumpPage" /&gt;
+        &lt;span class="jumper-text"&gt;页&lt;/span&gt;
+      &lt;/div&gt;
+
+      &lt;!-- 分页按钮 --&gt;
+      &lt;el-pagination v-model:current-page="currentPage" :page-size="pageSize" :background="true"
+                      layout="prev, pager, next" :total="total" :pager-count="7" 
+                      @current-change="handlePageChange" class="main-pagination" /&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+            </div>
+        </div>
+        
+        <div class="demo-section">
+            <div class="demo-title">JavaScript方法</div>
+            <div class="demo-description">
+                以下是相关的JavaScript方法实现：
+            </div>
+            
+            <div class="code-block">
+// 页码跳转处理
+const handleJumpPage = () => {
+  const page = parseInt(jumpPage.value.toString())
+  if (page && page >= 1 && page <= totalPages.value) {
+    currentPage.value = page
+    loadWebsites()
+  } else {
+    jumpPage.value = currentPage.value
+    ElMessage.warning('请输入有效的页码')
+  }
+}
+
+// 页面大小变化处理
+const handleSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1
+  jumpPage.value = 1
+  loadWebsites()
+}
+
+// 页码变化处理
+const handlePageChange = (page: number) => {
+  currentPage.value = page
+  jumpPage.value = page
+  loadWebsites()
+}
+            </div>
+        </div>
+        
+        <div class="demo-section">
+            <div class="demo-title">CSS样式</div>
+            <div class="demo-description">
+                以下是分页组件的CSS样式实现：
+            </div>
+            
+            <div class="code-block">
+.pagination-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 30px;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.pagination-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 0 20px;
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 20px;
+}
+
+.page-jumper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .pagination-controls {
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+  }
+  
+  .pagination-navigation {
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+  }
+}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 模拟分页功能
+        document.addEventListener('DOMContentLoaded', function() {
+            // 模拟页码跳转
+            const jumperInput = document.querySelector('.jumper-input');
+            jumperInput.addEventListener('blur', function() {
+                const page = parseInt(this.value);
+                if (page && page >= 1 && page <= 13) {
+                    alert(`跳转到第 ${page} 页`);
+                } else {
+                    this.value = 1;
+                    alert('请输入有效的页码');
+                }
+            });
+            
+            // 模拟每页显示数量变化
+            const pageSizeSelect = document.querySelector('select');
+            pageSizeSelect.addEventListener('change', function() {
+                alert(`每页显示 ${this.value} 条记录`);
+            });
+            
+            // 模拟分页按钮点击
+            const paginationButtons = document.querySelectorAll('.main-pagination button');
+            paginationButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    if (this.textContent === '上一页') {
+                        alert('跳转到上一页');
+                    } else if (this.textContent === '下一页') {
+                        alert('跳转到下一页');
+                    } else if (this.textContent !== '...') {
+                        alert(`跳转到第 ${this.textContent} 页`);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

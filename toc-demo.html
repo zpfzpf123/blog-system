@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>优化后的文章目录组件演示</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB',
+          'Microsoft YaHei', sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .demo-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: flex;
+        gap: 30px;
+        align-items: flex-start;
+      }
+
+      .main-content {
+        flex: 1;
+        background: white;
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      }
+
+      .sidebar {
+        width: 320px;
+        flex-shrink: 0;
+      }
+
+      .demo-title {
+        font-size: 2rem;
+        color: #2c3e50;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+
+      .demo-content {
+        line-height: 1.8;
+        color: #2c3e50;
+      }
+
+      .demo-content h1 {
+        font-size: 1.8rem;
+        color: #2c3e50;
+        margin: 20px 0 15px 0;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #667eea;
+      }
+
+      .demo-content h2 {
+        font-size: 1.5rem;
+        color: #34495e;
+        margin: 18px 0 12px 0;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #bdc3c7;
+      }
+
+      .demo-content h3 {
+        font-size: 1.3rem;
+        color: #2c3e50;
+        margin: 15px 0 10px 0;
+      }
+
+      .demo-content p {
+        margin: 10px 0;
+        font-size: 1rem;
+      }
+
+      /* 目录容器样式 */
+      .toc-container {
+        width: 100%;
+        z-index: 100;
+      }
+
+      .toc-card {
+        max-height: calc(100vh - 40px);
+        min-height: 380px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        position: sticky;
+        top: 20px;
+        min-width: 300px;
+      }
+
+      .toc-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 16px 48px rgba(102, 126, 234, 0.2);
+      }
+
+      .toc-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        min-height: 56px;
+        padding: 20px 24px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-bottom: none;
+        border-radius: 16px 16px 0 0;
+        margin: 0;
+        position: relative;
+        overflow: hidden;
+      }
+
+      /* 添加背景装饰元素 */
+      .toc-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+        animation: rotate 20s linear infinite;
+      }
+
+      @keyframes rotate {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .toc-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .toc-title-main {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: white;
+      }
+
+      .toc-icon {
+        font-size: 1.2rem;
+        color: white;
+        animation: iconFloat 2s ease-in-out infinite;
+      }
+
+      @keyframes iconFloat {
+        0%,
+        100% {
+          transform: translateY(0px) rotate(0deg);
+        }
+        50% {
+          transform: translateY(-2px) rotate(5deg);
+        }
+      }
+
+      .category-badge {
+        margin-left: 12px;
+      }
+
+      .category-tag {
+        background: rgba(255, 255, 255, 0.2) !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        color: white !important;
+        font-weight: 600;
+        border-radius: 12px !important;
+        padding: 4px 12px !important;
+        font-size: 0.8rem !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        backdrop-filter: blur(10px);
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .category-tag:hover {
+        background: rgba(255, 255, 255, 0.3) !important;
+        border-color: rgba(255, 255, 255, 0.5) !important;
+        transform: translateY(-1px) scale(1.05);
+        box-shadow: 0 4px 16px rgba(255, 255, 255, 0.2);
+      }
+
+      .toc-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
+
+      .toc-actions .btn {
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .toc-actions .btn:hover {
+        transform: translateY(-2px) scale(1.05);
+        box-shadow: 0 4px 16px rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .toc-content {
+        overflow-y: auto;
+        overflow-x: hidden;
+        max-height: calc(100vh - 200px);
+        scroll-behavior: smooth;
+        padding: 0 4px;
+      }
+
+      .toc-content::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .toc-content::-webkit-scrollbar-track {
+        background: rgba(102, 126, 234, 0.1);
+        border-radius: 4px;
+        margin: 4px 0;
+      }
+
+      .toc-content::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 4px;
+        transition: all 0.3s ease;
+      }
+
+      .toc-content::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+      }
+
+      /* 阅读进度指示器 */
+      .reading-progress-indicator {
+        margin-bottom: 20px;
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 12px;
+        border: 1px solid rgba(102, 126, 234, 0.1);
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+      }
+
+      .progress-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .progress-icon {
+        font-size: 1rem;
+        color: #667eea;
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(1.1);
+          opacity: 0.8;
+        }
+      }
+
+      .progress-label {
+        font-size: 0.85rem;
+        color: #555;
+        font-weight: 500;
+      }
+
+      .progress-bar-mini {
+        height: 8px;
+        background: rgba(102, 126, 234, 0.1);
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 12px 0 8px 0;
+        position: relative;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        border-radius: 4px;
+        transition: width 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        width: 65%;
+      }
+
+      .progress-fill::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+        animation: shimmer 2s infinite;
+      }
+
+      @keyframes shimmer {
+        0% {
+          left: -100%;
+        }
+        100% {
+          left: 100%;
+        }
+      }
+
+      .progress-text-mini {
+        font-size: 0.8rem;
+        color: #667eea;
+        font-weight: 600;
+        text-align: center;
+        display: block;
+      }
+
+      /* 现代化目录样式 */
+      .markdown-toc-content {
+        padding: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB',
+          'Microsoft YaHei', sans-serif;
+        background: #ffffff;
+        border-radius: 0 0 12px 12px;
+        overflow: hidden;
+      }
+
+      .markdown-toc-content .table-of-contents {
+        margin: 0;
+        padding: 0;
+      }
+
+      .markdown-toc-content ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        position: relative;
+      }
+
+      .markdown-toc-content li {
+        margin: 0;
+        padding: 0;
+        position: relative;
+      }
+
+      /* 目录链接基础样式 */
+      .markdown-toc-content .toc-link {
+        display: flex;
+        align-items: center;
+        padding: 12px 20px;
+        color: #374151;
+        text-decoration: none;
+        border-radius: 8px;
+        margin: 4px 8px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        font-size: 14px;
+        line-height: 1.6;
+        position: relative;
+        overflow: hidden;
+        font-weight: 400;
+        border: none;
+        background: transparent;
+        min-height: 44px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      }
+
+      /* 左侧装饰线 */
+      .markdown-toc-content .toc-link::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        transform: scaleY(0);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 0 2px 2px 0;
+      }
+
+      /* 右侧箭头指示器 */
+      .markdown-toc-content .toc-link::after {
+        content: '→';
+        position: absolute;
+        right: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #d1d5db;
+        font-size: 12px;
+        font-weight: 300;
+        opacity: 0;
+        transition: all 0.3s ease;
+      }
+
+      /* Hover 状态 */
+      .markdown-toc-content .toc-link:hover {
+        background: linear-gradient(
+          135deg,
+          rgba(102, 126, 234, 0.08) 0%,
+          rgba(118, 75, 162, 0.08) 100%
+        );
+        color: #667eea;
+        transform: translateX(8px);
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+        font-weight: 500;
+      }
+
+      .markdown-toc-content .toc-link:hover::before {
+        transform: scaleY(1);
+      }
+
+      .markdown-toc-content .toc-link:hover::after {
+        opacity: 1;
+        color: #667eea;
+        transform: translateY(-50%) translateX(4px);
+      }
+
+      /* Active 状态 */
+      .markdown-toc-content .toc-link.active {
+        background: linear-gradient(
+          135deg,
+          rgba(102, 126, 234, 0.12) 0%,
+          rgba(118, 75, 162, 0.12) 100%
+        );
+        color: #667eea;
+        font-weight: 600;
+        box-shadow: 0 2px 12px rgba(102, 126, 234, 0.2);
+        border-left: 4px solid #667eea;
+      }
+
+      .markdown-toc-content .toc-link.active::before {
+        transform: scaleY(1);
+        background: #667eea;
+      }
+
+      .markdown-toc-content .toc-link.active::after {
+        opacity: 1;
+        color: #667eea;
+      }
+
+      /* 层级缩进和连接线 */
+      .markdown-toc-content ul ul {
+        padding-left: 0;
+        position: relative;
+        margin: 0;
+      }
+
+      /* 子级连接线 */
+      .markdown-toc-content ul ul::before {
+        content: '';
+        position: absolute;
+        left: 20px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: linear-gradient(180deg, #e5e7eb 0%, #d1d5db 50%, #e5e7eb 100%);
+        border-radius: 1px;
+        opacity: 0.6;
+      }
+
+      /* 子级项目连接点 */
+      .markdown-toc-content ul ul li::before {
+        content: '';
+        position: absolute;
+        left: 18px;
+        top: 50%;
+        width: 6px;
+        height: 6px;
+        background: #d1d5db;
+        border-radius: 50%;
+        transform: translateY(-50%);
+        transition: all 0.3s ease;
+        z-index: 1;
+      }
+
+      .markdown-toc-content ul ul li:hover::before {
+        background: #667eea;
+        transform: translateY(-50%) scale(1.2);
+        box-shadow: 0 0 8px rgba(102, 126, 234, 0.4);
+      }
+
+      /* 不同级别的样式 */
+      .markdown-toc-content > ul > li > .toc-link {
+        font-size: 15px;
+        font-weight: 600;
+        padding: 14px 24px;
+        color: #1f2937;
+        border-bottom: 1px solid #f3f4f6;
+        background: rgba(102, 126, 234, 0.02);
+      }
+
+      .markdown-toc-content ul ul > li > .toc-link {
+        font-size: 14px;
+        font-weight: 500;
+        padding: 12px 24px 12px 48px;
+        color: #374151;
+      }
+
+      .markdown-toc-content ul ul ul > li > .toc-link {
+        font-size: 13px;
+        font-weight: 400;
+        padding: 10px 24px 10px 72px;
+        color: #6b7280;
+      }
+
+      .markdown-toc-content ul ul ul ul > li > .toc-link {
+        font-size: 12px;
+        padding: 8px 24px 8px 96px;
+        color: #9ca3af;
+      }
+
+      /* 动画效果 */
+      .markdown-toc-content li {
+        animation: fadeInUp 0.3s ease-out;
+        animation-fill-mode: both;
+      }
+
+      .markdown-toc-content li:nth-child(1) {
+        animation-delay: 0.1s;
+      }
+      .markdown-toc-content li:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+      .markdown-toc-content li:nth-child(3) {
+        animation-delay: 0.2s;
+      }
+      .markdown-toc-content li:nth-child(4) {
+        animation-delay: 0.25s;
+      }
+      .markdown-toc-content li:nth-child(5) {
+        animation-delay: 0.3s;
+      }
+
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* 目录底部信息 */
+      .toc-footer {
+        padding: 16px;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(240, 147, 251, 0.05));
+        border-top: 1px solid rgba(102, 126, 234, 0.1);
+        border-radius: 0 0 12px 12px;
+      }
+
+      .toc-stats {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .toc-count {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.85rem;
+        color: #667eea;
+        font-weight: 500;
+      }
+
+      .toc-count .icon {
+        font-size: 0.9rem;
+      }
+
+      /* 响应式设计 */
+      @media (max-width: 1200px) {
+        .demo-container {
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        .sidebar {
+          width: 100%;
+        }
+
+        .toc-card {
+          position: static;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .demo-container {
+          padding: 10px;
+        }
+
+        .main-content {
+          padding: 20px;
+        }
+
+        .toc-header {
+          padding: 16px 20px;
+        }
+
+        .toc-title-main {
+          font-size: 1rem;
+        }
+
+        .category-badge {
+          margin-left: 8px;
+        }
+
+        .category-tag {
+          font-size: 0.75rem !important;
+          padding: 2px 8px !important;
+        }
+
+        .toc-actions {
+          margin-top: 8px;
+        }
+
+        .toc-actions .btn {
+          font-size: 0.8rem;
+          padding: 6px 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="demo-container">
+      <!-- 主内容区域 -->
+      <div class="main-content">
+        <h1 class="demo-title">Vue2 WebSocket 插件封装方案使用说明文档</h1>
+
+        <div class="demo-content">
+          <h1>一、简介</h1>
+          <p>
+            本文档介绍了Vue2项目中WebSocket插件的封装方案，包括核心功能、使用方法、配置选项等详细内容。
+          </p>
+
+          <h2>1.1 背景介绍</h2>
+          <p>
+            在现代Web应用中，实时通信变得越来越重要。WebSocket作为一种全双工通信协议，能够提供低延迟、高效率的实时数据传输。
+          </p>
+
+          <h2>1.2 技术选型</h2>
+          <p>
+            我们选择了原生WebSocket
+            API作为底层实现，结合Vue2的响应式系统，构建了一个功能完整、易于使用的插件。
+          </p>
+
+          <h1>二、核心功能</h1>
+          <p>该WebSocket插件提供了以下核心功能：</p>
+
+          <h2>2.1 自动重连机制</h2>
+          <p>插件内置智能重连机制，当连接断开时能够自动尝试重新连接，并支持指数退避算法。</p>
+
+          <h2>2.2 心跳检测</h2>
+          <p>通过定时发送心跳包来检测连接状态，确保连接的稳定性和可靠性。</p>
+
+          <h2>2.3 消息队列</h2>
+          <p>在连接断开期间，消息会被缓存到队列中，重连成功后自动发送，确保消息不丢失。</p>
+
+          <h2>2.4 事件系统</h2>
+          <p>提供完整的事件系统，支持连接、断开、消息接收等事件的监听和处理。</p>
+
+          <h1>三、快速入门</h1>
+          <p>让我们通过一个简单的示例来了解如何使用这个插件：</p>
+
+          <h2>3.1 代码名称及建议目录</h2>
+          <p>
+            建议将插件文件命名为 <code>websocket.js</code> 或
+            <code>websocket-plugin.js</code>，放置在项目的 <code>src/plugins/</code> 目录下。
+          </p>
+
+          <h2>3.2 基本配置</h2>
+          <p>在Vue项目中引入插件并进行基本配置：</p>
+
+          <h3>3.2.1 安装依赖</h3>
+          <p>该插件无需额外安装依赖，使用原生WebSocket API实现。</p>
+
+          <h3>3.2.2 引入插件</h3>
+          <p>在main.js中引入并注册插件：</p>
+
+          <h2>3.3 使用示例</h2>
+          <p>在Vue组件中使用WebSocket插件：</p>
+
+          <h3>3.3.1 建立连接</h3>
+          <p>通过调用插件方法建立WebSocket连接：</p>
+
+          <h3>3.3.2 发送消息</h3>
+          <p>使用send方法发送消息到服务器：</p>
+
+          <h3>3.3.3 接收消息</h3>
+          <p>通过事件监听器接收服务器发送的消息：</p>
+
+          <h1>四、高级功能</h1>
+          <p>除了基本功能外，插件还提供了以下高级特性：</p>
+
+          <h2>4.1 连接池管理</h2>
+          <p>支持多个WebSocket连接的管理，每个连接都有独立的配置和状态。</p>
+
+          <h2>4.2 消息压缩</h2>
+          <p>支持消息压缩，减少网络传输的数据量，提高传输效率。</p>
+
+          <h2>4.3 安全认证</h2>
+          <p>支持多种认证方式，包括Token认证、证书认证等。</p>
+
+          <h1>五、最佳实践</h1>
+          <p>在使用WebSocket插件时，建议遵循以下最佳实践：</p>
+
+          <h2>5.1 错误处理</h2>
+          <p>始终实现完善的错误处理机制，包括网络错误、认证失败等情况的处理。</p>
+
+          <h2>5.2 性能优化</h2>
+          <p>合理设置心跳间隔、重连次数等参数，平衡性能和稳定性。</p>
+
+          <h2>5.3 监控和日志</h2>
+          <p>实现连接状态监控和详细的日志记录，便于问题排查和性能分析。</p>
+        </div>
+      </div>
+
+      <!-- 右侧目录区域 -->
+      <div class="sidebar">
+        <div class="toc-container">
+          <div class="toc-card">
+            <div class="toc-header">
+              <div class="toc-title">
+                <div class="toc-title-main">
+                  <span class="toc-icon">📑</span>
+                  <span>文章目录</span>
+                </div>
+                <!-- 分类徽章 -->
+                <div class="category-badge">
+                  <span class="category-tag">技术文档</span>
+                </div>
+              </div>
+              <div class="toc-actions">
+                <a href="#" class="btn">📊</a>
+                <a href="#" class="btn">⚙️</a>
+                <a href="#" class="btn">📋</a>
+              </div>
+            </div>
+
+            <div class="toc-content">
+              <!-- 阅读进度指示器 -->
+              <div class="reading-progress-indicator">
+                <div class="progress-info">
+                  <span class="progress-icon">📖</span>
+                  <span class="progress-label">阅读进度</span>
+                </div>
+                <div class="progress-bar-mini">
+                  <div class="progress-fill"></div>
+                </div>
+                <span class="progress-text-mini">65%</span>
+              </div>
+
+              <!-- 目录内容 -->
+              <div class="markdown-toc-content">
+                <div class="table-of-contents">
+                  <ul>
+                    <li>
+                      <a href="#intro" class="toc-link">一、简介</a>
+                      <ul>
+                        <li><a href="#background" class="toc-link">1.1 背景介绍</a></li>
+                        <li><a href="#tech-choice" class="toc-link">1.2 技术选型</a></li>
+                      </ul>
+                    </li>
+                    <li>
+                      <a href="#core-features" class="toc-link">二、核心功能</a>
+                      <ul>
+                        <li><a href="#auto-reconnect" class="toc-link">2.1 自动重连机制</a></li>
+                        <li><a href="#heartbeat" class="toc-link">2.2 心跳检测</a></li>
+                        <li><a href="#message-queue" class="toc-link">2.3 消息队列</a></li>
+                        <li><a href="#event-system" class="toc-link">2.4 事件系统</a></li>
+                      </ul>
+                    </li>
+                    <li>
+                      <a href="#quick-start" class="toc-link">三、快速入门</a>
+                      <ul>
+                        <li>
+                          <a href="#code-structure" class="toc-link">3.1 代码名称及建议目录</a>
+                        </li>
+                        <li>
+                          <a href="#basic-config" class="toc-link">3.2 基本配置</a>
+                          <ul>
+                            <li><a href="#install-deps" class="toc-link">3.2.1 安装依赖</a></li>
+                            <li><a href="#import-plugin" class="toc-link">3.2.2 引入插件</a></li>
+                          </ul>
+                        </li>
+                        <li>
+                          <a href="#usage-example" class="toc-link">3.3 使用示例</a>
+                          <ul>
+                            <li>
+                              <a href="#establish-connection" class="toc-link">3.3.1 建立连接</a>
+                            </li>
+                            <li><a href="#send-message" class="toc-link">3.3.2 发送消息</a></li>
+                            <li><a href="#receive-message" class="toc-link">3.3.3 接收消息</a></li>
+                          </ul>
+                        </li>
+                      </ul>
+                    </li>
+                    <li>
+                      <a href="#advanced-features" class="toc-link">四、高级功能</a>
+                      <ul>
+                        <li><a href="#connection-pool" class="toc-link">4.1 连接池管理</a></li>
+                        <li><a href="#message-compression" class="toc-link">4.2 消息压缩</a></li>
+                        <li><a href="#security-auth" class="toc-link">4.3 安全认证</a></li>
+                      </ul>
+                    </li>
+                    <li>
+                      <a href="#best-practices" class="toc-link">五、最佳实践</a>
+                      <ul>
+                        <li><a href="#error-handling" class="toc-link">5.1 错误处理</a></li>
+                        <li>
+                          <a href="#performance-optimization" class="toc-link">5.2 性能优化</a>
+                        </li>
+                        <li><a href="#monitoring-logging" class="toc-link">5.3 监控和日志</a></li>
+                      </ul>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- 目录底部信息 -->
+              <div class="toc-footer">
+                <div class="toc-stats">
+                  <span class="toc-count">
+                    <span class="icon">📊</span>
+                    25 个章节
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // 模拟目录项点击高亮
+      document.querySelectorAll('.toc-link').forEach((link) => {
+        link.addEventListener('click', function (e) {
+          e.preventDefault()
+
+          // 移除所有active类
+          document.querySelectorAll('.toc-link').forEach((l) => l.classList.remove('active'))
+
+          // 添加active类到当前点击的链接
+          this.classList.add('active')
+
+          // 模拟滚动到对应位置
+          const targetId = this.getAttribute('href').substring(1)
+          const targetElement = document.getElementById(targetId)
+          if (targetElement) {
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        })
+      })
+
+      // 模拟阅读进度更新
+      let progress = 65
+      const progressFill = document.querySelector('.progress-fill')
+      const progressText = document.querySelector('.progress-text-mini')
+
+      setInterval(() => {
+        progress = Math.min(100, progress + Math.random() * 2)
+        progressFill.style.width = progress + '%'
+        progressText.textContent = Math.round(progress) + '%'
+      }, 3000)
+
+      // 模拟滚动时更新当前章节
+      let currentSection = '一、简介'
+      const currentSectionElement = document.createElement('div')
+      currentSectionElement.className = 'current-section'
+      currentSectionElement.innerHTML = '<span>📍</span><span>' + currentSection + '</span>'
+      currentSectionElement.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: white;
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 8px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            margin-top: 8px;
+            backdrop-filter: blur(10px);
+        `
+
+      document.querySelector('.toc-title').appendChild(currentSectionElement)
+
+      // 模拟滚动更新当前章节
+      const sections = ['一、简介', '二、核心功能', '三、快速入门', '四、高级功能', '五、最佳实践']
+      let currentIndex = 0
+
+      setInterval(() => {
+        currentIndex = (currentIndex + 1) % sections.length
+        currentSection = sections[currentIndex]
+        currentSectionElement.querySelector('span:last-child').textContent = currentSection
+      }, 5000)
+    </script>
+  </body>
+</html>
