@@ -1,5 +1,0 @@
- M README.md
-?? auto-git-upload.bat
-?? auto-git-upload.ps1
-?? auto-git-upload.sh
-?? temp_git_status.txt
