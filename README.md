@@ -1,17 +1,28 @@
-# 博客系统
+# AI智能博客系统 🚀
 
-一个基于 Vue 3 + Spring Boot 的全栈博客应用。
+[![Vue](https://img.shields.io/badge/Vue-3.5.18-4FC08D?style=for-the-badge&logo=vue.js&logoColor=white)](https://vuejs.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-2.7.14-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-## 功能特性
+> 🌟 **项目地址**: [https://github.com/your-username/ai-blog-system](https://github.com/your-username/ai-blog-system)  
+> 📖 **在线演示**: [https://your-demo-url.com](https://your-demo-url.com)  
+> 🚀 **快速开始**: [部署指南](#部署)
 
-- 文章管理：创建、编辑、删除、查看文章
-- 分类管理：创建、编辑、删除文章分类
-- 标签管理：创建、编辑、删除文章标签
-- 响应式设计：适配不同屏幕尺寸
-- Markdown 支持：使用 Markdown 语法编写文章
-- 搜索功能：根据标题和内容搜索文章
-- 推荐功能：基于标签和内容的相关文章推荐
-- 外部资源推荐：根据文章内容推荐网络资源
+一个基于 Vue 3 + Spring Boot 的全栈博客应用，集成AI写作、智能推荐等先进功能。
+
+## ✨ 功能特性
+
+- 🤖 **AI写作助手**: 智能生成文章内容、标题和摘要
+- 🧠 **智能推荐系统**: 基于AI的内容推荐和外部资源推荐
+- 📝 **文章管理**: 创建、编辑、删除、查看文章
+- 🏷️ **分类管理**: 创建、编辑、删除文章分类
+- 🏷️ **标签管理**: 创建、编辑、删除文章标签
+- 📱 **响应式设计**: 适配不同屏幕尺寸
+- 📖 **Markdown支持**: 使用Markdown语法编写文章
+- 🔍 **智能搜索**: 根据标题和内容搜索文章
+- 🌐 **外部资源推荐**: 根据文章内容推荐网络资源
+- 📊 **数据统计**: 文章访问量、分类统计等
 
 ## 技术栈
 

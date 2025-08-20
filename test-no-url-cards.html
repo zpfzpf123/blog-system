@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>网站卡片（无URL显示）测试</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .page-header {
+        text-align: center;
+        margin-bottom: 40px;
+        color: white;
+      }
+
+      .page-title {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .page-description {
+        font-size: 1.1rem;
+        opacity: 0.9;
+      }
+
+      .test-info {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        padding: 30px;
+        margin-bottom: 30px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .test-title {
+        font-size: 1.5rem;
+        color: #1f2937;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .test-description {
+        color: #4b5563;
+        line-height: 1.6;
+        margin-bottom: 20px;
+      }
+
+      .test-steps {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 20px;
+        border-left: 4px solid #667eea;
+      }
+
+      .test-steps h4 {
+        color: #1f2937;
+        margin-bottom: 15px;
+      }
+
+      .test-steps ol {
+        color: #4b5563;
+        line-height: 1.8;
+        padding-left: 20px;
+      }
+
+      .test-steps li {
+        margin-bottom: 8px;
+      }
+
+      .website-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 30px;
+        margin-bottom: 40px;
+      }
+
+      .website-card {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        padding: 25px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .website-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .website-card:hover::before {
+        opacity: 1;
+      }
+
+      .website-card:hover {
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 20px;
+        position: relative;
+      }
+
+      .website-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 24px;
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+        transition: all 0.3s ease;
+      }
+
+      .website-card:hover .website-icon {
+        transform: scale(1.1) rotate(5deg);
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+      }
+
+      .website-info {
+        flex: 1;
+      }
+
+      .website-name {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 5px;
+      }
+
+      .card-actions {
+        display: flex;
+        gap: 8px;
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transform: translateX(20px);
+      }
+
+      .website-card:hover .card-actions {
+        opacity: 1;
+        transform: translateX(0);
+      }
+
+      .action-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .action-btn:hover {
+        transform: translateY(-2px) scale(1.05);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      }
+
+      .copy-btn {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+      }
+
+      .copy-btn:hover {
+        background: linear-gradient(135deg, #059669, #047857);
+        transform: translateY(-2px) scale(1.05) rotate(5deg);
+      }
+
+      .edit-btn {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+      }
+
+      .edit-btn:hover {
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      }
+
+      .delete-btn {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+      }
+
+      .delete-btn:hover {
+        background: linear-gradient(135deg, #dc2626, #b91c1c);
+      }
+
+      .copy-btn .icon {
+        animation: copyIconPulse 2s ease-in-out infinite;
+      }
+
+      @keyframes copyIconPulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.1);
+        }
+      }
+
+      .card-body {
+        margin-bottom: 20px;
+      }
+
+      .website-description {
+        color: #4b5563;
+        line-height: 1.6;
+        font-size: 0.95rem;
+      }
+
+      .card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+      }
+
+      .category-badge {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+      }
+
+      .created-time {
+        color: #9ca3af;
+        font-size: 0.85rem;
+      }
+
+      .url-info {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 20px;
+        padding: 30px;
+        margin-bottom: 30px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .url-info h3 {
+        color: #1f2937;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .url-info p {
+        color: #4b5563;
+        line-height: 1.6;
+        margin-bottom: 15px;
+      }
+
+      .url-example {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 20px;
+        border-left: 4px solid #10b981;
+        font-family: 'Courier New', monospace;
+        color: #059669;
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 768px) {
+        .website-cards {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+
+        .page-title {
+          font-size: 2rem;
+        }
+
+        .website-card {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="page-header">
+        <h1 class="page-title">🌐 网站卡片（无URL显示）测试</h1>
+        <p class="page-description">展示移除URL地址后的网站卡片效果</p>
+      </div>
+
+      <div class="test-info">
+        <h3 class="test-title">📋 功能说明</h3>
+        <p class="test-description">
+          网站卡片中已移除URL地址的显示，现在只显示网站名称、描述、分类和创建时间等信息。
+          用户仍然可以通过复制按钮获取网站地址，但界面上不再显示URL文本。
+        </p>
+        <div class="test-steps">
+          <h4>🧪 测试要点：</h4>
+          <ol>
+            <li>观察网站卡片是否不再显示URL地址</li>
+            <li>验证网站名称是否更加突出</li>
+            <li>检查卡片布局是否更加简洁</li>
+            <li>确认复制功能仍然可用</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="url-info">
+        <h3>🔗 URL信息说明</h3>
+        <p>虽然界面上不再显示URL地址，但用户仍然可以通过以下方式获取网站地址：</p>
+        <ul style="color: #4b5563; line-height: 1.6; margin-bottom: 15px; padding-left: 20px">
+          <li>点击绿色的复制按钮（📋图标）复制URL到剪贴板</li>
+          <li>点击网站卡片本身在新标签页打开网站</li>
+          <li>在编辑模式下查看和修改URL</li>
+        </ul>
+        <div class="url-example">
+          示例：https://github.com - 这个URL现在不会在卡片上显示，但功能依然完整
+        </div>
+      </div>
+
+      <div class="website-cards">
+        <!-- 网站卡片1 -->
+        <div class="website-card">
+          <div class="card-header">
+            <div class="website-icon">🌐</div>
+            <div class="website-info">
+              <h3 class="website-name">GitHub</h3>
+            </div>
+            <div class="card-actions">
+              <button class="action-btn copy-btn" onclick="copyUrl('https://github.com')">
+                <span class="icon">📋</span>
+              </button>
+              <button class="action-btn edit-btn">✏️</button>
+              <button class="action-btn delete-btn">🗑️</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="website-description">
+              全球最大的代码托管平台，支持Git版本控制，提供代码审查、项目管理、CI/CD等开发工具。
+            </p>
+          </div>
+          <div class="card-footer">
+            <span class="created-time">2024-01-15</span>
+            <span class="category-badge">开发工具</span>
+          </div>
+        </div>
+
+        <!-- 网站卡片2 -->
+        <div class="website-card">
+          <div class="card-header">
+            <div class="website-icon">🎨</div>
+            <div class="website-info">
+              <h3 class="website-name">Dribbble</h3>
+            </div>
+            <div class="card-actions">
+              <button class="action-btn copy-btn" onclick="copyUrl('https://dribbble.com')">
+                <span class="icon">📋</span>
+              </button>
+              <button class="action-btn edit-btn">✏️</button>
+              <button class="action-btn delete-btn">🗑️</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="website-description">
+              设计师社区平台，展示创意作品，分享设计灵感，连接全球设计师。
+            </p>
+          </div>
+          <div class="card-footer">
+            <span class="created-time">2024-01-20</span>
+            <span class="category-badge">设计资源</span>
+          </div>
+        </div>
+
+        <!-- 网站卡片3 -->
+        <div class="website-card">
+          <div class="card-header">
+            <div class="website-icon">📚</div>
+            <div class="website-info">
+              <h3 class="website-name">Stack Overflow</h3>
+            </div>
+            <div class="card-actions">
+              <button class="action-btn copy-btn" onclick="copyUrl('https://stackoverflow.com')">
+                <span class="icon">📋</span>
+              </button>
+              <button class="action-btn edit-btn">✏️</button>
+              <button class="action-btn delete-btn">🗑️</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="website-description">
+              全球最大的程序员问答社区，解决编程问题，分享技术知识，提升开发技能。
+            </p>
+          </div>
+          <div class="card-footer">
+            <span class="created-time">2024-01-25</span>
+            <span class="category-badge">技术学习</span>
+          </div>
+        </div>
+
+        <!-- 网站卡片4 -->
+        <div class="website-card">
+          <div class="card-header">
+            <div class="website-icon">🚀</div>
+            <div class="website-info">
+              <h3 class="website-name">Product Hunt</h3>
+            </div>
+            <div class="card-actions">
+              <button class="action-btn copy-btn" onclick="copyUrl('https://producthunt.com')">
+                <span class="icon">📋</span>
+              </button>
+              <button class="action-btn edit-btn">✏️</button>
+              <button class="action-btn delete-btn">🗑️</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="website-description">
+              发现最新产品和创业项目的平台，了解行业趋势，获取产品灵感。
+            </p>
+          </div>
+          <div class="card-footer">
+            <span class="created-time">2024-02-01</span>
+            <span class="category-badge">产品发现</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // 复制URL功能
+      async function copyUrl(url) {
+        try {
+          // 使用现代浏览器的 Clipboard API
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(url)
+            alert('网站地址已复制到剪贴板：' + url)
+          } else {
+            // 降级方案：使用传统的 document.execCommand
+            const textArea = document.createElement('textarea')
+            textArea.value = url
+            textArea.style.position = 'fixed'
+            textArea.style.left = '-999999px'
+            textArea.style.top = '-999999px'
+            document.body.appendChild(textArea)
+            textArea.focus()
+            textArea.select()
+
+            try {
+              document.execCommand('copy')
+              alert('网站地址已复制到剪贴板：' + url)
+            } catch (err) {
+              alert('复制失败，请手动复制：' + url)
+            } finally {
+              document.body.removeChild(textArea)
+            }
+          }
+        } catch (error) {
+          console.error('复制失败:', error)
+          alert('复制失败，请手动复制：' + url)
+        }
+      }
+
+      // 添加卡片悬停效果
+      document.querySelectorAll('.website-card').forEach((card) => {
+        card.addEventListener('mouseenter', function () {
+          this.style.transform = 'translateY(-8px) scale(1.02)'
+        })
+
+        card.addEventListener('mouseleave', function () {
+          this.style.transform = 'translateY(0) scale(1)'
+        })
+      })
+
+      // 添加按钮点击效果
+      document.querySelectorAll('.action-btn').forEach((btn) => {
+        btn.addEventListener('click', function () {
+          this.style.transform = 'scale(0.95)'
+          setTimeout(() => {
+            this.style.transform = ''
+          }, 150)
+        })
+      })
+    </script>
+  </body>
+</html>

@@ -7,6 +7,7 @@ import PostCreate from '../views/PostCreate.vue'
 import PostEdit from '../views/PostEdit.vue'
 import Categories from '../views/Categories.vue'
 import AIChat from '../views/AIChat.vue'
+
 import WebsiteCollection from '../views/WebsiteCollection.vue'
 
 const router = createRouter({
@@ -54,6 +55,7 @@ const router = createRouter({
       name: 'AIChat',
       component: AIChat,
     },
+
     {
       path: '/websites',
       name: 'WebsiteCollection',

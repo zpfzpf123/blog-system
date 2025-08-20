@@ -1,27 +1,34 @@
 <template>
   <div class="navigation-menu">
     <div class="menu-toggle" @click="toggleMenu" v-if="isMobile">
-      <span>�?/span>
+      <span>☰</span>
     </div>
-    <nav :class="{ 'mobile-menu': isMobile, 'open': isMenuOpen }">
+    <nav :class="{ 'mobile-menu': isMobile, open: isMenuOpen }">
       <ul class="menu-root">
         <li class="menu-item">
           <router-link to="/" @click="closeMenu">首页</router-link>
         </li>
-        <li class="menu-item has-children" @mouseenter="showSubmenu('admin')" @mouseleave="hideSubmenu('admin')">
-          <a href="#" @click.prevent="toggleSubmenu('admin')">管理 <span class="arrow">�?/span></a>
+        <li
+          class="menu-item has-children"
+          @mouseenter="showSubmenu('admin')"
+          @mouseleave="hideSubmenu"
+        >
+          <a href="#" @click.prevent="toggleSubmenu('admin')">管理 <span class="arrow">▼</span></a>
           <ul class="submenu" v-show="activeMenu === 'admin' || !isMobile">
             <li class="submenu-item">
               <router-link to="/admin/posts" @click="closeMenu">文章管理</router-link>
             </li>
             <li class="submenu-item">
-              <router-link to="/admin/api/posts/create?from=admin" @click="closeMenu">新建文章</router-link>
+              <router-link to="/admin/api/posts/create?from=admin" @click="closeMenu"
+                >新建文章</router-link
+              >
             </li>
           </ul>
         </li>
         <li class="menu-item">
           <router-link to="/websites" @click="closeMenu">网站合集</router-link>
         </li>
+
         <li class="menu-item">
           <router-link to="/ai-chat" @click="closeMenu">AI问答</router-link>
         </li>

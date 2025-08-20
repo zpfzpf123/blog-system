@@ -52,6 +52,16 @@
               <span class="message-time">{{ formatTime(message.timestamp) }}</span>
             </div>
             <div class="message-text" v-html="formatMessage(message.content)"></div>
+            <div v-if="message.role === 'assistant'" class="message-actions">
+              <button 
+                @click="copyMessage(message.content, message.timestamp.getTime())" 
+                class="copy-btn"
+                :title="copyStatus[message.timestamp.getTime()] || '复制回答'"
+              >
+                <span class="copy-icon">📋</span>
+                <span class="copy-text">{{ copyStatus[message.timestamp.getTime()] || '复制' }}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -146,6 +156,7 @@ const userInput = ref('')
 const isLoading = ref(false)
 const messagesContainer = ref<HTMLElement>()
 const inputTextarea = ref<HTMLTextAreaElement>()
+const copyStatus = ref<Record<number, string>>({})
 
 // 获取可用模型列表
 const fetchModels = async () => {
@@ -304,6 +315,51 @@ const exportChat = () => {
   a.click()
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
+}
+
+// 复制消息内容
+const copyMessage = async (content: string, messageTimestamp: number) => {
+  try {
+    // 移除HTML标签，获取纯文本内容
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = content
+    const plainText = tempDiv.textContent || tempDiv.innerText || ''
+    
+    // 使用现代Clipboard API
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(plainText)
+    } else {
+      // 降级方案：使用传统的复制方法
+      const textArea = document.createElement('textarea')
+      textArea.value = plainText
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-999999px'
+      textArea.style.top = '-999999px'
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+    }
+    
+    // 显示复制成功状态
+    copyStatus.value[messageTimestamp] = '已复制!'
+    
+    // 3秒后恢复原始状态
+    setTimeout(() => {
+      copyStatus.value[messageTimestamp] = ''
+    }, 3000)
+    
+  } catch (error) {
+    console.error('复制失败:', error)
+    // 显示复制失败状态
+    copyStatus.value[messageTimestamp] = '复制失败'
+    
+    // 3秒后恢复原始状态
+    setTimeout(() => {
+      copyStatus.value[messageTimestamp] = ''
+    }, 3000)
+  }
 }
 
 // 监听消息变化，自动滚动
@@ -728,6 +784,52 @@ onMounted(() => {
   border-radius: 6px;
   overflow-x: auto;
   margin: 10px 0;
+}
+
+/* 消息操作按钮样式 */
+.message-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  color: #6c757d;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 80px;
+  justify-content: center;
+}
+
+.copy-btn:hover {
+  background: #e9ecef;
+  border-color: #dee2e6;
+  color: #495057;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.copy-btn:active {
+  transform: translateY(0);
+}
+
+.copy-icon {
+  font-size: 0.9rem;
+}
+
+.copy-text {
+  font-size: 0.8rem;
 }
 
 .message-time {

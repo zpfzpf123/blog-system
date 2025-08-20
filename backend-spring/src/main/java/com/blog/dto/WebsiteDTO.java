@@ -42,7 +42,7 @@ public class WebsiteDTO {
     private String icon;
     private String favicon;
     private String screenshot;
-    private Long visitCount;
+
     private Boolean isFavorite;
     private Boolean isActive;
     private String status;
@@ -71,7 +71,7 @@ public class WebsiteDTO {
         this.icon = website.getIcon();
         this.favicon = website.getFavicon();
         this.screenshot = website.getScreenshot();
-        this.visitCount = website.getVisitCount();
+
         this.isFavorite = website.getIsFavorite();
         this.isActive = website.getIsActive();
         this.status = website.getStatus() != null ? website.getStatus().getValue() : null;
@@ -211,13 +211,7 @@ public class WebsiteDTO {
         this.screenshot = screenshot;
     }
     
-    public Long getVisitCount() {
-        return visitCount;
-    }
-    
-    public void setVisitCount(Long visitCount) {
-        this.visitCount = visitCount;
-    }
+
     
     public Boolean getIsFavorite() {
         return isFavorite;
@@ -279,7 +273,7 @@ public class WebsiteDTO {
                 ", categoryId=" + categoryId +
                 ", categoryName='" + categoryName + '\'' +
                 ", icon='" + icon + '\'' +
-                ", visitCount=" + visitCount +
+
                 ", isFavorite=" + isFavorite +
 
                 '}';

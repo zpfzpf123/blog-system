@@ -13,7 +13,7 @@ export interface Website {
   icon?: string
   createdAt: string
   updatedAt: string
-  visitCount: number
+
   isFavorite: boolean
   isActive: boolean
 }
@@ -93,7 +93,7 @@ export interface WebsiteStatistics {
   totalWebsites: number
   totalCategories: number
   totalTags: number
-  totalVisits: number
+
   favoriteWebsites: number
   activeWebsites: number
 }
@@ -140,6 +140,11 @@ export const websiteApi = {
     console.log('完整请求参数:', params)
 
     return axios.get(url).then((res: AxiosResponse) => res.data)
+  },
+
+  // 获取所有网站（用于状态监控）
+  getAllWebsites: (): Promise<Website[]> => {
+    return axios.get('/api/websites/all').then((res: AxiosResponse) => res.data)
   },
 
   // 根据ID获取网站
@@ -229,11 +234,6 @@ export const websiteApi = {
   // 获取最新网站
   getRecentWebsites: (limit: number = 10): Promise<Website[]> => {
     return axios.get(`/api/websites/recent?limit=${limit}`).then((res: AxiosResponse) => res.data)
-  },
-
-  // 增加访问次数
-  incrementVisitCount: (id: number): Promise<void> => {
-    return axios.post(`/api/websites/${id}/visit`).then(() => {})
   },
 
   // 切换收藏状态

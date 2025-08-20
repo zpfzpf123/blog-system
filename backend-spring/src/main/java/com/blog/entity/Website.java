@@ -101,8 +101,7 @@ public class Website {
     @Column(name = "screenshot")
     private String screenshot;
     
-    @Column(name = "visit_count")
-    private Long visitCount;
+
     
     @Column(name = "is_favorite")
     private Boolean isFavorite;
@@ -168,7 +167,7 @@ public class Website {
     
     // 构造函数
     public Website() {
-        this.visitCount = 0L;
+
         this.isFavorite = false;
         this.isActive = true;
         this.status = WebsiteStatus.ACTIVE;
@@ -263,13 +262,7 @@ public class Website {
         this.screenshot = screenshot;
     }
     
-    public Long getVisitCount() {
-        return visitCount;
-    }
-    
-    public void setVisitCount(Long visitCount) {
-        this.visitCount = visitCount;
-    }
+
     
     public Boolean getIsFavorite() {
         return isFavorite;
@@ -338,10 +331,6 @@ public class Website {
 
     
     // 业务方法
-    public void incrementVisitCount() {
-        this.visitCount = (this.visitCount == null) ? 1L : this.visitCount + 1;
-        this.updatedAt = LocalDateTime.now();
-    }
     
     public void toggleFavorite() {
         this.isFavorite = !this.isFavorite;
@@ -362,7 +351,7 @@ public class Website {
                 ", description='" + description + '\'' +
                 ", category=" + (getCategory() != null ? getCategory().getName() : "null") +
                 ", icon='" + icon + '\'' +
-                ", visitCount=" + visitCount +
+
                 ", isFavorite=" + isFavorite +
                 ", isActive=" + isActive +
                 ", status=" + status +

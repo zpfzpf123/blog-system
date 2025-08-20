@@ -217,6 +217,14 @@ public class WebsiteServiceImpl implements WebsiteService {
     }
     
     @Override
+    public List<WebsiteDTO> findAllWebsites() {
+        List<Website> websites = websiteRepository.findAllActiveWithCategories();
+        return websites.stream()
+                .map(WebsiteDTO::new)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
     public WebsitesResponseDTO findWebsites(WebsiteQueryRequest request) {
         // 执行查询（使用优化版本，返回List而不是Page）
         List<Website> websites;
@@ -339,7 +347,8 @@ public class WebsiteServiceImpl implements WebsiteService {
     
     @Override
     public List<WebsiteDTO> getPopularWebsites(int limit) {
-        List<Website> websites = websiteRepository.findTopWebsitesByVisitCountWithCategories();
+        // 由于移除了visit_count，改为返回最新创建的网站
+        List<Website> websites = websiteRepository.findRecentWebsitesWithCategories();
         
         // 限制返回数量
         if (websites.size() > limit) {
@@ -365,10 +374,7 @@ public class WebsiteServiceImpl implements WebsiteService {
                 .collect(Collectors.toList());
     }
     
-    @Override
-    public void incrementVisitCount(Long id) {
-        websiteRepository.incrementVisitCount(id);
-    }
+
     
     @Override
     public void toggleFavorite(Long id) {
@@ -402,15 +408,13 @@ public class WebsiteServiceImpl implements WebsiteService {
         Long totalWebsites = websiteRepository.countActiveWebsites();
         Long totalCategories = categoryRepository.countByIsActiveTrue();
 
-        Long totalVisits = websiteRepository.findAll().stream()
-                .mapToLong(w -> w.getVisitCount() != null ? w.getVisitCount() : 0)
-                .sum();
+
         Long favoriteWebsites = websiteRepository.countFavoriteWebsites();
         Long activeWebsites = websiteRepository.countActiveWebsites();
         
         return new WebsiteService.WebsiteStatistics(
             totalWebsites, totalCategories, 
-            totalVisits, favoriteWebsites, activeWebsites
+            favoriteWebsites, activeWebsites
         );
     }
     
@@ -457,8 +461,7 @@ public class WebsiteServiceImpl implements WebsiteService {
                 return Sort.by(direction, "name");
             case "url":
                 return Sort.by(direction, "url");
-            case "visitCount":
-                return Sort.by(direction, "visitCount");
+
             case "updatedAt":
                 return Sort.by(direction, "updatedAt");
             case "createdAt":
@@ -487,9 +490,7 @@ public class WebsiteServiceImpl implements WebsiteService {
                 case "url":
                     result = compareStrings(w1.getUrl(), w2.getUrl());
                     break;
-                case "visitCount":
-                    result = compareLongs(w1.getVisitCount(), w2.getVisitCount());
-                    break;
+
                 case "updatedAt":
                     result = compareDates(w1.getUpdatedAt(), w2.getUpdatedAt());
                     break;

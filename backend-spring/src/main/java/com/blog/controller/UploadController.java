@@ -26,7 +26,7 @@ import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/api/uploads")
-@CrossOrigin(originPatterns = "http://localhost:*")
+@CrossOrigin(originPatterns = {"http://localhost:*", "https://localhost:*", "http://127.0.0.1:*", "https://127.0.0.1:*"})
 public class UploadController {
 
     @Value("${file.upload-dir:uploads}")

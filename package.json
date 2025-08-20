@@ -1,6 +1,10 @@
 {
-  "name": "blog",
-  "version": "0.0.0",
+  "name": "ai-blog-system",
+  "version": "1.0.0",
+  "description": "AI智能博客系统 - 基于Vue3和Spring Boot的全栈博客应用，集成AI写作、智能推荐等功能",
+  "keywords": ["blog", "vue3", "spring-boot", "ai", "markdown", "recommendation"],
+  "author": "AI Blog Team",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "engines": {

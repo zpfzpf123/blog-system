@@ -26,7 +26,7 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/websites")
-@CrossOrigin(originPatterns = "http://localhost:*")
+@CrossOrigin(originPatterns = {"http://localhost:*", "https://localhost:*", "http://127.0.0.1:*", "https://127.0.0.1:*"})
 public class WebsiteController {
     
     @Autowired
@@ -245,6 +245,21 @@ public class WebsiteController {
     }
     
     /**
+     * 获取所有网站（用于状态监控）
+     * GET /api/websites/all
+     */
+    @GetMapping("/all")
+    public ResponseEntity<List<WebsiteDTO>> getAllWebsites() {
+        try {
+            List<WebsiteDTO> websites = websiteService.findAllWebsites();
+            return ResponseEntity.ok(websites);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().build();
+        }
+    }
+    
+    /**
      * 根据收藏状态获取网站列表
      * GET /api/websites/favorite?isFavorite={isFavorite}
      */
@@ -302,19 +317,7 @@ public class WebsiteController {
         }
     }
     
-    /**
-     * 增加网站访问次数
-     * POST /api/websites/{id}/visit
-     */
-    @PostMapping("/{id}/visit")
-    public ResponseEntity<Void> incrementVisitCount(@PathVariable Long id) {
-        try {
-            websiteService.incrementVisitCount(id);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
+
     
     /**
      * 切换网站收藏状态

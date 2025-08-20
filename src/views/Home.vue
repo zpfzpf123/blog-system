@@ -196,6 +196,8 @@ const handleSearchPanelKeydown = (e: KeyboardEvent) => {
           selectedResultIndex.value <= 0
             ? searchResults.value.length - 1
             : selectedResultIndex.value - 1
+        // 滚动到选中的结果项
+        scrollToSelectedResult()
       }
       break
     case 'ArrowDown':
@@ -205,6 +207,8 @@ const handleSearchPanelKeydown = (e: KeyboardEvent) => {
           selectedResultIndex.value >= searchResults.value.length - 1
             ? 0
             : selectedResultIndex.value + 1
+        // 滚动到选中的结果项
+        scrollToSelectedResult()
       }
       break
     case 'Enter':
@@ -224,6 +228,29 @@ const handleSearchPanelKeydown = (e: KeyboardEvent) => {
       closeGlobalSearch()
       break
   }
+}
+
+// 滚动到选中的搜索结果项
+const scrollToSelectedResult = () => {
+  nextTick(() => {
+    const selectedElement = document.querySelector('.result-item.is-selected') as HTMLElement
+    const resultList = document.querySelector('.result-list') as HTMLElement
+    
+    if (selectedElement && resultList) {
+      // 计算选中元素相对于列表容器的位置
+      const containerRect = resultList.getBoundingClientRect()
+      const elementRect = selectedElement.getBoundingClientRect()
+      
+      // 如果选中元素不在可视区域内，进行滚动
+      if (elementRect.top < containerRect.top || elementRect.bottom > containerRect.bottom) {
+        selectedElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'nearest'
+        })
+      }
+    }
+  })
 }
 
 // 监听搜索结果变化，重置选中索引
@@ -2235,6 +2262,28 @@ const handleSearchResultClick = (item: SearchResultItem) => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(102, 126, 234, 0.3) transparent;
+}
+
+.result-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.result-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.result-list::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.3);
+  border-radius: 3px;
+}
+
+.result-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.5);
 }
 .result-item {
   padding: 12px 14px;
@@ -2257,6 +2306,31 @@ const handleSearchResultClick = (item: SearchResultItem) => {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
   border-color: #667eea;
+  position: relative;
+  z-index: 1;
+}
+
+.result-item.is-selected::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  border-radius: 2px;
+  animation: selectedPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes selectedPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scaleY(1.1);
+  }
 }
 
 .result-item.is-selected .result-title {

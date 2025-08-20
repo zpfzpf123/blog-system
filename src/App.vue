@@ -1,3 +1,19 @@
+<!--
+ * @Author: 18582297328 zpfzpf123@example.com
+ * @Date: 2025-08-04 12:55:14
+ * @LastEditors: 18582297328 zpfzpf123@example.com
+ * @LastEditTime: 2025-08-18 16:42:11
+ * @FilePath: \blog\src\App.vue
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+-->
+<!--
+ * @Author: 18582297328 zpfzpf123@example.com
+ * @Date: 2025-08-04 12:55:14
+ * @LastEditors: 18582297328 zpfzpf123@example.com
+ * @LastEditTime: 2025-08-17 01:51:31
+ * @FilePath: \blog\src\App.vue
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+-->
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
 import { HomeFilled, Setting, ChatDotRound, Link, ArrowUpBold } from '@element-plus/icons-vue'
@@ -81,13 +97,7 @@ onUnmounted(() => {
       >
         <!-- 进度环 -->
         <svg class="progress-ring" viewBox="0 0 120 120">
-          <circle
-            class="progress-ring-bg"
-            cx="60"
-            cy="60"
-            r="54"
-            stroke-width="4"
-          />
+          <circle class="progress-ring-bg" cx="60" cy="60" r="54" stroke-width="4" />
           <circle
             class="progress-ring-fill"
             cx="60"
@@ -151,9 +161,9 @@ header::after {
 .main-nav {
   display: flex;
   gap: 2.2rem;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.95);
   border-radius: 16px;
-  box-shadow: 0 2px 12px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.15);
   padding: 0.3rem 1.2rem;
   align-items: center;
   margin: 0 auto;
@@ -161,13 +171,15 @@ header::after {
   transition:
     box-shadow 0.3s,
     background 0.3s;
+  border: 1px solid rgba(102, 126, 234, 0.1);
 }
 .main-nav:hover {
-  box-shadow: 0 6px 24px rgba(102, 126, 234, 0.18);
-  background: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 32px rgba(102, 126, 234, 0.25);
+  background: rgba(255, 255, 255, 1);
+  border-color: rgba(102, 126, 234, 0.2);
 }
 .main-nav a {
-  color: #222;
+  color: #4a5568;
   text-decoration: none;
   font-weight: 600;
   font-size: 1.08rem;
@@ -184,42 +196,99 @@ header::after {
   overflow: hidden;
 }
 .main-nav a.router-link-exact-active {
-  background: linear-gradient(90deg, #42e695 0%, #3bb2b8 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
-  box-shadow: 0 2px 12px rgba(66, 230, 149, 0.12);
-  transform: scale(1.08);
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+  transform: scale(1.05);
 }
 .main-nav a:hover {
-  background: linear-gradient(90deg, #43cea2 0%, #185a9d 100%);
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   color: #fff;
-  transform: scale(1.07) translateY(-2px);
-  box-shadow: 0 4px 16px rgba(66, 230, 149, 0.18);
+  transform: scale(1.03) translateY(-1px);
+  box-shadow: 0 6px 24px rgba(240, 147, 251, 0.25);
 }
 .nav-icon {
   font-size: 1.3em;
   margin-right: 2px;
-  color: #fff;
+  color: #667eea;
   transition:
     color 0.3s,
-    transform 0.3s;
+    transform 0.3s,
+    filter 0.3s;
+  filter: drop-shadow(0 2px 4px rgba(102, 126, 234, 0.3));
+}
+
+/* 为不同图标设置协调的个性化颜色 */
+.main-nav a:nth-child(1) .nav-icon {
+  color: #667eea;
+  filter: drop-shadow(0 2px 4px rgba(102, 126, 234, 0.4));
+}
+
+.main-nav a:nth-child(2) .nav-icon {
+  color: #8b5cf6;
+  filter: drop-shadow(0 2px 4px rgba(139, 92, 246, 0.4));
+}
+
+.main-nav a:nth-child(3) .nav-icon {
+  color: #06b6d4;
+  filter: drop-shadow(0 2px 4px rgba(6, 182, 212, 0.4));
+}
+
+.main-nav a:nth-child(4) .nav-icon {
+  color: #10b981;
+  filter: drop-shadow(0 2px 4px rgba(16, 185, 129, 0.4));
 }
 .animated-nav-icon {
-  animation: iconPulse 2.2s infinite;
+  animation: iconPulse 3s infinite ease-in-out;
 }
+
 @keyframes iconPulse {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 0 #42a5f5);
-    transform: scale(1);
+  0% {
+    filter: drop-shadow(0 2px 4px rgba(102, 126, 234, 0.2));
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    filter: drop-shadow(0 3px 8px rgba(102, 126, 234, 0.3));
+    transform: scale(1.05) rotate(-2deg);
   }
   50% {
-    filter: drop-shadow(0 0 8px #42a5f5);
-    transform: scale(1.18) rotate(-8deg);
+    filter: drop-shadow(0 4px 12px rgba(102, 126, 234, 0.5));
+    transform: scale(1.1) rotate(-3deg);
+  }
+  75% {
+    filter: drop-shadow(0 3px 8px rgba(102, 126, 234, 0.3));
+    transform: scale(1.05) rotate(-2deg);
+  }
+  100% {
+    filter: drop-shadow(0 2px 4px rgba(102, 126, 234, 0.2));
+    transform: scale(1) rotate(0deg);
   }
 }
 .main-nav a:hover .nav-icon {
-  color: #ffd700;
-  transform: scale(1.18) rotate(-8deg);
+  color: #fff;
+  transform: scale(1.15) rotate(-5deg);
+  filter: drop-shadow(0 4px 12px rgba(255, 255, 255, 0.8));
+}
+
+/* 为不同图标添加悬停时的个性化效果 */
+.main-nav a:nth-child(1):hover .nav-icon {
+  filter: drop-shadow(0 4px 12px rgba(102, 126, 234, 0.8));
+}
+
+.main-nav a:nth-child(2):hover .nav-icon {
+  filter: drop-shadow(0 4px 12px rgba(139, 92, 246, 0.8));
+}
+
+.main-nav a:nth-child(3):hover .nav-icon {
+  filter: drop-shadow(0 4px 12px rgba(6, 182, 212, 0.8));
+}
+
+.main-nav a:nth-child(4):hover .nav-icon {
+  filter: drop-shadow(0 4px 12px rgba(16, 185, 129, 0.8));
+}
+.main-nav a.router-link-exact-active .nav-icon {
+  color: #fff;
+  filter: drop-shadow(0 2px 8px rgba(255, 255, 255, 0.6));
 }
 main {
   flex: 1;

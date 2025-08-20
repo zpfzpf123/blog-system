@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS websites (
     icon VARCHAR(500) COMMENT '网站图标URL',
     favicon VARCHAR(500) COMMENT '网站favicon URL',
     screenshot VARCHAR(500) COMMENT '网站截图URL',
-    visit_count BIGINT DEFAULT 0 COMMENT '访问次数',
+
     is_favorite BOOLEAN DEFAULT FALSE COMMENT '是否收藏',
     is_active BOOLEAN DEFAULT TRUE COMMENT '是否启用',
     status ENUM('active', 'inactive', 'broken') DEFAULT 'active' COMMENT '网站状态',
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS websites (
     INDEX idx_website_favorite (is_favorite),
     INDEX idx_website_active (is_active),
     INDEX idx_website_status (status),
-    INDEX idx_website_visit_count (visit_count),
+
     INDEX idx_website_created (created_at),
     INDEX idx_website_updated (updated_at),
     
@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS website_statistics (
     total_websites BIGINT DEFAULT 0 COMMENT '总网站数',
     total_categories BIGINT DEFAULT 0 COMMENT '总分类数',
 
-    total_visits BIGINT DEFAULT 0 COMMENT '总访问数',
+
     new_websites BIGINT DEFAULT 0 COMMENT '新增网站数',
     active_categories BIGINT DEFAULT 0 COMMENT '活跃分类数',
 
@@ -144,15 +144,15 @@ INSERT INTO website_categories (name, description, color, sort_order) VALUES
 
 
 -- 插入示例网站数据
-INSERT INTO websites (name, url, description, category_id, icon, visit_count, is_favorite) VALUES
-('GitHub', 'https://github.com', '全球最大的代码托管平台，支持Git版本控制', 1, 'https://github.githubassets.com/favicons/favicon.svg', 156, TRUE),
-('Stack Overflow', 'https://stackoverflow.com', '程序员问答社区，解决各种编程问题', 1, 'https://cdn.sstatic.net/Sites/stackoverflow/Img/favicon.ico', 89, TRUE),
-('MDN Web Docs', 'https://developer.mozilla.org', 'Web技术权威文档，学习前端开发必备', 3, 'https://developer.mozilla.org/favicon-48x48.cbbd161b.png', 234, TRUE),
-('知乎', 'https://zhihu.com', '中文互联网最大的问答社区', 5, 'https://static.zhihu.com/heifetz/favicon.ico', 67, FALSE),
-('B站', 'https://bilibili.com', '年轻人喜爱的视频网站，学习娱乐两不误', 2, 'https://www.bilibili.com/favicon.ico', 189, TRUE),
-('掘金', 'https://juejin.cn', '优质的技术社区，分享技术文章', 3, 'https://lf3-cdn-tos.bytescm.com/obj/static/xitu_juejin_web/6c61ae65d1c41ae8221a670fa32d05aa.svg', 123, TRUE),
-('Dribbble', 'https://dribbble.com', '设计师分享作品和灵感的平台', 4, 'https://cdn.dribbble.com/assets/favicon-63b2904a073c89b52b19aa08cebc95a155cde7d02fb76c2c6e54e163ae0c5aa4.ico', 78, FALSE),
-('Unsplash', 'https://unsplash.com', '高质量免费图片素材网站', 4, 'https://images.unsplash.com/favicon-32x32.png', 145, TRUE);
+INSERT INTO websites (name, url, description, category_id, icon, is_favorite) VALUES
+('GitHub', 'https://github.com', '全球最大的代码托管平台，支持Git版本控制', 1, 'https://github.githubassets.com/favicons/favicon.svg', TRUE),
+('Stack Overflow', 'https://stackoverflow.com', '程序员问答社区，解决各种编程问题', 1, 'https://cdn.sstatic.net/Sites/stackoverflow/Img/favicon.ico', TRUE),
+('MDN Web Docs', 'https://developer.mozilla.org', 'Web技术权威文档，学习前端开发必备', 3, 'https://developer.mozilla.org/favicon-48x48.cbbd161b.png', TRUE),
+('知乎', 'https://zhihu.com', '中文互联网最大的问答社区', 5, 'https://static.zhihu.com/heifetz/favicon.ico', FALSE),
+('B站', 'https://bilibili.com', '年轻人喜爱的视频网站，学习娱乐两不误', 2, 'https://www.bilibili.com/favicon.ico', TRUE),
+('掘金', 'https://juejin.cn', '优质的技术社区，分享技术文章', 3, 'https://lf3-cdn-tos.bytescm.com/obj/static/xitu_juejin_web/6c61ae65d1c41ae8221a670fa32d05aa.svg', TRUE),
+('Dribbble', 'https://dribbble.com', '设计师分享作品和灵感的平台', 4, 'https://cdn.dribbble.com/assets/favicon-63b2904a073c89b52b19aa08cebc95a155cde7d02fb76c2c6e54e163ae0c5aa4.ico', FALSE),
+('Unsplash', 'https://unsplash.com', '高质量免费图片素材网站', 4, 'https://images.unsplash.com/favicon-32x32.png', TRUE);
 
 
 
@@ -167,7 +167,7 @@ SELECT
     w.icon,
     w.favicon,
     w.screenshot,
-    w.visit_count,
+
     w.is_favorite,
     w.is_active,
     w.status,
@@ -191,7 +191,7 @@ SELECT
 
     wc.sort_order,
     COUNT(w.id) as website_count,
-    SUM(w.visit_count) as total_visits,
+
     MAX(w.updated_at) as last_updated
 FROM website_categories wc
 LEFT JOIN websites w ON wc.id = w.category_id AND w.is_active = TRUE
@@ -201,19 +201,7 @@ ORDER BY wc.sort_order, wc.name;
 
 
 
--- 创建存储过程：更新网站访问次数
-DELIMITER //
-CREATE PROCEDURE UpdateWebsiteVisitCount(IN website_id_param BIGINT)
-BEGIN
-    UPDATE websites 
-    SET visit_count = visit_count + 1,
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = website_id_param;
-    
-    INSERT INTO website_visits (website_id, visitor_ip, user_agent, referer)
-    VALUES (website_id_param, @visitor_ip, @user_agent, @referer);
-END //
-DELIMITER ;
+
 
 -- 创建存储过程：清理无效网站
 DELIMITER //
@@ -233,7 +221,7 @@ DELIMITER ;
 -- 创建索引优化查询性能
 CREATE INDEX idx_websites_category_status ON websites(category_id, is_active, status);
 CREATE INDEX idx_websites_favorite_active ON websites(is_favorite, is_active);
-CREATE INDEX idx_websites_visit_created ON websites(visit_count DESC, created_at DESC);
+
 
 CREATE INDEX idx_visits_website_time ON website_visits(website_id, visit_time DESC);
 

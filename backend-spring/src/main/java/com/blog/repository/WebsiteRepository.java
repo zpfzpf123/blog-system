@@ -122,11 +122,7 @@ public interface WebsiteRepository extends JpaRepository<Website, Long> {
                                         @Param("endTime") LocalDateTime endTime, 
                                         Pageable pageable);
     
-    /**
-     * 查找访问次数最多的网站
-     */
-    @Query("SELECT w FROM Website w WHERE w.isActive = true ORDER BY w.visitCount DESC")
-    List<Website> findTopWebsitesByVisitCount(Pageable pageable);
+
     
     /**
      * 查找最近创建的网站
@@ -171,11 +167,7 @@ public interface WebsiteRepository extends JpaRepository<Website, Long> {
            "(w.lastCheckTime IS NULL OR w.lastCheckTime < :checkTime)")
     List<Website> findWebsitesNeedingStatusCheck(@Param("checkTime") LocalDateTime checkTime);
     
-    /**
-     * 更新网站访问次数
-     */
-    @Query("UPDATE Website w SET w.visitCount = w.visitCount + 1, w.updatedAt = CURRENT_TIMESTAMP WHERE w.id = :id")
-    void incrementVisitCount(@Param("id") Long id);
+
     
     /**
      * 切换网站收藏状态
@@ -301,14 +293,7 @@ public interface WebsiteRepository extends JpaRepository<Website, Long> {
     List<Website> findByCreatedAtBetweenWithCategories(@Param("startTime") LocalDateTime startTime, 
                                                       @Param("endTime") LocalDateTime endTime);
     
-    /**
-     * 查找访问次数最多的网站 - 优化版本，预加载分类关系
-     */
-    @Query("SELECT DISTINCT w FROM Website w " +
-           "LEFT JOIN FETCH w.categoryRelations cr " +
-           "LEFT JOIN FETCH cr.category " +
-           "WHERE w.isActive = true ORDER BY w.visitCount DESC")
-    List<Website> findTopWebsitesByVisitCountWithCategories();
+
     
     /**
      * 查找最近创建的网站 - 优化版本，预加载分类关系

@@ -54,6 +54,11 @@ public interface WebsiteService {
     WebsitesResponseDTO findWebsites(WebsiteQueryRequest request);
     
     /**
+     * 获取所有网站（用于状态监控）
+     */
+    List<WebsiteDTO> findAllWebsites();
+    
+    /**
      * 根据分类ID查找网站列表
      */
     List<WebsiteDTO> findWebsitesByCategory(Long categoryId);
@@ -80,10 +85,7 @@ public interface WebsiteService {
      */
     List<WebsiteDTO> getRecentWebsites(int limit);
     
-    /**
-     * 增加网站访问次数
-     */
-    void incrementVisitCount(Long id);
+
     
     /**
      * 切换网站收藏状态
@@ -127,7 +129,7 @@ public interface WebsiteService {
         private Long totalWebsites;
         private Long totalCategories;
 
-        private Long totalVisits;
+
         private Long favoriteWebsites;
         private Long activeWebsites;
         
@@ -135,10 +137,9 @@ public interface WebsiteService {
         public WebsiteStatistics() {}
         
         public WebsiteStatistics(Long totalWebsites, Long totalCategories, 
-                               Long totalVisits, Long favoriteWebsites, Long activeWebsites) {
+                               Long favoriteWebsites, Long activeWebsites) {
             this.totalWebsites = totalWebsites;
             this.totalCategories = totalCategories;
-            this.totalVisits = totalVisits;
             this.favoriteWebsites = favoriteWebsites;
             this.activeWebsites = activeWebsites;
         }
@@ -152,8 +153,7 @@ public interface WebsiteService {
         
 
         
-        public Long getTotalVisits() { return totalVisits; }
-        public void setTotalVisits(Long totalVisits) { this.totalVisits = totalVisits; }
+
         
         public Long getFavoriteWebsites() { return favoriteWebsites; }
         public void setFavoriteWebsites(Long favoriteWebsites) { this.favoriteWebsites = favoriteWebsites; }

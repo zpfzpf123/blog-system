@@ -77,17 +77,6 @@
             </div>
           </div>
         </el-card>
-
-        <div class="recommendations-section">
-          <PostRecommendations
-            v-if="blogPost"
-            :post-id="blogPost.id"
-            :tags="blogPost.tags || []"
-            :category="blogPost.category || { id: 0, name: '未分类' }"
-            :title="blogPost.title"
-            :content="blogPost.content || ''"
-          />
-        </div>
       </div>
 
       <div class="sidebar">
@@ -164,7 +153,6 @@ import {
 } from '@element-plus/icons-vue'
 import axios from '@/utils/axios'
 import Breadcrumb from '@/components/Breadcrumb.vue'
-import PostRecommendations from '@/components/PostRecommendations.vue'
 import MarkdownIt from 'markdown-it'
 import anchor from 'markdown-it-anchor'
 import toc from 'markdown-it-table-of-contents'
@@ -1409,9 +1397,6 @@ watch(
 }
 
 /* 推荐内容 */
-.recommendations-section {
-  margin-top: 20px;
-}
 
 /* 目录容器 */
 .toc-container {

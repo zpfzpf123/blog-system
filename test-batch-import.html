@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>批量导入功能测试</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .test-section {
+        background: white;
+        padding: 20px;
+        margin: 20px 0;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .test-title {
+        color: #333;
+        border-bottom: 2px solid #007bff;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+      }
+      .test-button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 10px 5px;
+      }
+      .test-button:hover {
+        background: #0056b3;
+      }
+      .result {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 15px;
+        margin: 15px 0;
+        white-space: pre-wrap;
+        font-family: monospace;
+      }
+      .error {
+        background: #f8d7da;
+        border-color: #f5c6cb;
+        color: #721c24;
+      }
+      .success {
+        background: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+      }
+      .sample-data {
+        background: #e9ecef;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        padding: 10px;
+        margin: 10px 0;
+        font-family: monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>批量导入功能测试</h1>
+
+    <div class="test-section">
+      <h2 class="test-title">1. 浏览器书签HTML解析测试</h2>
+      <p>测试从浏览器导出的书签HTML文件中解析网站信息</p>
+
+      <div class="sample-data">
+        <strong>示例书签HTML内容：</strong>
+        <pre>
+&lt;!DOCTYPE NETSCAPE-Bookmark-file-1&gt;
+&lt;!-- This is an automatically generated file. --&gt;
+&lt;!-- It will be read and overwritten. --&gt;
+&lt;META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8"&gt;
+&lt;TITLE&gt;Bookmarks&lt;/TITLE&gt;
+&lt;H1&gt;Bookmarks&lt;/H1&gt;
+&lt;DL&gt;&lt;p&gt;
+    &lt;DT&gt;&lt;A HREF="https://github.com" TITLE="GitHub: Let's build from here"&gt;GitHub&lt;/A&gt;
+    &lt;DT&gt;&lt;A HREF="https://stackoverflow.com" TITLE="Stack Overflow - Where Developers Learn, Share, &amp; Build Careers"&gt;Stack Overflow&lt;/A&gt;
+    &lt;DT&gt;&lt;A HREF="https://www.google.com" TITLE="Google"&gt;Google&lt;/A&gt;
+&lt;/DL&gt;&lt;p&gt;</pre
+        >
+      </div>
+
+      <button class="test-button" onclick="testBookmarkParsing()">测试书签解析</button>
+      <div id="bookmark-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2 class="test-title">2. JSON文件解析测试</h2>
+      <p>测试从JSON文件中解析网站信息</p>
+
+      <div class="sample-data">
+        <strong>示例JSON内容：</strong>
+        <pre>
+[
+  {
+    "name": "GitHub",
+    "url": "https://github.com",
+    "description": "代码托管平台",
+    "categoryIds": [1, 2]
+  },
+  {
+    "name": "Stack Overflow",
+    "url": "https://stackoverflow.com",
+    "description": "程序员问答社区",
+    "categoryIds": [1]
+  }
+]</pre
+        >
+      </div>
+
+      <button class="test-button" onclick="testJsonParsing()">测试JSON解析</button>
+      <div id="json-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2 class="test-title">3. CSV文件解析测试</h2>
+      <p>测试从CSV文件中解析网站信息</p>
+
+      <div class="sample-data">
+        <strong>示例CSV内容：</strong>
+        <pre>
+name,url,description,categoryIds
+GitHub,https://github.com,代码托管平台,1,2
+Stack Overflow,https://stackoverflow.com,程序员问答社区,1
+Google,https://www.google.com,搜索引擎,</pre
+        >
+      </div>
+
+      <button class="test-button" onclick="testCsvParsing()">测试CSV解析</button>
+      <div id="csv-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2 class="test-title">4. 手动输入解析测试</h2>
+      <p>测试手动输入的网站信息解析</p>
+
+      <div class="sample-data">
+        <strong>示例输入格式：</strong>
+        <pre>
+GitHub | https://github.com | 代码托管平台 | 开发工具
+Stack Overflow | https://stackoverflow.com | 程序员问答社区 | 学习资源
+Google | https://www.google.com | 搜索引擎</pre
+        >
+      </div>
+
+      <button class="test-button" onclick="testManualParsing()">测试手动输入解析</button>
+      <div id="manual-result" class="result"></div>
+    </div>
+
+    <script>
+      // 模拟批量导入功能中的解析方法
+      function parseBookmarkFile(htmlContent) {
+        try {
+          const parser = new DOMParser()
+          const doc = parser.parseFromString(htmlContent, 'text/html')
+          const links = doc.querySelectorAll('a')
+
+          const websites = []
+
+          links.forEach((link) => {
+            const name = link.textContent?.trim() || '未命名'
+            const url = link.getAttribute('href') || ''
+            const description = link.getAttribute('title') || name
+
+            if (url && url.startsWith('http')) {
+              websites.push({
+                name,
+                url,
+                description,
+                categoryIds: [],
+              })
+            }
+          })
+
+          return {
+            success: true,
+            websites: websites,
+            message: `成功解析 ${websites.length} 个书签`,
+          }
+        } catch (error) {
+          return {
+            success: false,
+            error: error.message,
+          }
+        }
+      }
+
+      function parseJsonFile(content) {
+        try {
+          const data = JSON.parse(content)
+          let websites = []
+
+          if (Array.isArray(data)) {
+            websites = data
+          } else if (data.websites && Array.isArray(data.websites)) {
+            websites = data.websites
+          } else {
+            throw new Error('无效的JSON格式')
+          }
+
+          const parsedWebsites = websites
+            .map((item) => ({
+              name: item.name || item.title || '未命名',
+              url: item.url || item.link || '',
+              description: item.description || item.desc || item.name || '未命名',
+              categoryIds: item.categoryIds || item.categories || [],
+            }))
+            .filter((item) => item.url && item.url.startsWith('http'))
+
+          return {
+            success: true,
+            websites: parsedWebsites,
+            message: `成功解析 ${parsedWebsites.length} 个网站`,
+          }
+        } catch (error) {
+          return {
+            success: false,
+            error: error.message,
+          }
+        }
+      }
+
+      function parseCsvFile(content) {
+        try {
+          const lines = content.split('\n').filter((line) => line.trim())
+          if (lines.length < 2) {
+            throw new Error('CSV文件格式不正确')
+          }
+
+          const headers = lines[0].split(',').map((h) => h.trim().toLowerCase())
+          const websites = []
+
+          for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(',').map((v) => v.trim())
+            if (values.length < headers.length) continue
+
+            const website = {}
+            headers.forEach((header, index) => {
+              website[header] = values[index] || ''
+            })
+
+            if (website.url || website.link) {
+              websites.push({
+                name: website.name || website.title || '未命名',
+                url: website.url || website.link,
+                description: website.description || website.desc || website.name || '未命名',
+                categoryIds: website.categoryids
+                  ? website.categoryids
+                      .split(',')
+                      .map((id) => parseInt(id.trim()))
+                      .filter((id) => !isNaN(id))
+                  : [],
+              })
+            }
+          }
+
+          return {
+            success: true,
+            websites: websites,
+            message: `成功解析 ${websites.length} 个网站`,
+          }
+        } catch (error) {
+          return {
+            success: false,
+            error: error.message,
+          }
+        }
+      }
+
+      function parseManualInput(text) {
+        try {
+          const lines = text.split('\n').filter((line) => line.trim())
+          const websites = []
+
+          lines.forEach((line, index) => {
+            const parts = line.split('|').map((part) => part.trim())
+            if (parts.length < 2) {
+              websites.push({
+                name: '未命名',
+                url: '',
+                description: '格式错误',
+                categoryIds: [],
+                error: `第${index + 1}行格式错误，需要至少包含名称和URL`,
+              })
+              return
+            }
+
+            const name = parts[0] || '未命名'
+            const url = parts[1] || ''
+            const description = parts[2] || name
+            const categoryNames = parts[3] ? parts[3].split(',').map((c) => c.trim()) : []
+
+            if (!url || !url.startsWith('http')) {
+              websites.push({
+                name,
+                url,
+                description,
+                categoryIds: [],
+                error: `第${index + 1}行URL格式错误`,
+              })
+              return
+            }
+
+            websites.push({
+              name,
+              url,
+              description,
+              categoryIds: [],
+            })
+          })
+
+          return {
+            success: true,
+            websites: websites,
+            message: `成功解析 ${websites.length} 个网站`,
+          }
+        } catch (error) {
+          return {
+            success: false,
+            error: error.message,
+          }
+        }
+      }
+
+      // 测试函数
+      function testBookmarkParsing() {
+        const sampleHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<!-- This is an automatically generated file. -->
+<!-- It will be read and overwritten. -->
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>
+<DL><p>
+    <DT><A HREF="https://github.com" TITLE="GitHub: Let's build from here">GitHub</A>
+    <DT><A HREF="https://stackoverflow.com" TITLE="Stack Overflow - Where Developers Learn, Share, & Build Careers">Stack Overflow</A>
+    <DT><A HREF="https://www.google.com" TITLE="Google">Google</A>
+</DL><p>`
+
+        const result = parseBookmarkFile(sampleHtml)
+        displayResult('bookmark-result', result)
+      }
+
+      function testJsonParsing() {
+        const sampleJson = `[
+  {
+    "name": "GitHub",
+    "url": "https://github.com",
+    "description": "代码托管平台",
+    "categoryIds": [1, 2]
+  },
+  {
+    "name": "Stack Overflow",
+    "url": "https://stackoverflow.com",
+    "description": "程序员问答社区",
+    "categoryIds": [1]
+  }
+]`
+
+        const result = parseJsonFile(sampleJson)
+        displayResult('json-result', result)
+      }
+
+      function testCsvParsing() {
+        const sampleCsv = `name,url,description,categoryIds
+GitHub,https://github.com,代码托管平台,1,2
+Stack Overflow,https://stackoverflow.com,程序员问答社区,1
+Google,https://www.google.com,搜索引擎,`
+
+        const result = parseCsvFile(sampleCsv)
+        displayResult('csv-result', result)
+      }
+
+      function testManualParsing() {
+        const sampleText = `GitHub | https://github.com | 代码托管平台 | 开发工具
+Stack Overflow | https://stackoverflow.com | 程序员问答社区 | 学习资源
+Google | https://www.google.com | 搜索引擎`
+
+        const result = parseManualInput(sampleText)
+        displayResult('manual-result', result)
+      }
+
+      function displayResult(elementId, result) {
+        const element = document.getElementById(elementId)
+        if (result.success) {
+          element.className = 'result success'
+          element.textContent = `${result.message}\n\n解析结果：\n${JSON.stringify(result.websites, null, 2)}`
+        } else {
+          element.className = 'result error'
+          element.textContent = `解析失败：${result.error}`
+        }
+      }
+    </script>
+  </body>
+</html>

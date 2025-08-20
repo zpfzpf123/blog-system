@@ -1,0 +1,74 @@
+{
+  "name": "AI智能博客系统",
+  "englishName": "AI Smart Blog System",
+  "version": "1.0.0",
+  "description": "基于Vue3和Spring Boot的全栈博客应用，集成AI写作、智能推荐等先进功能",
+  "keywords": [
+    "博客系统",
+    "AI写作",
+    "智能推荐",
+    "Vue3",
+    "Spring Boot",
+    "Markdown",
+    "全栈应用"
+  ],
+  "author": {
+    "name": "AI Blog Team",
+    "email": "contact@ai-blog.com",
+    "website": "https://ai-blog.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/ai-blog-system",
+    "issues": "https://github.com/your-username/ai-blog-system/issues",
+    "wiki": "https://github.com/your-username/ai-blog-system/wiki"
+  },
+  "demo": {
+    "url": "https://your-demo-url.com",
+    "description": "在线演示版本"
+  },
+  "documentation": {
+    "url": "https://your-docs-url.com",
+    "description": "详细文档"
+  },
+  "license": "MIT",
+  "homepage": "https://ai-blog.com",
+  "social": {
+    "github": "https://github.com/your-username/ai-blog-system",
+    "twitter": "https://twitter.com/ai_blog_system",
+    "discord": "https://discord.gg/ai-blog-system"
+  },
+  "features": {
+    "ai": {
+      "writing": "AI写作助手",
+      "recommendation": "智能推荐系统",
+      "content": "内容生成"
+    },
+    "blog": {
+      "management": "文章管理",
+      "categories": "分类管理",
+      "tags": "标签管理",
+      "markdown": "Markdown支持"
+    },
+    "ui": {
+      "responsive": "响应式设计",
+      "modern": "现代化界面",
+      "accessibility": "无障碍访问"
+    }
+  },
+  "techStack": {
+    "frontend": ["Vue 3", "TypeScript", "Element Plus", "Vite"],
+    "backend": ["Spring Boot", "Java", "JPA", "PostgreSQL"],
+    "ai": ["OpenAI API", "Custom AI Models"],
+    "deployment": ["Docker", "Railway", "Render"]
+  },
+  "contributors": [
+    {
+      "name": "AI Blog Team",
+      "role": "核心开发团队"
+    }
+  ],
+  "changelog": {
+    "1.0.0": "初始版本发布，包含基础博客功能和AI写作助手"
+  }
+}
