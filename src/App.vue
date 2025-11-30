@@ -1,22 +1,15 @@
+
 <!--
  * @Author: 18582297328 zpfzpf123@example.com
  * @Date: 2025-08-04 12:55:14
- * @LastEditors: 18582297328 zpfzpf123@example.com
- * @LastEditTime: 2025-08-18 16:42:11
- * @FilePath: \blog\src\App.vue
- * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
--->
-<!--
- * @Author: 18582297328 zpfzpf123@example.com
- * @Date: 2025-08-04 12:55:14
- * @LastEditors: 18582297328 zpfzpf123@example.com
- * @LastEditTime: 2025-08-17 01:51:31
+ * @LastEditors: 18582297328 2622013323@qq.com
+ * @LastEditTime: 2025-11-30 16:26:13
  * @FilePath: \blog\src\App.vue
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 -->
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
-import { HomeFilled, Setting, ChatDotRound, Link, ArrowUpBold } from '@element-plus/icons-vue'
+import { HomeFilled, Setting, ChatDotRound, Link, ArrowUpBold, MagicStick, FolderOpened, Key } from '@element-plus/icons-vue'
 import { ElIcon } from 'element-plus'
 import { ref, onMounted, onUnmounted } from 'vue'
 
@@ -71,6 +64,18 @@ onUnmounted(() => {
             <el-icon class="nav-icon animated-nav-icon"><ChatDotRound /></el-icon>
             <span>AI问答</span>
           </RouterLink>
+          <RouterLink to="/css-animations">
+            <el-icon class="nav-icon animated-nav-icon"><MagicStick /></el-icon>
+            <span>CSS动画演示</span>
+          </RouterLink>
+          <RouterLink to="/project-manager">
+            <el-icon class="nav-icon animated-nav-icon"><FolderOpened /></el-icon>
+            <span>项目管理</span>
+          </RouterLink>
+          <RouterLink to="/git-users">
+            <el-icon class="nav-icon animated-nav-icon"><Key /></el-icon>
+            <span>Git用户</span>
+          </RouterLink>
         </nav>
       </div>
     </header>
@@ -78,12 +83,6 @@ onUnmounted(() => {
     <main>
       <RouterView />
     </main>
-
-    <footer>
-      <div class="footer-content">
-        <p>&copy; 2025 我的博客. All rights reserved.</p>
-      </div>
-    </footer>
 
     <!-- 滚动到顶部按钮 -->
     <Transition name="scroll-to-top">
@@ -132,7 +131,6 @@ onUnmounted(() => {
 header {
   background: #e9edf3;
   color: #222;
-  padding: 1.2rem 0 1rem 0;
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
   box-shadow: none;
@@ -156,13 +154,11 @@ header::after {
 .header-content {
   /* max-width: 1200px; */
   margin: 0 auto;
-  padding: 0 40px;
 }
 .main-nav {
   display: flex;
   gap: 2.2rem;
   background: rgba(255, 255, 255, 0.95);
-  border-radius: 16px;
   box-shadow: 0 4px 20px rgba(102, 126, 234, 0.15);
   padding: 0.3rem 1.2rem;
   align-items: center;
@@ -238,6 +234,15 @@ header::after {
   color: #10b981;
   filter: drop-shadow(0 2px 4px rgba(16, 185, 129, 0.4));
 }
+.main-nav a:nth-child(5) .nav-icon {
+  color: #f97316;
+  filter: drop-shadow(0 2px 4px rgba(249, 115, 22, 0.4));
+}
+
+.main-nav a:nth-child(6) .nav-icon {
+  color: #ec4899;
+  filter: drop-shadow(0 2px 4px rgba(236, 72, 153, 0.4));
+}
 .animated-nav-icon {
   animation: iconPulse 3s infinite ease-in-out;
 }
@@ -292,10 +297,7 @@ header::after {
 }
 main {
   flex: 1;
-  padding: 2.5rem 0 2rem 0;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  display: block;
   min-height: 600px;
   background: transparent;
 }
@@ -348,7 +350,7 @@ footer {
     border-radius: 14px;
   }
   main {
-    padding: 1.2rem 0 1rem 0;
+    padding: 1.2rem 16px 1rem 16px;
   }
 }
 @media (max-width: 600px) {
@@ -358,7 +360,7 @@ footer {
     border-radius: 8px;
   }
   main {
-    padding: 0.5rem 0 0.5rem 0;
+    padding: 0.5rem 12px 0.5rem 12px;
   }
 }
 
