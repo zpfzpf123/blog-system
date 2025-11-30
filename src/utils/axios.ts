@@ -2,7 +2,7 @@
  * @Author: 18582297328 2622013323@qq.com
  * @Date: 2025-08-05 13:36:17
  * @LastEditors: 18582297328 2622013323@qq.com
- * @LastEditTime: 2025-08-12 10:10:50
+ * @LastEditTime: 2025-11-30 21:01:10
  * @FilePath: \blog\src\utils\axios.ts
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
@@ -24,6 +24,13 @@ api.interceptors.request.use(
   (config) => {
     // 在发送请求之前做些什么
     console.log('Request:', config.method?.toUpperCase(), config.url)
+    
+    // 为Git相关操作设置更长的超时时间（5分钟）
+    if (config.url?.includes('/git-')) {
+      config.timeout = 300000 // Git操作需要更长时间（5分钟）
+      console.log('🔧 Git操作检测到，超时时间设置为5分钟')
+    }
+    
     return config
   },
   (error) => {

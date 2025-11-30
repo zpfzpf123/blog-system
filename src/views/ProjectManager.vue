@@ -20,9 +20,16 @@ interface Project {
   readmeContent?: string
   gitCommits?: string
   gitUserId?: number
-  createdAt: string
-  updatedAt: string
   isFavorite: boolean
+}
+
+interface GitUser {
+  id: number
+  name: string
+  username: string
+  email?: string
+  description?: string
+  isDefault?: boolean
 }
 
 interface GitCommit {
@@ -35,6 +42,7 @@ interface GitCommit {
 // 状态管理
 const router = useRouter()
 const projects = ref<Project[]>([])
+const gitUsers = ref<GitUser[]>([])
 const loading = ref(false)
 const dialogVisible = ref(false)
 const dialogTitle = ref('新建项目')
@@ -43,19 +51,6 @@ const searchKeyword = ref('')
 const statusFilter = ref<string>('')
 const folderSelectorVisible = ref(false)
 const analyzingProject = ref(false)
-
-// Git用户相关
-interface GitUser {
-  id: number
-  name: string
-  username: string
-  password: string
-  email?: string
-  description?: string
-  isDefault?: boolean
-}
-
-const gitUsers = ref<GitUser[]>([])
 
 // 表单数据
 const formData = ref<Partial<Project>>({
@@ -68,7 +63,6 @@ const formData = ref<Partial<Project>>({
   repoUrl: '',
   readmeContent: '',
   gitCommits: '',
-  gitUserId: undefined,
   isFavorite: false,
 })
 
@@ -128,6 +122,17 @@ const statistics = computed(() => {
 })
 
 // API 方法
+// 获取Git用户列表
+const fetchGitUsers = async () => {
+  try {
+    const response = await axios.get('/api/git-users')
+    gitUsers.value = response.data
+  } catch (error) {
+    console.error('获取Git用户列表失败:', error)
+    // 不显示错误，因为Git用户可能还没有配置
+  }
+}
+
 const fetchProjects = async () => {
   try {
     loading.value = true
@@ -156,15 +161,6 @@ const fetchProjects = async () => {
     ElMessage.error('获取项目列表失败')
   } finally {
     loading.value = false
-  }
-}
-
-const fetchGitUsers = async () => {
-  try {
-    const response = await axios.get('/api/git-users')
-    gitUsers.value = response.data
-  } catch (error) {
-    console.error('获取Git用户列表失败:', error)
   }
 }
 
@@ -225,6 +221,12 @@ const analyzeProject = async (path: string) => {
     if (result.readmeContent) {
       formData.value.readmeContent = result.readmeContent
       formData.value.description = result.readmeContent // 使用完整README内容作为描述
+    }
+    
+    // 自动填充Git远程仓库地址
+    if (result.gitRemoteUrl) {
+      formData.value.repoUrl = result.gitRemoteUrl
+      console.log('自动填充仓库地址:', result.gitRemoteUrl)
     }
     
     // 保存Git提交记录
@@ -562,21 +564,27 @@ onMounted(() => {
         </el-form-item>
 
         <el-form-item label="Git用户">
-          <el-select v-model="formData.gitUserId" placeholder="选择Git用户（用于智能提交）" clearable style="width: 100%">
+          <el-select 
+            v-model="formData.gitUserId" 
+            placeholder="选择Git用户（用于代码提交）"
+            clearable
+            style="width: 100%"
+          >
             <el-option
               v-for="user in gitUsers"
               :key="user.id"
-              :label="user.name + (user.isDefault ? ' (默认)' : '')"
+              :label="`${user.name} (${user.username})`"
               :value="user.id"
             >
-              <div style="display: flex; justify-content: space-between; align-items: center">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
                 <span>{{ user.name }}</span>
-                <span style="font-size: 12px; color: #999">{{ user.username }}</span>
+                <span style="font-size: 12px; color: #999;">{{ user.username }}</span>
+                <el-tag v-if="user.isDefault" size="small" type="success">默认</el-tag>
               </div>
             </el-option>
           </el-select>
-          <div style="margin-top: 8px; font-size: 12px; color: #999;">
-            💡 智能提交时将使用选中的Git用户进行认证，如未选择则使用默认用户
+          <div style="margin-top: 8px; font-size: 12px; color: #909399;">
+            💡 提示：选择后在Git提交时将使用此账号
           </div>
         </el-form-item>
 

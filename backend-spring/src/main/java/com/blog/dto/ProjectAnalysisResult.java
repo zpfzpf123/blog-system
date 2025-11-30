@@ -9,6 +9,7 @@ public class ProjectAnalysisResult {
     private String projectName;
     private String readmeContent;
     private String localPath;
+    private String gitRemoteUrl; // Git远程仓库地址
     private List<GitCommitInfo> gitCommits;
     
     public String getProjectName() {
@@ -33,6 +34,14 @@ public class ProjectAnalysisResult {
     
     public void setLocalPath(String localPath) {
         this.localPath = localPath;
+    }
+    
+    public String getGitRemoteUrl() {
+        return gitRemoteUrl;
+    }
+    
+    public void setGitRemoteUrl(String gitRemoteUrl) {
+        this.gitRemoteUrl = gitRemoteUrl;
     }
     
     public List<GitCommitInfo> getGitCommits() {

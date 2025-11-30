@@ -54,7 +54,7 @@ public class Project {
     private Integer sortOrder = 0;
     
     @Column(name = "git_user_id")
-    private Long gitUserId;
+    private Long gitUserId; // 关联的Git用户ID
     
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

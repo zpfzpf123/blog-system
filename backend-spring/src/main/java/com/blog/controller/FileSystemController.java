@@ -7,12 +7,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -135,7 +131,13 @@ public class FileSystemController {
                 System.out.println("未找到 README.md 文件");
             }
             
-            // 3. 获取Git提交记录
+            // 3. 获取Git远程仓库地址
+            String gitRemoteUrl = getGitRemoteUrl(projectPath);
+            if (gitRemoteUrl != null) {
+                result.setGitRemoteUrl(gitRemoteUrl);
+            }
+            
+            // 4. 获取Git提交记录
             List<GitCommitInfo> commits = getGitCommits(projectPath);
             result.setGitCommits(commits);
             System.out.println("Git提交记录数量: " + commits.size());
@@ -147,6 +149,122 @@ public class FileSystemController {
             e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    /**
+     * 获取指定提交的详细改动信息
+     * GET /api/filesystem/commit-detail?projectPath=xxx&commitHash=xxx
+     */
+    @GetMapping("/commit-detail")
+    public ResponseEntity<?> getCommitDetail(
+            @RequestParam String projectPath,
+            @RequestParam String commitHash) {
+        try {
+            System.out.println("=== 获取提交详情 ===");
+            System.out.println("项目路径: " + projectPath);
+            System.out.println("提交哈希: " + commitHash);
+            
+            File projectDir = new File(projectPath);
+            if (!projectDir.exists() || !projectDir.isDirectory()) {
+                return ResponseEntity.badRequest().body("项目路径无效");
+            }
+            
+            // 检查是否是Git仓库
+            File gitDir = new File(projectPath, ".git");
+            if (!gitDir.exists()) {
+                return ResponseEntity.badRequest().body("不是Git仓库");
+            }
+            
+            // 使用 git show 命令获取提交详情
+            // --stat: 显示文件变更统计
+            // --numstat: 显示数字统计（添加/删除行数）
+            // -p: 显示详细的diff
+            ProcessBuilder pb = new ProcessBuilder(
+                "git", "show",
+                commitHash,
+                "--stat",
+                "--numstat",
+                "-p",
+                "--pretty=format:%H%n%an%n%ae%n%ad%n%s%n%b"
+            );
+            pb.directory(projectDir);
+            pb.redirectErrorStream(true);
+            
+            Process process = pb.start();
+            
+            StringBuilder output = new StringBuilder();
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(process.getInputStream(), "UTF-8"))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+            
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                return ResponseEntity.badRequest().body("获取提交详情失败");
+            }
+            
+            // 解析输出
+            String result = output.toString();
+            
+            // 构造返回对象
+            java.util.Map<String, Object> response = new java.util.HashMap<>();
+            response.put("success", true);
+            response.put("commitHash", commitHash);
+            response.put("diff", result);
+            
+            System.out.println("提交详情获取成功");
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            System.err.println("获取提交详情失败: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("获取提交详情失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 获取Git远程仓库地址
+     * 优先获取origin远程仓库的URL
+     */
+    private String getGitRemoteUrl(String projectPath) {
+        try {
+            // 检查是否是Git仓库
+            File gitDir = new File(projectPath, ".git");
+            if (!gitDir.exists()) {
+                System.out.println("不是Git仓库，无法获取远程地址");
+                return null;
+            }
+            
+            // 执行 git remote get-url origin 命令获取远程仓库地址
+            ProcessBuilder pb = new ProcessBuilder("git", "remote", "get-url", "origin");
+            pb.directory(new File(projectPath));
+            pb.redirectErrorStream(true);
+            
+            Process process = pb.start();
+            
+            String remoteUrl = null;
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(process.getInputStream(), "UTF-8"))) {
+                remoteUrl = reader.readLine(); // 读取第一行，即远程地址
+            }
+            
+            process.waitFor();
+            
+            if (remoteUrl != null && !remoteUrl.trim().isEmpty()) {
+                System.out.println("Git远程仓库地址: " + remoteUrl);
+                return remoteUrl.trim();
+            } else {
+                System.out.println("未配置Git远程仓库");
+            }
+            
+        } catch (Exception e) {
+            System.err.println("获取Git远程地址失败: " + e.getMessage());
+        }
+        
+        return null;
     }
     
     /**
@@ -163,10 +281,11 @@ public class FileSystemController {
                 return commits;
             }
             
-            // 执行git log命令获取最近50条提交记录
+            // 执行git log命令获取提交记录
+            // 增加获取数量到500条，确保历史记录完整性
             ProcessBuilder pb = new ProcessBuilder(
                 "git", "log", 
-                "--max-count=50",
+                "--max-count=500",
                 "--pretty=format:%H|%an|%ad|%s",
                 "--date=iso"
             );
@@ -175,7 +294,7 @@ public class FileSystemController {
             
             Process process = pb.start();
             
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), "UTF-8"))) {
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream(), "UTF-8"))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     String[] parts = line.split("\\|", 4);
@@ -199,4 +318,5 @@ public class FileSystemController {
         
         return commits;
     }
+    
 }

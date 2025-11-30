@@ -63,7 +63,6 @@ public class ProjectServiceImpl implements ProjectService {
         existingProject.setRepoUrl(project.getRepoUrl());
         existingProject.setReadmeContent(project.getReadmeContent());
         existingProject.setGitCommits(project.getGitCommits());
-        existingProject.setGitUserId(project.getGitUserId());
         existingProject.setIsFavorite(project.getIsFavorite());
         existingProject.setSortOrder(project.getSortOrder());
         

@@ -9,8 +9,7 @@ public class GitCommitInfo {
     private String date;
     private String message;
     
-    public GitCommitInfo() {
-    }
+    public GitCommitInfo() {}
     
     public GitCommitInfo(String hash, String author, String date, String message) {
         this.hash = hash;

@@ -1,12 +1,11 @@
 package com.blog.entity;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import javax.persistence.*;
 import java.time.LocalDateTime;
 
 /**
  * Git用户实体类
- * 用于管理Git账号信息
+ * 用于存储Git账号信息，支持多账号管理
  * 
  * @author 开发团队
  * @since 2024-11-30
@@ -19,51 +18,27 @@ public class GitUser {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    /**
-     * 用户名称（显示名称）
-     */
-    @Column(nullable = false)
-    private String name;
+    @Column(name = "name", nullable = false, length = 100)
+    private String name; // 显示名称
     
-    /**
-     * Git用户名
-     */
-    @Column(nullable = false)
-    private String username;
+    @Column(name = "username", nullable = false, unique = true, length = 100)
+    private String username; // Git用户名
     
-    /**
-     * Git密码或Token
-     */
-    @Column(nullable = false)
-    private String password;
+    @Column(name = "password", nullable = false, length = 500)
+    private String password; // Git密码或Personal Access Token
     
-    /**
-     * 邮箱
-     */
-    private String email;
+    @Column(name = "email", length = 200)
+    private String email; // 邮箱
     
-    /**
-     * 描述
-     */
-    private String description;
+    @Column(name = "description", length = 500)
+    private String description; // 描述
     
-    /**
-     * 是否默认账号
-     */
     @Column(name = "is_default")
-    private Boolean isDefault = false;
+    private Boolean isDefault = false; // 是否默认账号
     
-    /**
-     * 创建时间
-     */
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
     
-    /**
-     * 更新时间
-     */
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
@@ -79,7 +54,6 @@ public class GitUser {
     }
     
     // Getters and Setters
-    
     public Long getId() {
         return id;
     }

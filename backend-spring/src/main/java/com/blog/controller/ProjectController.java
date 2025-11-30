@@ -1,8 +1,10 @@
 package com.blog.controller;
 
+import com.blog.dto.GitCommitInfo;
+import com.blog.dto.GitStatusResult;
 import com.blog.entity.Project;
 import com.blog.service.ProjectService;
-import com.blog.service.GitService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +13,9 @@ import org.springframework.web.bind.annotation.*;
 import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,8 +34,7 @@ public class ProjectController {
     @Autowired
     private ProjectService projectService;
     
-    @Autowired
-    private GitService gitService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
     
     /**
      * 获取所有项目
@@ -150,23 +154,16 @@ public class ProjectController {
                 return ResponseEntity.badRequest().body(response);
             }
             
-            // 直接打开指定路径（无论是文件夹还是文件）
-            // 如果是文件，Windows会在资源管理器中高亮显示该文件
-            
             // 根据操作系统打开文件夹
             String os = System.getProperty("os.name").toLowerCase();
             
             if (os.contains("win")) {
-                // Windows系统：直接打开文件夹（不使用/select参数）
                 Runtime.getRuntime().exec("explorer.exe \"" + folder.getAbsolutePath() + "\"");
             } else if (os.contains("mac")) {
-                // macOS系统：使用open命令
                 Runtime.getRuntime().exec(new String[]{"open", folder.getAbsolutePath()});
             } else if (os.contains("nix") || os.contains("nux")) {
-                // Linux系统：尝试使用xdg-open
                 Runtime.getRuntime().exec(new String[]{"xdg-open", folder.getAbsolutePath()});
             } else {
-                // 其他系统：尝试使用Desktop类
                 if (Desktop.isDesktopSupported()) {
                     Desktop desktop = Desktop.getDesktop();
                     desktop.open(folder);
@@ -195,526 +192,1015 @@ public class ProjectController {
     }
     
     /**
-     * 检查Git状态
-     * GET /api/projects/{id}/git-status
+     * 刷新项目的 Git 提交记录
+     * POST /api/projects/{id}/refresh-commits
      */
-    @GetMapping("/{id}/git-status")
-    public ResponseEntity<Map<String, Object>> checkGitStatus(@PathVariable Long id) {
+    @PostMapping("/{id}/refresh-commits")
+    public ResponseEntity<Map<String, Object>> refreshGitCommits(@PathVariable Long id) {
+        Map<String, Object> response = new HashMap<>();
+        
         try {
+            // 获取项目信息
             Project project = projectService.getProjectById(id)
                 .orElseThrow(() -> new RuntimeException("项目不存在"));
             
             String localPath = project.getLocalPath();
             if (localPath == null || localPath.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
                 response.put("message", "该项目没有配置本地路径");
                 return ResponseEntity.badRequest().body(response);
             }
             
-            Map<String, Object> result = gitService.checkGitStatus(localPath);
-            return ResponseEntity.ok(result);
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "检查Git状态失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
-    
-    /**
-     * Fetch远程更新
-     * POST /api/projects/{id}/git-fetch
-     */
-    @PostMapping("/{id}/git-fetch")
-    public ResponseEntity<Map<String, Object>> gitFetch(@PathVariable Long id) {
-        try {
-            Project project = projectService.getProjectById(id)
-                .orElseThrow(() -> new RuntimeException("项目不存在"));
-            
-            String localPath = project.getLocalPath();
-            
-            if (localPath == null || localPath.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
+            File projectDir = new File(localPath);
+            if (!projectDir.exists() || !projectDir.isDirectory()) {
                 response.put("success", false);
-                response.put("message", "该项目没有配置本地路径");
+                response.put("message", "本地路径不存在: " + localPath);
                 return ResponseEntity.badRequest().body(response);
             }
             
-            Map<String, Object> result = gitService.fetchFromRemote(localPath);
-            return ResponseEntity.ok(result);
+            // 获取最新的 Git 提交记录
+            List<GitCommitInfo> commits = getGitCommits(localPath);
             
-        } catch (Exception e) {
-            e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "Fetch失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
-    
-    /**
-     * 拉取远程代码（使用rebase）
-     * POST /api/projects/{id}/git-pull
-     */
-    @PostMapping("/{id}/git-pull")
-    public ResponseEntity<Map<String, Object>> gitPull(@PathVariable Long id) {
-        try {
-            Project project = projectService.getProjectById(id)
-                .orElseThrow(() -> new RuntimeException("项目不存在"));
-            
-            String localPath = project.getLocalPath();
-            
-            if (localPath == null || localPath.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
+            if (commits.isEmpty()) {
                 response.put("success", false);
-                response.put("message", "该项目没有配置本地路径");
+                response.put("message", "该项目不是 Git 仓库或没有提交记录");
                 return ResponseEntity.badRequest().body(response);
             }
             
-            Map<String, Object> result = gitService.pullFromRemote(localPath);
-            return ResponseEntity.ok(result);
+            // 更新项目的 Git 提交记录
+            String commitsJson = objectMapper.writeValueAsString(commits);
+            project.setGitCommits(commitsJson);
+            projectService.updateProject(id, project);
             
-        } catch (Exception e) {
-            e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "Pull失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
-    
-    /**
-     * 获取冲突文件列表
-     * GET /api/projects/{id}/git-conflicts
-     */
-    @GetMapping("/{id}/git-conflicts")
-    public ResponseEntity<Map<String, Object>> getConflicts(@PathVariable Long id) {
-        try {
-            Project project = projectService.getProjectById(id)
-                .orElseThrow(() -> new RuntimeException("项目不存在"));
-            
-            String localPath = project.getLocalPath();
-            
-            if (localPath == null || localPath.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "该项目没有配置本地路径");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            List<String> conflictFiles = gitService.getConflictFiles(localPath);
-            
-            Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("conflictFiles", conflictFiles);
-            response.put("count", conflictFiles.size());
+            response.put("message", "成功刷新 " + commits.size() + " 条提交记录");
+            response.put("count", commits.size());
+            response.put("commits", commits);
             
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
             e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
             response.put("success", false);
-            response.put("message", "获取冲突文件失败: " + e.getMessage());
+            response.put("message", "刷新失败: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
     
     /**
-     * 解决冲突
-     * POST /api/projects/{id}/git-resolve-conflict
+     * 获取Git提交记录
      */
-    @PostMapping("/{id}/git-resolve-conflict")
-    public ResponseEntity<Map<String, Object>> resolveConflict(
-            @PathVariable Long id,
-            @RequestBody Map<String, String> body) {
+    private List<GitCommitInfo> getGitCommits(String projectPath) {
+        List<GitCommitInfo> commits = new ArrayList<>();
+        
         try {
-            Project project = projectService.getProjectById(id)
-                .orElseThrow(() -> new RuntimeException("项目不存在"));
-            
-            String localPath = project.getLocalPath();
-            String filePath = body.get("filePath");
-            String strategy = body.get("strategy"); // ours / theirs
-            
-            if (localPath == null || localPath.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "该项目没有配置本地路径");
-                return ResponseEntity.badRequest().body(response);
+            // 检查是否是Git仓库
+            File gitDir = new File(projectPath, ".git");
+            if (!gitDir.exists()) {
+                System.out.println("不是Git仓库");
+                return commits;
             }
             
-            Map<String, Object> result = gitService.resolveConflict(localPath, filePath, strategy);
-            return ResponseEntity.ok(result);
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "解决冲突失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
-    
-    /**
-     * 继续Rebase
-     * POST /api/projects/{id}/git-rebase-continue
-     */
-    @PostMapping("/{id}/git-rebase-continue")
-    public ResponseEntity<Map<String, Object>> continueRebase(@PathVariable Long id) {
-        try {
-            Project project = projectService.getProjectById(id)
-                .orElseThrow(() -> new RuntimeException("项目不存在"));
-            
-            String localPath = project.getLocalPath();
-            
-            if (localPath == null || localPath.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "该项目没有配置本地路径");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            Map<String, Object> result = gitService.continueRebase(localPath);
-            return ResponseEntity.ok(result);
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "继续Rebase失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
-    
-    /**
-     * 中止Rebase
-     * POST /api/projects/{id}/git-rebase-abort
-     */
-    @PostMapping("/{id}/git-rebase-abort")
-    public ResponseEntity<Map<String, Object>> abortRebase(@PathVariable Long id) {
-        try {
-            Project project = projectService.getProjectById(id)
-                .orElseThrow(() -> new RuntimeException("项目不存在"));
-            
-            String localPath = project.getLocalPath();
-            
-            if (localPath == null || localPath.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "该项目没有配置本地路径");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            Map<String, Object> result = gitService.abortRebase(localPath);
-            return ResponseEntity.ok(result);
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "中止Rebase失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
-    
-    /**
-     * 生成建议的提交信息
-     * POST /api/projects/{id}/git-generate-message
-     */
-    @PostMapping("/{id}/git-generate-message")
-    public ResponseEntity<Map<String, Object>> generateCommitMessage(
-            @PathVariable Long id,
-            @RequestBody Map<String, Object> body) {
-        try {
-            Project project = projectService.getProjectById(id)
-                .orElseThrow(() -> new RuntimeException("项目不存在"));
-            
-            String localPath = project.getLocalPath();
-            
-            if (localPath == null || localPath.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "该项目没有配置本地路径");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            // 获取状态信息
-            Map<String, Object> statusInfo = (Map<String, Object>) body.get("statusInfo");
-            if (statusInfo == null) {
-                statusInfo = gitService.checkGitStatus(localPath);
-            }
-            
-            // 生成提交信息
-            String message = gitService.generateCommitMessage(statusInfo);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", message);
-            
-            return ResponseEntity.ok(response);
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "生成提交信息失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
-    
-    /**
-     * 智能提交代码（支持文件选择、自定义提交信息、分支选择和自动重试）
-     * POST /api/projects/{id}/git-commit
-     */
-    @PostMapping("/{id}/git-commit")
-    public ResponseEntity<Map<String, Object>> smartGitCommit(
-            @PathVariable Long id,
-            @RequestBody(required = false) Map<String, Object> body) {
-        try {
-            Project project = projectService.getProjectById(id)
-                .orElseThrow(() -> new RuntimeException("项目不存在"));
-            
-            String localPath = project.getLocalPath();
-            
-            if (localPath == null || localPath.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "该项目没有配置本地路径");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            // 获取请求参数
-            String commitMessage = null;
-            List<String> selectedFiles = null;
-            String targetBranch = null;
-            boolean shouldPush = true;
-            int maxRetries = 0;
-            
-            if (body != null) {
-                commitMessage = (String) body.get("commitMessage");
-                selectedFiles = (List<String>) body.get("selectedFiles");
-                targetBranch = (String) body.get("targetBranch");
-                
-                Object shouldPushObj = body.get("shouldPush");
-                if (shouldPushObj != null) {
-                    shouldPush = (Boolean) shouldPushObj;
-                }
-                
-                Object retriesObj = body.get("maxRetries");
-                if (retriesObj != null) {
-                    maxRetries = ((Number) retriesObj).intValue();
-                }
-            }
-            
-            // 如果没有提供提交信息，自动生成
-            if (commitMessage == null || commitMessage.trim().isEmpty()) {
-                Map<String, Object> statusResult = gitService.checkGitStatus(localPath);
-                
-                if (!(Boolean) statusResult.get("success")) {
-                    return ResponseEntity.badRequest().body(statusResult);
-                }
-                
-                if (!(Boolean) statusResult.get("hasChanges")) {
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("success", false);
-                    response.put("message", "没有需要提交的变更");
-                    return ResponseEntity.ok(response);
-                }
-                
-                commitMessage = gitService.generateCommitMessage(statusResult);
-            }
-            
-            // 执行提交和推送
-            Map<String, Object> commitResult = gitService.commitAndPush(
-                localPath, 
-                commitMessage, 
-                selectedFiles, 
-                targetBranch,
-                shouldPush,
-                maxRetries,
-                project.getGitUserId()
+            // 执行git log命令获取提交记录 - 获取最近500条
+            ProcessBuilder pb = new ProcessBuilder(
+                "git", "log", 
+                "--max-count=500",
+                "--pretty=format:%H|%an|%ad|%s",
+                "--date=iso"
             );
+            pb.directory(new File(projectPath));
+            pb.redirectErrorStream(true);
             
-            return ResponseEntity.ok(commitResult);
+            Process process = pb.start();
             
-        } catch (Exception e) {
-            e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "Git提交失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
-    
-    /**
-     * 解决冲突后继续提交
-     * POST /api/projects/{id}/git-continue
-     */
-    @PostMapping("/{id}/git-continue")
-    public ResponseEntity<Map<String, Object>> continueAfterConflict(
-            @PathVariable Long id,
-            @RequestBody Map<String, String> body) {
-        try{
-            Project project = projectService.getProjectById(id)
-                .orElseThrow(() -> new RuntimeException("项目不存在"));
-            
-            String localPath = project.getLocalPath();
-            if (localPath == null || localPath.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "该项目没有配置本地路径");
-                return ResponseEntity.badRequest().body(response);
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(process.getInputStream(), "UTF-8"))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String[] parts = line.split("\\|", 4);
+                    if (parts.length >= 4) {
+                        GitCommitInfo commit = new GitCommitInfo(
+                            parts[0], // hash
+                            parts[1], // author
+                            parts[2], // date
+                            parts[3]  // message
+                        );
+                        commits.add(commit);
+                    }
+                }
             }
             
-            String commitMessage = body.get("commitMessage");
-            Map<String, Object> result = gitService.continueAfterConflict(localPath, commitMessage);
-            
-            return ResponseEntity.ok(result);
+            process.waitFor();
             
         } catch (Exception e) {
+            System.err.println("获取Git记录失败: " + e.getMessage());
             e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "继续提交失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
+        
+        return commits;
     }
     
     /**
-     * 获取Git分支列表
-     * GET /api/projects/{id}/git-branches
+     * 获取Git分支列表（本地分支和远程分支）
+     * GET /api/projects/{id}/git/branches
      */
-    @GetMapping("/{id}/git-branches")
+    @GetMapping("/{id}/git/branches")
     public ResponseEntity<Map<String, Object>> getGitBranches(@PathVariable Long id) {
+        Map<String, Object> result = new HashMap<>();
+        
         try {
+            // 获取项目信息
             Project project = projectService.getProjectById(id)
                 .orElseThrow(() -> new RuntimeException("项目不存在"));
             
             String localPath = project.getLocalPath();
             if (localPath == null || localPath.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "该项目没有配置本地路径");
-                return ResponseEntity.badRequest().body(response);
+                result.put("success", false);
+                result.put("message", "该项目没有配置本地路径");
+                return ResponseEntity.badRequest().body(result);
             }
             
-            Map<String, Object> result = gitService.getBranches(localPath);
+            File projectDir = new File(localPath);
+            if (!projectDir.exists() || !projectDir.isDirectory()) {
+                result.put("success", false);
+                result.put("message", "本地路径不存在: " + localPath);
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 检查是否是Git仓库
+            File gitDir = new File(projectDir, ".git");
+            if (!gitDir.exists()) {
+                result.put("success", false);
+                result.put("message", "该项目不是Git仓库");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 获取当前分支
+            String currentBranch = getCurrentBranch(localPath);
+            
+            // 获取所有本地分支
+            List<String> localBranches = getLocalBranches(localPath);
+            
+            // 获取所有远程分支
+            List<String> remoteBranches = getRemoteBranches(localPath);
+            
+            result.put("success", true);
+            result.put("currentBranch", currentBranch);
+            result.put("localBranches", localBranches);
+            result.put("remoteBranches", remoteBranches);
+            
             return ResponseEntity.ok(result);
             
         } catch (Exception e) {
             e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "获取分支列表失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            result.put("success", false);
+            result.put("message", "获取分支列表失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
         }
     }
     
     /**
-     * 切换Git分支
-     * POST /api/projects/{id}/git-switch-branch
+     * 获取当前分支名称
      */
-    @PostMapping("/{id}/git-switch-branch")
-    public ResponseEntity<Map<String, Object>> switchGitBranch(
+    private String getCurrentBranch(String projectPath) throws Exception {
+        ProcessBuilder pb = new ProcessBuilder("git", "branch", "--show-current");
+        pb.directory(new File(projectPath));
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+        
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), "UTF-8"))) {
+            String branch = reader.readLine();
+            if (branch != null && !branch.trim().isEmpty()) {
+                return branch.trim();
+            }
+        }
+        
+        process.waitFor();
+        return "unknown";
+    }
+    
+    /**
+     * 获取所有本地分支
+     */
+    private List<String> getLocalBranches(String projectPath) throws Exception {
+        List<String> branches = new ArrayList<>();
+        
+        ProcessBuilder pb = new ProcessBuilder("git", "branch");
+        pb.directory(new File(projectPath));
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+        
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), "UTF-8"))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                // 去掉*号和空格
+                String branch = line.replaceAll("^[\\s*]+", "").trim();
+                if (!branch.isEmpty()) {
+                    branches.add(branch);
+                }
+            }
+        }
+        
+        process.waitFor();
+        return branches;
+    }
+    
+    /**
+     * 获取所有远程分支
+     */
+    private List<String> getRemoteBranches(String projectPath) throws Exception {
+        List<String> branches = new ArrayList<>();
+        
+        ProcessBuilder pb = new ProcessBuilder("git", "branch", "-r");
+        pb.directory(new File(projectPath));
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+        
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), "UTF-8"))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                // 去掉前面的空格
+                String branch = line.trim();
+                // 过滤掉HEAD指向
+                if (!branch.isEmpty() && !branch.contains("->")) {
+                    branches.add(branch);
+                }
+            }
+        }
+        
+        process.waitFor();
+        return branches;
+    }
+    
+    /**
+     * Git环境检查 - 第一步
+     * POST /api/projects/{id}/git/check-status
+     */
+    @PostMapping("/{id}/git/check-status")
+    public ResponseEntity<GitStatusResult> checkGitStatus(@PathVariable Long id) {
+        GitStatusResult result = new GitStatusResult();
+        
+        try {
+            // 获取项目信息
+            Project project = projectService.getProjectById(id)
+                .orElseThrow(() -> new RuntimeException("项目不存在"));
+            
+            String localPath = project.getLocalPath();
+            if (localPath == null || localPath.trim().isEmpty()) {
+                result.setSuccess(false);
+                result.setMessage("该项目没有配置本地路径");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            File projectDir = new File(localPath);
+            if (!projectDir.exists() || !projectDir.isDirectory()) {
+                result.setSuccess(false);
+                result.setMessage("本地路径不存在: " + localPath);
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 检查是否是Git仓库
+            File gitDir = new File(projectDir, ".git");
+            if (!gitDir.exists()) {
+                result.setSuccess(false);
+                result.setMessage("该项目不是Git仓库");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 执行 git status 命令
+            GitStatusResult statusResult = executeGitStatus(localPath);
+            
+            return ResponseEntity.ok(statusResult);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.setSuccess(false);
+            result.setMessage("环境检查失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
+        }
+    }
+    
+    /**
+     * 执行git status命令并解析结果
+     */
+    private GitStatusResult executeGitStatus(String projectPath) throws Exception {
+        GitStatusResult result = new GitStatusResult();
+        List<String> modifiedFiles = new ArrayList<>();
+        List<String> untrackedFiles = new ArrayList<>();
+        
+        try {
+            // 获取当前分支
+            ProcessBuilder branchPb = new ProcessBuilder("git", "branch", "--show-current");
+            branchPb.directory(new File(projectPath));
+            branchPb.redirectErrorStream(true);
+            Process branchProcess = branchPb.start();
+            
+            try (BufferedReader branchReader = new BufferedReader(
+                    new InputStreamReader(branchProcess.getInputStream(), "UTF-8"))) {
+                String branch = branchReader.readLine();
+                if (branch != null && !branch.trim().isEmpty()) {
+                    result.setCurrentBranch(branch.trim());
+                }
+            }
+            branchProcess.waitFor();
+            
+            // 执行git status --porcelain命令
+            ProcessBuilder statusPb = new ProcessBuilder("git", "status", "--porcelain");
+            statusPb.directory(new File(projectPath));
+            statusPb.redirectErrorStream(true);
+            Process statusProcess = statusPb.start();
+            
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(statusProcess.getInputStream(), "UTF-8"))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.length() < 3) continue;
+                    
+                    String status = line.substring(0, 2);
+                    String fileName = line.substring(3).trim();
+                    
+                    // 解析文件状态
+                    if (status.startsWith("??")) {
+                        // 未跟踪的文件
+                        untrackedFiles.add(fileName);
+                    } else if (!status.trim().isEmpty()) {
+                        // 已修改的文件（包括暂存区和工作区）
+                        modifiedFiles.add(fileName);
+                    }
+                }
+            }
+            
+            statusProcess.waitFor();
+            
+            // 设置结果
+            result.setSuccess(true);
+            result.setModifiedFiles(modifiedFiles);
+            result.setUntrackedFiles(untrackedFiles);
+            result.setModifiedCount(modifiedFiles.size());
+            result.setUntrackedCount(untrackedFiles.size());
+            result.setHasChanges(modifiedFiles.size() > 0 || untrackedFiles.size() > 0);
+            
+            if (result.isHasChanges()) {
+                result.setMessage("检测到 " + (modifiedFiles.size() + untrackedFiles.size()) + " 个文件变更");
+            } else {
+                result.setMessage("工作区干净，没有待提交的更改");
+            }
+            
+        } catch (Exception e) {
+            result.setSuccess(false);
+            result.setMessage("执行git status失败: " + e.getMessage());
+            throw e;
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Git本地提交 - 第二步：暂存文件
+     * POST /api/projects/{id}/git/add
+     */
+    @PostMapping("/{id}/git/add")
+    public ResponseEntity<Map<String, Object>> gitAdd(@PathVariable Long id) {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            // 获取项目信息
+            Project project = projectService.getProjectById(id)
+                .orElseThrow(() -> new RuntimeException("项目不存在"));
+            
+            String localPath = project.getLocalPath();
+            if (localPath == null || localPath.trim().isEmpty()) {
+                result.put("success", false);
+                result.put("message", "该项目没有配置本地路径");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            File projectDir = new File(localPath);
+            if (!projectDir.exists() || !projectDir.isDirectory()) {
+                result.put("success", false);
+                result.put("message", "本地路径不存在: " + localPath);
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 检查是否是Git仓库
+            File gitDir = new File(projectDir, ".git");
+            if (!gitDir.exists()) {
+                result.put("success", false);
+                result.put("message", "该项目不是Git仓库");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 执行 git add .
+            ProcessBuilder pb = new ProcessBuilder("git", "add", ".");
+            pb.directory(new File(localPath));
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            
+            // 读取命令输出
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), "UTF-8"))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+            
+            int exitCode = process.waitFor();
+            
+            if (exitCode == 0) {
+                result.put("success", true);
+                result.put("message", "已暂存所有更改");
+                result.put("output", output.toString());
+            } else {
+                result.put("success", false);
+                result.put("message", "暂存失败: " + output.toString());
+                result.put("exitCode", exitCode);
+            }
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.put("success", false);
+            result.put("message", "执行git add失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
+        }
+    }
+    
+    /**
+     * Git本地提交 - 第二步：提交到本地仓库
+     * POST /api/projects/{id}/git/commit
+     */
+    @PostMapping("/{id}/git/commit")
+    public ResponseEntity<Map<String, Object>> gitCommit(
             @PathVariable Long id,
-            @RequestBody Map<String, String> body) {
+            @RequestBody Map<String, String> requestBody) {
+        Map<String, Object> result = new HashMap<>();
+        
         try {
+            // 获取提交信息
+            String commitMessage = requestBody.get("message");
+            if (commitMessage == null || commitMessage.trim().isEmpty()) {
+                result.put("success", false);
+                result.put("message", "提交信息不能为空");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 获取项目信息
             Project project = projectService.getProjectById(id)
                 .orElseThrow(() -> new RuntimeException("项目不存在"));
             
             String localPath = project.getLocalPath();
             if (localPath == null || localPath.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "该项目没有配置本地路径");
-                return ResponseEntity.badRequest().body(response);
+                result.put("success", false);
+                result.put("message", "该项目没有配置本地路径");
+                return ResponseEntity.badRequest().body(result);
             }
             
-            String branchName = body.get("branchName");
-            if (branchName == null || branchName.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "分支名称不能为空");
-                return ResponseEntity.badRequest().body(response);
+            File projectDir = new File(localPath);
+            if (!projectDir.exists() || !projectDir.isDirectory()) {
+                result.put("success", false);
+                result.put("message", "本地路径不存在: " + localPath);
+                return ResponseEntity.badRequest().body(result);
             }
             
-            Map<String, Object> result = gitService.switchBranch(localPath, branchName);
+            // 检查是否是Git仓库
+            File gitDir = new File(projectDir, ".git");
+            if (!gitDir.exists()) {
+                result.put("success", false);
+                result.put("message", "该项目不是Git仓库");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 执行 git commit -m "message"
+            ProcessBuilder pb = new ProcessBuilder("git", "commit", "-m", commitMessage);
+            pb.directory(new File(localPath));
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            
+            // 读取命令输出
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), "UTF-8"))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+            
+            int exitCode = process.waitFor();
+            
+            if (exitCode == 0) {
+                result.put("success", true);
+                result.put("message", "本地提交成功");
+                result.put("output", output.toString());
+                
+                // 解析commit hash（从输出中提取）
+                String outputStr = output.toString();
+                if (outputStr.contains("[")) {
+                    int start = outputStr.indexOf("[") + 1;
+                    int end = outputStr.indexOf("]");
+                    if (end > start) {
+                        String commitInfo = outputStr.substring(start, end);
+                        result.put("commitInfo", commitInfo);
+                    }
+                }
+            } else {
+                // 检查是否是"没有更改"的情况
+                String outputStr = output.toString();
+                if (outputStr.contains("nothing to commit") || outputStr.contains("no changes")) {
+                    result.put("success", true);
+                    result.put("message", "工作区干净，没有需要提交的更改");
+                    result.put("noChanges", true);
+                } else {
+                    result.put("success", false);
+                    result.put("message", "提交失败: " + outputStr);
+                    result.put("exitCode", exitCode);
+                }
+            }
             
             return ResponseEntity.ok(result);
             
         } catch (Exception e) {
             e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "切换分支失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            result.put("success", false);
+            result.put("message", "执行git commit失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
         }
     }
     
     /**
-     * 保存Git忽略规则
-     * POST /api/projects/{id}/git-ignore-rules
+     * Git智能同步 - 第三步：获取远程更新
+     * POST /api/projects/{id}/git/fetch
      */
-    @PostMapping("/{id}/git-ignore-rules")
-    public ResponseEntity<Map<String, Object>> saveGitIgnoreRules(
+    @PostMapping("/{id}/git/fetch")
+    public ResponseEntity<Map<String, Object>> gitFetch(@PathVariable Long id) {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            // 获取项目信息
+            Project project = projectService.getProjectById(id)
+                .orElseThrow(() -> new RuntimeException("项目不存在"));
+            
+            String localPath = project.getLocalPath();
+            if (localPath == null || localPath.trim().isEmpty()) {
+                result.put("success", false);
+                result.put("message", "该项目没有配置本地路径");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            File projectDir = new File(localPath);
+            if (!projectDir.exists() || !projectDir.isDirectory()) {
+                result.put("success", false);
+                result.put("message", "本地路径不存在: " + localPath);
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 检查是否是Git仓库
+            File gitDir = new File(projectDir, ".git");
+            if (!gitDir.exists()) {
+                result.put("success", false);
+                result.put("message", "该项目不是Git仓库");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 执行 git fetch
+            ProcessBuilder pb = new ProcessBuilder("git", "fetch");
+            pb.directory(new File(localPath));
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            
+            // 读取命令输出
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), "UTF-8"))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+            
+            int exitCode = process.waitFor();
+            
+            if (exitCode == 0) {
+                result.put("success", true);
+                result.put("message", "获取远程最新状态完成");
+                result.put("output", output.toString());
+            } else {
+                result.put("success", false);
+                result.put("message", "获取远程更新失败: " + output.toString());
+                result.put("exitCode", exitCode);
+            }
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.put("success", false);
+            result.put("message", "执行git fetch失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
+        }
+    }
+    
+    /**
+     * Git智能同步 - 第三步：变基拉取
+     * POST /api/projects/{id}/git/pull-rebase
+     */
+    @PostMapping("/{id}/git/pull-rebase")
+    public ResponseEntity<Map<String, Object>> gitPullRebase(@PathVariable Long id) {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            // 获取项目信息
+            Project project = projectService.getProjectById(id)
+                .orElseThrow(() -> new RuntimeException("项目不存在"));
+            
+            String localPath = project.getLocalPath();
+            if (localPath == null || localPath.trim().isEmpty()) {
+                result.put("success", false);
+                result.put("message", "该项目没有配置本地路径");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            File projectDir = new File(localPath);
+            if (!projectDir.exists() || !projectDir.isDirectory()) {
+                result.put("success", false);
+                result.put("message", "本地路径不存在: " + localPath);
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 检查是否是Git仓库
+            File gitDir = new File(projectDir, ".git");
+            if (!gitDir.exists()) {
+                result.put("success", false);
+                result.put("message", "该项目不是Git仓库");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 执行 git pull --rebase
+            ProcessBuilder pb = new ProcessBuilder("git", "pull", "--rebase");
+            pb.directory(new File(localPath));
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            
+            // 读取命令输出
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), "UTF-8"))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+            
+            int exitCode = process.waitFor();
+            String outputStr = output.toString();
+            
+            // 检查是否有冲突
+            boolean hasConflict = outputStr.contains("CONFLICT") || 
+                                 outputStr.contains("conflict") ||
+                                 exitCode != 0;
+            
+            if (exitCode == 0) {
+                result.put("success", true);
+                result.put("hasConflict", false);
+                
+                // 判断是否已经是最新的
+                if (outputStr.contains("Already up to date") || 
+                    outputStr.contains("Already up-to-date") ||
+                    outputStr.contains("Current branch") && outputStr.contains("up to date")) {
+                    result.put("message", "当前分支已是最新");
+                    result.put("upToDate", true);
+                } else {
+                    result.put("message", "变基拉取成功");
+                    result.put("upToDate", false);
+                }
+                
+                result.put("output", outputStr);
+            } else {
+                // 检查是否是冲突
+                if (hasConflict) {
+                    result.put("success", false);
+                    result.put("hasConflict", true);
+                    result.put("message", "检测到代码冲突，请在IDE中解决后继续");
+                    result.put("output", outputStr);
+                    
+                    // 不执行abort，保留冲突现场让用户解决
+                    result.put("rebaseAborted", false);
+                    result.put("abortMessage", "请解决冲突后点击'继续推送'");
+                } else {
+                    result.put("success", false);
+                    result.put("hasConflict", false);
+                    result.put("message", "拉取失败: " + outputStr);
+                    result.put("exitCode", exitCode);
+                }
+            }
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.put("success", false);
+            result.put("message", "执行git pull --rebase失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
+        }
+    }
+    
+    /**
+     * 检查是否处于rebase状态
+     * POST /api/projects/{id}/git/check-rebase-status
+     */
+    @PostMapping("/{id}/git/check-rebase-status")
+    public ResponseEntity<Map<String, Object>> checkRebaseStatus(@PathVariable Long id) {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            // 获取项目信息
+            Project project = projectService.getProjectById(id)
+                .orElseThrow(() -> new RuntimeException("项目不存在"));
+            
+            String localPath = project.getLocalPath();
+            if (localPath == null || localPath.trim().isEmpty()) {
+                result.put("success", false);
+                result.put("message", "该项目没有配置本地路径");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            File projectDir = new File(localPath);
+            // 检查 .git/rebase-merge 或 .git/rebase-apply 目录
+            File rebaseMerge = new File(projectDir, ".git/rebase-merge");
+            File rebaseApply = new File(projectDir, ".git/rebase-apply");
+            
+            boolean inRebase = rebaseMerge.exists() || rebaseApply.exists();
+            
+            result.put("success", true);
+            result.put("inRebase", inRebase);
+            
+            if (inRebase) {
+                result.put("message", "当前处于rebase状态");
+            } else {
+                result.put("message", "当前不在rebase状态");
+            }
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.put("success", false);
+            result.put("message", "检查rebase状态失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
+        }
+    }
+    
+    /**
+     * 继续推送（解决冲突后）
+     * POST /api/projects/{id}/git/continue-push
+     * 自动执行：git add . → git rebase --continue → git push
+     */
+    @PostMapping("/{id}/git/continue-push")
+    public ResponseEntity<Map<String, Object>> continuePush(@PathVariable Long id) {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            // 获取项目信息
+            Project project = projectService.getProjectById(id)
+                .orElseThrow(() -> new RuntimeException("项目不存在"));
+            
+            String localPath = project.getLocalPath();
+            if (localPath == null || localPath.trim().isEmpty()) {
+                result.put("success", false);
+                result.put("message", "该项目没有配置本地路径");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            File projectDir = new File(localPath);
+            if (!projectDir.exists() || !projectDir.isDirectory()) {
+                result.put("success", false);
+                result.put("message", "本地路径不存在: " + localPath);
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 步骤1: git add . (暂存所有解决后的文件)
+            ProcessBuilder addPb = new ProcessBuilder("git", "add", ".");
+            addPb.directory(new File(localPath));
+            addPb.redirectErrorStream(true);
+            Process addProcess = addPb.start();
+            
+            StringBuilder addOutput = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(addProcess.getInputStream(), "UTF-8"))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    addOutput.append(line).append("\n");
+                }
+            }
+            
+            int addExitCode = addProcess.waitFor();
+            if (addExitCode != 0) {
+                result.put("success", false);
+                result.put("message", "暂存文件失败: " + addOutput.toString());
+                result.put("step", "add");
+                return ResponseEntity.ok(result);
+            }
+            
+            // 步骤2: git rebase --continue
+            ProcessBuilder continuePb = new ProcessBuilder("git", "rebase", "--continue");
+            continuePb.directory(new File(localPath));
+            continuePb.redirectErrorStream(true);
+            Process continueProcess = continuePb.start();
+            
+            StringBuilder continueOutput = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(continueProcess.getInputStream(), "UTF-8"))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    continueOutput.append(line).append("\n");
+                }
+            }
+            
+            int continueExitCode = continueProcess.waitFor();
+            String continueOutputStr = continueOutput.toString();
+            
+            // 检查是否还有冲突
+            if (continueOutputStr.contains("CONFLICT") || continueOutputStr.contains("conflict")) {
+                result.put("success", false);
+                result.put("hasConflict", true);
+                result.put("message", "仍有未解决的冲突，请继续解决");
+                result.put("output", continueOutputStr);
+                result.put("step", "rebase-continue");
+                return ResponseEntity.ok(result);
+            }
+            
+            if (continueExitCode != 0) {
+                result.put("success", false);
+                result.put("message", "继续rebase失败: " + continueOutputStr);
+                result.put("step", "rebase-continue");
+                return ResponseEntity.ok(result);
+            }
+            
+            // 步骤3: git push
+            ProcessBuilder pushPb = new ProcessBuilder("git", "push");
+            pushPb.directory(new File(localPath));
+            pushPb.redirectErrorStream(true);
+            Process pushProcess = pushPb.start();
+            
+            StringBuilder pushOutput = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(pushProcess.getInputStream(), "UTF-8"))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    pushOutput.append(line).append("\n");
+                }
+            }
+            
+            int pushExitCode = pushProcess.waitFor();
+            String pushOutputStr = pushOutput.toString();
+            
+            if (pushExitCode == 0) {
+                result.put("success", true);
+                result.put("message", "推送成功！");
+                result.put("output", pushOutputStr);
+            } else {
+                result.put("success", false);
+                result.put("message", "推送失败: " + pushOutputStr);
+                result.put("step", "push");
+            }
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.put("success", false);
+            result.put("message", "继续推送失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
+        }
+    }
+    
+    /**
+     * Git推送代码 - 第五步
+     * POST /api/projects/{id}/git/push
+     * 支持指定本地分支和远程分支
+     */
+    @PostMapping("/{id}/git/push")
+    public ResponseEntity<Map<String, Object>> gitPush(
             @PathVariable Long id,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody(required = false) Map<String, String> requestBody) {
+        Map<String, Object> result = new HashMap<>();
+        
         try {
+            // 获取项目信息
             Project project = projectService.getProjectById(id)
                 .orElseThrow(() -> new RuntimeException("项目不存在"));
             
             String localPath = project.getLocalPath();
             if (localPath == null || localPath.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "该项目没有配置本地路径");
-                return ResponseEntity.badRequest().body(response);
+                result.put("success", false);
+                result.put("message", "该项目没有配置本地路径");
+                return ResponseEntity.badRequest().body(result);
             }
             
-            List<String> ignoreFiles = (List<String>) body.get("ignoreFiles");
-            Map<String, Object> result = gitService.saveIgnoreRules(localPath, ignoreFiles);
+            File projectDir = new File(localPath);
+            if (!projectDir.exists() || !projectDir.isDirectory()) {
+                result.put("success", false);
+                result.put("message", "本地路径不存在: " + localPath);
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 检查是否是Git仓库
+            File gitDir = new File(projectDir, ".git");
+            if (!gitDir.exists()) {
+                result.put("success", false);
+                result.put("message", "该项目不是Git仓库");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            // 获取分支参数（可选）
+            String localBranch = requestBody != null ? requestBody.get("localBranch") : null;
+            String remoteBranch = requestBody != null ? requestBody.get("remoteBranch") : null;
+            
+            // 构建 git push 命令
+            List<String> pushCommand = new ArrayList<>();
+            pushCommand.add("git");
+            pushCommand.add("push");
+            
+            // 如果指定了分支，添加分支参数
+            if (remoteBranch != null && !remoteBranch.trim().isEmpty()) {
+                // 解析远程分支，格式可能是 origin/main 或 main
+                String[] parts = remoteBranch.split("/");
+                String remote = parts.length > 1 ? parts[0] : "origin";
+                String branch = parts.length > 1 ? parts[1] : remoteBranch;
+                
+                pushCommand.add(remote);
+                
+                if (localBranch != null && !localBranch.trim().isEmpty()) {
+                    // 推送本地分支到远程分支: git push origin localBranch:remoteBranch
+                    pushCommand.add(localBranch + ":" + branch);
+                } else {
+                    // 只推送到指定的远程分支: git push origin remoteBranch
+                    pushCommand.add(branch);
+                }
+            }
+            
+            // 执行 git push
+            ProcessBuilder pb = new ProcessBuilder(pushCommand);
+            pb.directory(new File(localPath));
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            
+            // 读取命令输出
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), "UTF-8"))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+            
+            int exitCode = process.waitFor();
+            String outputStr = output.toString();
+            
+            if (exitCode == 0) {
+                result.put("success", true);
+                result.put("message", "推送成功！");
+                result.put("output", outputStr);
+                
+                // 检查是否是 "Everything up-to-date"
+                if (outputStr.contains("Everything up-to-date") || 
+                    outputStr.contains("up to date")) {
+                    result.put("upToDate", true);
+                    result.put("message", "已是最新，无需推送");
+                } else {
+                    result.put("upToDate", false);
+                }
+            } else {
+                // 检查常见的push失败原因
+                if (outputStr.contains("rejected") || outputStr.contains("non-fast-forward")) {
+                    result.put("success", false);
+                    result.put("needPull", true);
+                    result.put("message", "推送被拒绝：远程有新提交，需要先拉取");
+                } else if (outputStr.contains("no upstream") || outputStr.contains("set-upstream")) {
+                    result.put("success", false);
+                    result.put("needSetUpstream", true);
+                    result.put("message", "未设置上游分支，请先配置远程分支");
+                } else {
+                    result.put("success", false);
+                    result.put("message", "推送失败: " + outputStr);
+                }
+                result.put("exitCode", exitCode);
+            }
             
             return ResponseEntity.ok(result);
             
         } catch (Exception e) {
             e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "保存忽略规则失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
-    
-    /**
-     * 获取Git忽略规则
-     * GET /api/projects/{id}/git-ignore-rules
-     */
-    @GetMapping("/{id}/git-ignore-rules")
-    public ResponseEntity<Map<String, Object>> getGitIgnoreRules(@PathVariable Long id) {
-        try {
-            Project project = projectService.getProjectById(id)
-                .orElseThrow(() -> new RuntimeException("项目不存在"));
-            
-            String localPath = project.getLocalPath();
-            if (localPath == null || localPath.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "该项目没有配置本地路径");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            Map<String, Object> result = gitService.loadIgnoreRules(localPath);
-            return ResponseEntity.ok(result);
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "获取忽略规则失败: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            result.put("success", false);
+            result.put("message", "执行git push失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
         }
     }
 }
