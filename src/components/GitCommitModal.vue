@@ -10,7 +10,8 @@ import {
   Document, 
   Upload, 
   Download, 
-  Connection 
+  Connection,
+  Refresh
 } from '@element-plus/icons-vue'
 
 const props = defineProps<{
@@ -33,6 +34,8 @@ const isProcessing = ref(false)
 const activeStep = ref(0)
 // 是否有冲突待解决
 const hasConflictPending = ref(false)
+// 失败的步骤（用于重试）
+const failedStep = ref<'fetch' | 'pull' | 'push' | null>(null)
 
 // 分支相关
 const currentBranch = ref('')
@@ -89,6 +92,7 @@ const resetState = () => {
   commitMessage.value = ''
   isProcessing.value = false
   hasConflictPending.value = false
+  failedStep.value = null
   // 不重置分支选择，保留用户的选择
 }
 
@@ -248,6 +252,8 @@ const startSmartCommit = async () => {
     if (!fetchResponse.data.success) {
       stepStatus.value = 'error'
       addLog(fetchResponse.data.message, 'error')
+      addLog('网络请求失败，可点击下方"重试"按钮重新执行', 'warning')
+      failedStep.value = 'fetch'
       isProcessing.value = false
       return
     }
@@ -274,6 +280,8 @@ const startSmartCommit = async () => {
     if (!pullResponse.data.success) {
       stepStatus.value = 'error'
       addLog(pullResponse.data.message, 'error')
+      addLog('网络请求失败，可点击下方"重试"按钮重新执行', 'warning')
+      failedStep.value = 'pull'
       isProcessing.value = false
       return
     }
@@ -292,42 +300,7 @@ const startSmartCommit = async () => {
     activeStep.value = 4
 
     // 5. 推送代码
-    const pushCmd = selectedRemoteBranch.value 
-      ? `git push ${selectedRemoteBranch.value.split('/')[0]} ${selectedLocalBranch.value}:${selectedRemoteBranch.value.split('/').slice(1).join('/')}`
-      : 'git push'
-    addLog(pushCmd, 'cmd')
-    addLog('正在推送到远程服务器...', 'info')
-    
-    const pushResponse = await axios.post(`/api/projects/${props.projectId}/git/push`, {
-      localBranch: selectedLocalBranch.value,
-      remoteBranch: selectedRemoteBranch.value
-    })
-    
-    if (!pushResponse.data.success) {
-      stepStatus.value = 'error'
-      addLog(pushResponse.data.message, 'error')
-      
-      if (pushResponse.data.needPull) {
-        addLog('远程有新提交，请重新执行智能提交', 'warning')
-      }
-      
-      isProcessing.value = false
-      return
-    }
-    
-    // 推送成功
-    if (pushResponse.data.upToDate) {
-      addLog('已是最新，无需推送', 'success')
-    } else {
-      addLog('推送成功！', 'success')
-    }
-    
-    activeStep.value = 5
-    stepStatus.value = 'success'
-    addLog('✅ 智能提交全流程执行完毕', 'success')
-    
-    emit('success')
-    isProcessing.value = false
+    await executePush()
     
   } catch (error: any) {
     console.error(error)
@@ -398,6 +371,178 @@ const continuePush = async () => {
       duration: 3000
     })
   }
+}
+
+// 重试网络操作
+const retryNetworkStep = async () => {
+  if (!props.projectId || !failedStep.value) {
+    addLog('没有可重试的步骤', 'error')
+    return
+  }
+
+  isProcessing.value = true
+  addLog('', 'info')
+  addLog('开始重试...', 'info')
+
+  try {
+    // 根据失败的步骤执行对应操作
+    if (failedStep.value === 'fetch') {
+      // 重试 fetch
+      addLog('git fetch', 'cmd')
+      addLog('正在重新获取远程最新状态...', 'info')
+      
+      const fetchResponse = await axios.post(`/api/projects/${props.projectId}/git/fetch`)
+      
+      if (!fetchResponse.data.success) {
+        stepStatus.value = 'error'
+        addLog(fetchResponse.data.message, 'error')
+        addLog('重试失败，请检查网络连接', 'warning')
+        isProcessing.value = false
+        return
+      }
+      
+      addLog('获取远程最新状态完成', 'success')
+      failedStep.value = null
+      
+      // 继续执行 pull
+      addLog('git pull --rebase', 'cmd')
+      addLog('正在变基拉取远程代码...', 'info')
+      
+      const pullResponse = await axios.post(`/api/projects/${props.projectId}/git/pull-rebase`)
+      
+      if (pullResponse.data.hasConflict) {
+        stepStatus.value = 'error'
+        addLog('检测到代码冲突！', 'error')
+        addLog('请在IDE中编辑解决冲突文件', 'warning')
+        addLog('解决完成后，点击下方"继续推送"按钮', 'warning')
+        hasConflictPending.value = true
+        isProcessing.value = false
+        return
+      }
+      
+      if (!pullResponse.data.success) {
+        stepStatus.value = 'error'
+        addLog(pullResponse.data.message, 'error')
+        addLog('网络请求失败，可点击下方"重试"按钮重新执行', 'warning')
+        failedStep.value = 'pull'
+        isProcessing.value = false
+        return
+      }
+      
+      if (pullResponse.data.upToDate) {
+        addLog('当前分支已是最新', 'success')
+      } else {
+        addLog('变基拉取成功', 'success')
+      }
+      
+      activeStep.value = 3
+      addLog('代码合并状态良好，无冲突', 'success')
+      activeStep.value = 4
+      
+      // 继续推送
+      await executePush()
+      
+    } else if (failedStep.value === 'pull') {
+      // 重试 pull
+      addLog('git pull --rebase', 'cmd')
+      addLog('正在重新变基拉取远程代码...', 'info')
+      
+      const pullResponse = await axios.post(`/api/projects/${props.projectId}/git/pull-rebase`)
+      
+      if (pullResponse.data.hasConflict) {
+        stepStatus.value = 'error'
+        addLog('检测到代码冲突！', 'error')
+        addLog('请在IDE中编辑解决冲突文件', 'warning')
+        addLog('解决完成后，点击下方"继续推送"按钮', 'warning')
+        hasConflictPending.value = true
+        isProcessing.value = false
+        return
+      }
+      
+      if (!pullResponse.data.success) {
+        stepStatus.value = 'error'
+        addLog(pullResponse.data.message, 'error')
+        addLog('重试失败，请检查网络连接', 'warning')
+        isProcessing.value = false
+        return
+      }
+      
+      if (pullResponse.data.upToDate) {
+        addLog('当前分支已是最新', 'success')
+      } else {
+        addLog('变基拉取成功', 'success')
+      }
+      
+      failedStep.value = null
+      activeStep.value = 3
+      addLog('代码合并状态良好，无冲突', 'success')
+      activeStep.value = 4
+      
+      // 继续推送
+      await executePush()
+      
+    } else if (failedStep.value === 'push') {
+      // 重试 push
+      await executePush()
+    }
+    
+  } catch (error: any) {
+    console.error(error)
+    stepStatus.value = 'error'
+    const errorMsg = error.response?.data?.message || error.message || '未知错误'
+    addLog(`重试出错: ${errorMsg}`, 'error')
+    isProcessing.value = false
+    
+    ElMessage.error({
+      message: errorMsg,
+      duration: 3000
+    })
+  }
+}
+
+// 执行推送操作（提取为独立函数，供重试使用）
+const executePush = async () => {
+  const pushCmd = selectedRemoteBranch.value 
+    ? `git push ${selectedRemoteBranch.value.split('/')[0]} ${selectedLocalBranch.value}:${selectedRemoteBranch.value.split('/').slice(1).join('/')}`
+    : 'git push'
+  addLog(pushCmd, 'cmd')
+  addLog('正在推送到远程服务器...', 'info')
+  
+  const pushResponse = await axios.post(`/api/projects/${props.projectId}/git/push`, {
+    localBranch: selectedLocalBranch.value,
+    remoteBranch: selectedRemoteBranch.value
+  })
+  
+  if (!pushResponse.data.success) {
+    stepStatus.value = 'error'
+    addLog(pushResponse.data.message, 'error')
+    
+    if (pushResponse.data.needPull) {
+      addLog('远程有新提交，请重新执行智能提交', 'warning')
+      failedStep.value = null
+    } else {
+      addLog('网络请求失败，可点击下方"重试"按钮重新执行', 'warning')
+      failedStep.value = 'push'
+    }
+    
+    isProcessing.value = false
+    return
+  }
+  
+  // 推送成功
+  if (pushResponse.data.upToDate) {
+    addLog('已是最新，无需推送', 'success')
+  } else {
+    addLog('推送成功！', 'success')
+  }
+  
+  activeStep.value = 5
+  stepStatus.value = 'success'
+  addLog('智能提交全流程执行完毕', 'success')
+  
+  failedStep.value = null
+  emit('success')
+  isProcessing.value = false
 }
 
 </script>
@@ -517,13 +662,24 @@ const continuePush = async () => {
         
         <!-- 正常提交按钮 -->
         <el-button 
-          v-if="!hasConflictPending"
+          v-if="!hasConflictPending && !failedStep"
           type="primary" 
           @click="startSmartCommit" 
           :loading="isProcessing"
           :disabled="!commitMessage.trim()"
         >
           {{ isProcessing ? '正在执行...' : '开始智能提交' }}
+        </el-button>
+        
+        <!-- 重试按钮（网络请求失败时显示） -->
+        <el-button 
+          v-if="!hasConflictPending && failedStep"
+          type="warning" 
+          @click="retryNetworkStep" 
+          :loading="isProcessing"
+          :icon="Refresh"
+        >
+          {{ isProcessing ? '正在重试...' : '重试' }}
         </el-button>
         
         <!-- 继续推送按钮（冲突时显示） -->
