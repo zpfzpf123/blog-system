@@ -176,11 +176,13 @@ public class FileSystemController {
             }
             
             // 使用 git show 命令获取提交详情
+            // -c core.quotepath=false: 禁止对中文文件名进行转义
             // --stat: 显示文件变更统计
             // --numstat: 显示数字统计（添加/删除行数）
             // -p: 显示详细的diff
             ProcessBuilder pb = new ProcessBuilder(
-                "git", "show",
+                "git", "-c", "core.quotepath=false",
+                "show",
                 commitHash,
                 "--stat",
                 "--numstat",
