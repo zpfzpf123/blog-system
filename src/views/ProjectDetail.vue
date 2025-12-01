@@ -32,7 +32,6 @@ interface Project {
   techStack: string[]
   localPath?: string
   repoUrl?: string
-  readmeContent?: string
   gitCommits?: string
   createdAt: string
   updatedAt: string
@@ -86,7 +85,7 @@ const generateToc = () => {
 }
 
 // 监听项目内容变化重新生成目录
-watch(() => project.value?.readmeContent, () => {
+watch(() => project.value?.description, () => {
   generateToc()
 })
 
@@ -114,11 +113,12 @@ const gitCommits = computed<GitCommit[]>(() => {
 })
 
 const readmeHtml = computed(() => {
-  if (!project.value?.readmeContent) return ''
+  const content = project.value?.description
+  if (!content) return ''
   try {
-    return marked(project.value.readmeContent)
+    return marked(content)
   } catch (error) {
-    return project.value.readmeContent
+    return content
   }
 })
 

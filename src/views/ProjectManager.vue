@@ -17,10 +17,11 @@ interface Project {
   techStack: string[]
   localPath?: string
   repoUrl?: string
-  readmeContent?: string
   gitCommits?: string
   gitUserId?: number
   isFavorite: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 interface GitUser {
@@ -51,6 +52,15 @@ const searchKeyword = ref('')
 const statusFilter = ref<string>('')
 const folderSelectorVisible = ref(false)
 const analyzingProject = ref(false)
+const addGitUserDialogVisible = ref(false)
+const newGitUserName = ref('')
+const newGitUserData = ref({
+  name: '',
+  username: '',
+  password: '',
+  email: '',
+  description: ''
+})
 
 // 表单数据
 const formData = ref<Partial<Project>>({
@@ -61,7 +71,6 @@ const formData = ref<Partial<Project>>({
   techStack: [],
   localPath: '',
   repoUrl: '',
-  readmeContent: '',
   gitCommits: '',
   isFavorite: false,
 })
@@ -175,7 +184,6 @@ const openCreateDialog = () => {
     techStack: [],
     localPath: '',
     repoUrl: '',
-    readmeContent: '',
     gitCommits: '',
     gitUserId: undefined,
     isFavorite: false,
@@ -219,7 +227,6 @@ const analyzeProject = async (path: string) => {
     
     // 自动填充README内容
     if (result.readmeContent) {
-      formData.value.readmeContent = result.readmeContent
       formData.value.description = result.readmeContent // 使用完整README内容作为描述
     }
     
@@ -329,12 +336,67 @@ const formatDate = (dateStr: string) => {
   return date.toLocaleDateString('zh-CN')
 }
 
+// 进度条颜色
+const getProgressColor = (progress: number) => {
+  if (progress >= 80) return '#67c23a'
+  if (progress >= 50) return '#409eff'
+  if (progress >= 30) return '#e6a23c'
+  return '#f56c6c'
+}
+
 // 查看项目详情
 const viewProjectDetail = (project: Project) => {
   router.push({
     name: 'ProjectDetail',
     params: { id: project.id }
   })
+}
+
+// 显示新增Git用户按钮
+const showAddGitUserButton = computed(() => {
+  if (!formData.value.gitUserId) return false
+  // 检查输入的是否是新用户名（不在现有用户列表中）
+  const inputValue = formData.value.gitUserId
+  return typeof inputValue === 'string' && !gitUsers.value.some(u => u.id === inputValue)
+})
+
+// 打开新增Git用户对话框
+const openAddGitUserDialog = () => {
+  // 获取输入的用户名
+  const inputUsername = formData.value.gitUserId as string
+  newGitUserData.value = {
+    name: inputUsername,
+    username: inputUsername,
+    password: '',
+    email: '',
+    description: ''
+  }
+  addGitUserDialogVisible.value = true
+}
+
+// 新增Git用户
+const addGitUser = async () => {
+  if (!newGitUserData.value.username || !newGitUserData.value.password) {
+    ElMessage.warning('请输入用户名和Token')
+    return
+  }
+
+  try {
+    const response = await axios.post('/api/git-users', newGitUserData.value)
+    ElMessage.success('Git用户创建成功')
+    
+    // 刷新Git用户列表
+    await fetchGitUsers()
+    
+    // 将新创建的用户设置为当前项目的Git用户
+    formData.value.gitUserId = response.data.id
+    
+    // 关闭对话框
+    addGitUserDialogVisible.value = false
+  } catch (error: any) {
+    console.error('创建Git用户失败:', error)
+    ElMessage.error(error.response?.data?.message || '创建Git用户失败')
+  }
 }
 
 onMounted(() => {
@@ -451,6 +513,15 @@ onMounted(() => {
         <div class="card-body">
           <p class="project-description">{{ project.description || '暂无描述' }}</p>
 
+          <div class="progress-section">
+            <div class="progress-label">项目进度</div>
+            <el-progress 
+              :percentage="project.progress" 
+              :color="getProgressColor(project.progress)"
+              :stroke-width="8"
+            />
+          </div>
+
           <div v-if="project.techStack && project.techStack.length > 0" class="tech-tags">
             <el-tag
               v-for="tech in project.techStack.slice(0, 4)"
@@ -551,10 +622,7 @@ onMounted(() => {
               {{ analyzingProject ? '解析中...' : '选择文件夹' }}
             </el-button>
           </div>
-          <div v-if="formData.readmeContent" style="margin-top: 8px; font-size: 12px; color: #67c23a;">
-            ✓ 已读取README.md ({{ formData.readmeContent.length }} 字符)
-          </div>
-          <div v-if="formData.gitCommits" style="margin-top: 4px; font-size: 12px; color: #409eff;">
+          <div v-if="formData.gitCommits" style="margin-top: 8px; font-size: 12px; color: #409eff;">
             ✓ 已读取 {{ JSON.parse(formData.gitCommits).length }} 条Git提交记录
           </div>
         </el-form-item>
@@ -564,27 +632,38 @@ onMounted(() => {
         </el-form-item>
 
         <el-form-item label="Git用户">
-          <el-select 
-            v-model="formData.gitUserId" 
-            placeholder="选择Git用户（用于代码提交）"
-            clearable
-            style="width: 100%"
-          >
-            <el-option
-              v-for="user in gitUsers"
-              :key="user.id"
-              :label="`${user.name} (${user.username})`"
-              :value="user.id"
+          <div style="display: flex; gap: 12px; align-items: flex-start;">
+            <el-select 
+              v-model="formData.gitUserId" 
+              placeholder="选择或输入新Git用户名"
+              filterable
+              allow-create
+              clearable
+              style="flex: 1;"
             >
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span>{{ user.name }}</span>
-                <span style="font-size: 12px; color: #999;">{{ user.username }}</span>
-                <el-tag v-if="user.isDefault" size="small" type="success">默认</el-tag>
-              </div>
-            </el-option>
-          </el-select>
+              <el-option
+                v-for="user in gitUsers"
+                :key="user.id"
+                :label="`${user.name} (${user.username})`"
+                :value="user.id"
+              >
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>{{ user.name }}</span>
+                  <span style="font-size: 12px; color: #999;">{{ user.username }}</span>
+                  <el-tag v-if="user.isDefault" size="small" type="success">默认</el-tag>
+                </div>
+              </el-option>
+            </el-select>
+            <el-button 
+              v-if="showAddGitUserButton" 
+              type="primary" 
+              @click="openAddGitUserDialog"
+            >
+              新增
+            </el-button>
+          </div>
           <div style="margin-top: 8px; font-size: 12px; color: #909399;">
-            💡 提示：选择后在Git提交时将使用此账号
+            💡 提示：可以选择已有用户，或输入新用户名后点击"新增"按钮创建
           </div>
         </el-form-item>
 
@@ -604,6 +683,54 @@ onMounted(() => {
       v-model="folderSelectorVisible"
       @confirm="handleFolderSelected"
     />
+
+    <!-- 新增Git用户对话框 -->
+    <el-dialog
+      v-model="addGitUserDialogVisible"
+      title="新增Git用户"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <el-form :model="newGitUserData" label-width="100px">
+        <el-form-item label="显示名称" required>
+          <el-input v-model="newGitUserData.name" placeholder="请输入显示名称" />
+        </el-form-item>
+
+        <el-form-item label="用户名" required>
+          <el-input v-model="newGitUserData.username" placeholder="请输入Git用户名" />
+        </el-form-item>
+
+        <el-form-item label="Token" required>
+          <el-input 
+            v-model="newGitUserData.password" 
+            type="password"
+            show-password
+            placeholder="请输入Personal Access Token"
+          />
+          <div style="margin-top: 4px; font-size: 12px; color: #909399;">
+            提示：用于Git操作的访问令牌
+          </div>
+        </el-form-item>
+
+        <el-form-item label="邮箱">
+          <el-input v-model="newGitUserData.email" placeholder="请输入邮箱（可选）" />
+        </el-form-item>
+
+        <el-form-item label="描述">
+          <el-input 
+            v-model="newGitUserData.description" 
+            type="textarea"
+            :rows="3"
+            placeholder="请输入描述（可选）"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="addGitUserDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="addGitUser">新增用户</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -777,6 +904,17 @@ onMounted(() => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.progress-section {
+  margin-bottom: 16px;
+}
+
+.progress-label {
+  font-size: 13px;
+  color: #606266;
+  font-weight: 500;
+  margin-bottom: 8px;
 }
 
 .tech-tags {

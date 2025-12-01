@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Folder, ArrowLeft, Check } from '@element-plus/icons-vue'
 import axios from '@/utils/axios'
@@ -67,9 +67,18 @@ const loadDirectory = async (path: string) => {
     
     // 计算父路径
     if (path) {
-      const parts = path.split(/[/\\]/)
+      const parts = path.split(/[/\\]/).filter(p => p) // 过滤空字符串
       parts.pop()
-      parentPath.value = parts.join('\\') || ''
+      if (parts.length === 0) {
+        // 已经在根目录，返回磁盘列表
+        parentPath.value = ''
+      } else if (parts.length === 1 && parts[0].endsWith(':')) {
+        // 盘符根目录，如 E:\ 
+        parentPath.value = parts[0] + '\\'
+      } else {
+        // 普通目录
+        parentPath.value = parts.join('\\')
+      }
     }
   } catch (error) {
     console.error('加载文件夹失败:', error)
@@ -111,6 +120,42 @@ const handleConfirm = () => {
   emit('confirm', selectedPath.value)
   visible.value = false
 }
+
+// 生成面包屑导航
+const breadcrumbs = computed(() => {
+  if (!currentPath.value) {
+    return [{ name: '我的电脑', path: '' }]
+  }
+  
+  const parts = currentPath.value.split(/[/\\]/).filter(p => p)
+  const crumbs = [{ name: '我的电脑', path: '' }]
+  
+  let accumulatedPath = ''
+  parts.forEach((part, index) => {
+    if (index === 0) {
+      // 盘符，如 E:
+      accumulatedPath = part + '\\'
+    } else {
+      // 子目录
+      accumulatedPath += part
+      if (index < parts.length - 1) {
+        accumulatedPath += '\\'
+      }
+    }
+    crumbs.push({ name: part, path: accumulatedPath })
+  })
+  
+  return crumbs
+})
+
+// 点击面包屑跳转
+const handleBreadcrumbClick = (path: string) => {
+  if (path === '') {
+    loadRootDrives()
+  } else {
+    loadDirectory(path)
+  }
+}
 </script>
 
 <template>
@@ -126,7 +171,22 @@ const handleConfirm = () => {
         <el-button :icon="ArrowLeft" size="small" @click="goBack" :disabled="currentPath === ''">
           返回上一级
         </el-button>
-        <span class="path-text">{{ currentPath || '我的电脑' }}</span>
+        <div class="breadcrumb-container">
+          <span
+            v-for="(crumb, index) in breadcrumbs"
+            :key="crumb.path"
+            class="breadcrumb-item"
+          >
+            <span
+              class="breadcrumb-link"
+              :class="{ 'active': index === breadcrumbs.length - 1 }"
+              @click="handleBreadcrumbClick(crumb.path)"
+            >
+              {{ crumb.name }}
+            </span>
+            <span v-if="index < breadcrumbs.length - 1" class="breadcrumb-separator">\</span>
+          </span>
+        </div>
       </div>
 
       <!-- 文件夹列表 -->
@@ -186,6 +246,52 @@ const handleConfirm = () => {
   word-break: break-all;
 }
 
+.breadcrumb-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 14px;
+  overflow-x: auto;
+}
+
+.breadcrumb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.breadcrumb-link {
+  color: #409eff;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.breadcrumb-link:hover {
+  background: #ecf5ff;
+  color: #66b1ff;
+}
+
+.breadcrumb-link.active {
+  color: #303133;
+  font-weight: 500;
+  cursor: default;
+}
+
+.breadcrumb-link.active:hover {
+  background: transparent;
+}
+
+.breadcrumb-separator {
+  color: #909399;
+  font-size: 12px;
+  user-select: none;
+}
+
 .folder-list {
   flex: 1;
   min-height: 300px;
@@ -205,6 +311,10 @@ const handleConfirm = () => {
   cursor: pointer;
   transition: all 0.2s;
   position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .folder-item:hover {
