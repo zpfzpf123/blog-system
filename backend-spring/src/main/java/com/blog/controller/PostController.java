@@ -41,6 +41,8 @@ public class PostController {
      * @param categoryIds 分类ID列表
      * @param tagIds 标签ID列表
      * @param search 搜索关键字
+     * @param sortBy 排序字段
+     * @param sortOrder 排序方式
      * @return ResponseEntity<PostsResponseDTO> 文章列表响应
      */
     public ResponseEntity<PostsResponseDTO> getPosts(
@@ -48,9 +50,11 @@ public class PostController {
             @RequestParam(defaultValue = "10") Integer limit,
             @RequestParam(required = false) List<Long> categoryIds,
             @RequestParam(required = false) List<Long> tagIds,
-            @RequestParam(required = false) String search) {
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
         
-        PostsResponseDTO response = postService.getPosts(page, limit, categoryIds, tagIds, search);
+        PostsResponseDTO response = postService.getPosts(page, limit, categoryIds, tagIds, search, sortBy, sortOrder);
         return ResponseEntity.ok(response);
     }
     

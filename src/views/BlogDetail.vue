@@ -1,7 +1,5 @@
 <template>
   <div class="blog-detail-container">
-    <Breadcrumb />
-
     <div v-if="loading" class="loading-container">
       <el-card class="loading-card">
         <el-skeleton :rows="10" animated />
@@ -9,7 +7,7 @@
     </div>
 
     <div v-else-if="blogPost" class="blog-layout">
-      <div class="main-content">
+      <div class="blog-main">
         <el-card class="blog-card">
           <div class="blog-header">
             <h1 class="blog-title">{{ blogPost.title }}</h1>
@@ -46,7 +44,7 @@
           </div>
 
           <div class="blog-content">
-            <div v-html="renderedContent"></div>
+            <div class="markdown-body" v-html="renderedHtml"></div>
           </div>
 
           <div class="blog-footer">
@@ -79,46 +77,29 @@
         </el-card>
       </div>
 
-      <div class="sidebar">
-        <div class="toc-container">
-          <el-card class="toc-card">
+      <div class="blog-sidebar">
+        <div class="sidebar-sticky">
+          <el-card class="toc-card" @wheel.stop>
             <template #header>
               <div class="toc-header">
-                <div class="toc-title">
-                  <el-icon><List /></el-icon>
-                  <span>文章目录</span>
-                </div>
-                <div class="toc-actions">
-                  <el-button
-                    size="small"
-                    @click="toggleToc"
-                    :icon="tocExpanded ? ArrowUp : ArrowDown"
-                    text
-                  />
-                </div>
+                <el-icon><List /></el-icon>
+                <span>目录</span>
               </div>
             </template>
-
-            <div class="toc-content" :class="{ expanded: tocExpanded }">
+            <div class="toc-content">
               <div v-if="tocItems.length > 0" class="toc-list">
                 <div
                   v-for="item in tocItems"
                   :key="item.id"
-                  class="toc-item"
-                  :class="[`toc-level-${item.level}`, { active: currentHeadingId === item.id }]"
+                  :class="['toc-item', `toc-level-${item.level}`, { 'toc-active': activeTocId === item.id }]"
                   @click="scrollToHeading(item.id)"
                 >
-                  <span class="toc-text">{{ item.text }}</span>
+                  <span class="toc-text" :title="item.text">{{ item.text }}</span>
                 </div>
               </div>
-
               <div v-else class="toc-empty">
-                <el-empty description="暂无目录" :image-size="60" />
-                <p class="empty-tip">文章内容中未检测到标题结构</p>
-              </div>
-
-              <div v-if="tocItems.length > 0" class="toc-stats">
-                <span>共 {{ tocItems.length }} 个章节</span>
+                <el-icon><Document /></el-icon>
+                <span>暂无目录</span>
               </div>
             </div>
           </el-card>
@@ -143,21 +124,20 @@ import {
   Clock,
   Folder,
   Timer,
-  List,
   DocumentCopy,
   Share,
   FullScreen,
   Close,
-  ArrowUp,
-  ArrowDown,
+  List,
+  Document,
 } from '@element-plus/icons-vue'
 import axios from '@/utils/axios'
-import Breadcrumb from '@/components/Breadcrumb.vue'
 import MarkdownIt from 'markdown-it'
-import anchor from 'markdown-it-anchor'
-import toc from 'markdown-it-table-of-contents'
+import markdownItAnchor from 'markdown-it-anchor'
+import markdownItToc from 'markdown-it-table-of-contents'
 import hljs from 'highlight.js'
-import 'highlight.js/styles/github-dark.css'
+import 'highlight.js/styles/github.css'
+import 'github-markdown-css/github-markdown-light.css'
 import { processImageUrlsInMarkdown, copyEnhancedRichContent } from '@/utils/imageUtils'
 
 // 类型定义
@@ -181,23 +161,18 @@ interface BlogPost {
   tags: Tag[]
 }
 
-interface TocItem {
-  id: string
-  text: string
-  level: number
-}
-
 // 响应式数据
 const blogPost = ref<BlogPost | null>(null)
 const loading = ref(false)
 const estimatedReadingTime = ref(0)
-const currentHeadingId = ref('')
 const isFullscreen = ref(false)
-const tocExpanded = ref(true)
+const renderedHtml = ref('')
+const tocItems = ref<Array<{ id: string; text: string; level: number }>>([])
+const activeTocId = ref('')
 
 const route = useRoute()
 
-// 创建 markdown-it 实例
+// 初始化 markdown-it
 const md = new MarkdownIt({
   html: true,
   linkify: true,
@@ -205,62 +180,36 @@ const md = new MarkdownIt({
   highlight: function (str, lang) {
     if (lang && hljs.getLanguage(lang)) {
       try {
-        return hljs.highlight(str, { language: lang }).value
-      } catch {
-        // 忽略错误
-      }
+        return '<pre class="hljs"><code>' +
+               hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
+               '</code></pre>'
+      } catch (__) {}
     }
-    return hljs.highlightAuto(str).value
-  },
+    return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>'
+  }
 })
 
-// 配置插件
-md.use(anchor, {
-  permalink: true,
-  permalinkBefore: true,
-  permalinkSymbol: '§',
-  slugify: (str: string) => {
-    // 使用与tocItems相同的ID生成逻辑
-    return str.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]/g, '-')
-  },
+// 配置插件 - 自动为标题生成 ID
+md.use(markdownItAnchor, {
+  permalink: false,
+  level: [1, 2, 3, 4, 5, 6],
+  slugify: (s: string) => {
+    // 使用标题文本作为 ID（移除特殊字符）
+    return encodeURIComponent(s.trim())
+  }
 })
 
-md.use(toc, {
-  includeLevel: [1, 2, 3, 4, 5, 6],
-  containerHeaderHtml: '<h2>目录</h2>',
+md.use(markdownItToc, {
+  includeLevel: [1, 2, 3],
+  containerHeaderHtml: '<div class="toc-title">目录</div>'
 })
 
-// 计算属性
-const renderedContent = computed(() => {
-  if (!blogPost.value?.content) return ''
-
-  // 处理图片路径
-  const content = processImageUrlsInMarkdown(blogPost.value.content)
-
-  // 渲染 markdown
-  return md.render(content)
-})
-
-const tocItems = computed(() => {
-  if (!blogPost.value?.content) return []
-
-  const headings: TocItem[] = []
-  const lines = blogPost.value.content.split('\n')
-
-  lines.forEach((line) => {
-    const match = line.match(/^(#{1,6})\s+(.+)$/)
-    if (match) {
-      const level = match[1].length
-      const text = match[2].trim()
-      // 使用与markdown-it-anchor相同的ID生成逻辑
-      const id = text.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]/g, '-')
-
-      headings.push({ id, text, level })
-    }
-  })
-
-  return headings
-})
+// 渲染 Markdown
+const renderMarkdown = (content: string) => {
+  if (!content) return ''
+  const processed = processImageUrlsInMarkdown(content)
+  return md.render(processed)
+}
 
 // 方法
 const fetchBlogPost = async (id: string) => {
@@ -271,10 +220,17 @@ const fetchBlogPost = async (id: string) => {
 
     if (blogPost.value?.content) {
       estimatedReadingTime.value = calculateReadingTime(blogPost.value.content)
+      renderedHtml.value = renderMarkdown(blogPost.value.content)
+      
+      // 等待DOM完全渲染
       await nextTick()
-      setupScrollSync()
-      // 渲染后进行查询高亮与定位
-      await nextTick()
+      
+      // 延迟执行以确保v-html已经渲染完成
+      setTimeout(() => {
+        extractTocItems()
+        enhanceCodeBlocks()
+      }, 100)
+      
       highlightQueryInContent()
     }
   } catch (error) {
@@ -286,7 +242,7 @@ const fetchBlogPost = async (id: string) => {
 }
 
 const calculateReadingTime = (content: string) => {
-  const textContent = content.replace(/<[^>]*>/g, '')
+  const textContent = content.replace(/[#*`\[\]()]/g, '')
   const chineseChars = textContent.match(/[\u4e00-\u9fa5]/g)?.length || 0
   const englishWords = textContent.match(/[a-zA-Z]+/g)?.length || 0
 
@@ -304,6 +260,135 @@ const formatDate = (dateString: string) => {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+  })
+}
+
+// 提取目录项
+const extractTocItems = () => {
+  const container = document.querySelector('.markdown-body')
+  if (!container) return
+  
+  const headings = container.querySelectorAll('h1, h2, h3')
+  
+  tocItems.value = Array.from(headings).map((heading, index) => {
+    const headingEl = heading as HTMLElement
+    let id = headingEl.id
+    
+    // 如果标题没有ID，手动添加一个
+    if (!id) {
+      const text = headingEl.textContent || ''
+      id = encodeURIComponent(text.trim()) || `heading-${index}`
+      headingEl.id = id
+    }
+    
+    return {
+      id,
+      text: headingEl.textContent || '',
+      level: parseInt(headingEl.tagName.substring(1))
+    }
+  })
+}
+
+// 为代码块添加工具栏
+const enhanceCodeBlocks = () => {
+  const container = document.querySelector('.markdown-body')
+  if (!container) return
+  
+  let codeBlocks = container.querySelectorAll('pre.hljs')
+  if (codeBlocks.length === 0) {
+    codeBlocks = container.querySelectorAll('pre')
+  }
+  
+  codeBlocks.forEach((pre, index) => {
+    // 避免重复添加
+    if (pre.querySelector('.code-toolbar')) return
+    
+    const code = pre.querySelector('code')
+    if (!code) return
+    
+    // 检查代码行数，超过10行添加展开收起功能
+    const lines = code.textContent?.split('\n').length || 0
+    const needCollapse = lines > 10
+    
+    // 创建工具栏
+    const toolbar = document.createElement('div')
+    toolbar.className = 'code-toolbar'
+    
+    // 语言标签
+    const lang = pre.className.match(/language-(\w+)/)?.[1] || 'text'
+    const langTag = document.createElement('span')
+    langTag.className = 'code-lang'
+    langTag.textContent = lang.toUpperCase()
+    toolbar.appendChild(langTag)
+    
+    // 按钮容器
+    const btnGroup = document.createElement('div')
+    btnGroup.className = 'code-btn-group'
+    
+    // 展开/收起按钮
+    if (needCollapse) {
+      const collapseBtn = document.createElement('button')
+      collapseBtn.className = 'code-btn code-collapse-btn'
+      collapseBtn.innerHTML = '<span>展开</span>'
+      collapseBtn.title = '展开/收起代码'
+      
+      // 初始状态：收起（添加 collapsed 类）
+      pre.classList.add('code-collapsed')
+      
+      collapseBtn.addEventListener('click', () => {
+        pre.classList.toggle('code-collapsed')
+        const isCollapsed = pre.classList.contains('code-collapsed')
+        collapseBtn.innerHTML = isCollapsed ? '<span>展开</span>' : '<span>收起</span>'
+      })
+      
+      btnGroup.appendChild(collapseBtn)
+    }
+    
+    // 复制按钮
+    const copyBtn = document.createElement('button')
+    copyBtn.className = 'code-btn code-copy-btn'
+    copyBtn.innerHTML = '<span>复制</span>'
+    copyBtn.title = '复制代码'
+    
+    copyBtn.addEventListener('click', async () => {
+      const codeText = code.textContent || ''
+      try {
+        await navigator.clipboard.writeText(codeText)
+        copyBtn.innerHTML = '<span>✓ 已复制</span>'
+        copyBtn.classList.add('copied')
+        
+        setTimeout(() => {
+          copyBtn.innerHTML = '<span>复制</span>'
+          copyBtn.classList.remove('copied')
+        }, 2000)
+      } catch (err) {
+        console.error('复制失败:', err)
+        copyBtn.innerHTML = '<span>✗ 失败</span>'
+        setTimeout(() => {
+          copyBtn.innerHTML = '<span>复制</span>'
+        }, 2000)
+      }
+    })
+    
+    btnGroup.appendChild(copyBtn)
+    toolbar.appendChild(btnGroup)
+    
+    // 插入工具栏
+    pre.insertBefore(toolbar, pre.firstChild)
+  })
+}
+
+// 跳转到标题
+const scrollToHeading = (id: string) => {
+  const element = document.getElementById(id)
+  if (!element) return
+  
+  const elementTop = element.getBoundingClientRect().top + window.pageYOffset
+  const offsetTop = 80
+  
+  window.scrollTo({
+    top: elementTop - offsetTop,
+    behavior: 'smooth'
   })
 }
 
@@ -434,413 +519,25 @@ const toggleFullscreen = () => {
   }
 }
 
-const toggleToc = () => {
-  tocExpanded.value = !tocExpanded.value
-}
 
-const scrollToHeading = (id: string) => {
-  const element = document.getElementById(id)
-  if (element) {
-    const headerOffset = 80
-    const elementPosition = element.getBoundingClientRect().top
-    const offsetPosition = elementPosition + window.pageYOffset - headerOffset
 
-    window.scrollTo({
-      top: offsetPosition,
-      behavior: 'smooth',
-    })
-  }
-}
-
-const updateCurrentHeading = () => {
-  const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6')
-  if (headings.length === 0) return
-
-  const viewportHeight = window.innerHeight
-  const threshold = Math.min(100, viewportHeight * 0.2)
-
-  let currentHeading: Element | null = null
-  let minDistance = Infinity
-
-  headings.forEach((heading) => {
+// 滚动监听，更新活动目录项
+const updateActiveToc = () => {
+  const headings = document.querySelectorAll('.markdown-body h1, .markdown-body h2, .markdown-body h3')
+  let currentId = ''
+  
+  for (let i = headings.length - 1; i >= 0; i--) {
+    const heading = headings[i] as HTMLElement
     const rect = heading.getBoundingClientRect()
-    const distance = Math.abs(rect.top - threshold)
-
-    if (rect.top <= threshold && distance < minDistance) {
-      minDistance = distance
-      currentHeading = heading
-    }
-  })
-
-  if (!currentHeading) {
-    headings.forEach((heading) => {
-      const rect = heading.getBoundingClientRect()
-      const distance = Math.abs(rect.top)
-
-      if (distance < minDistance) {
-        minDistance = distance
-        currentHeading = heading
-      }
-    })
-  }
-
-  if (currentHeading && (currentHeading as HTMLElement).id) {
-    currentHeadingId.value = (currentHeading as HTMLElement).id
-  }
-}
-
-const setupScrollSync = () => {
-  setTimeout(() => {
-    updateCurrentHeading()
-
-    nextTick(() => {
-      const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6')
-      if (headings.length > 0) {
-        handleScroll()
-
-        setTimeout(() => {
-          updateCurrentHeading()
-          // 在滚动同步设置完成后添加代码复制按钮
-          addCodeCopyButtons()
-        }, 500)
-      }
-    })
-  }, 300)
-}
-
-const handleScroll = () => {
-  updateCurrentHeading()
-}
-
-// 节流函数
-const throttle = (func: () => void, wait: number) => {
-  let inThrottle: boolean
-  return function executedFunction() {
-    if (!inThrottle) {
-      func()
-      inThrottle = true
-      setTimeout(() => (inThrottle = false), wait)
+    if (rect.top <= 100) {
+      currentId = heading.id
+      break
     }
   }
-}
-
-const throttledHandleScroll = throttle(handleScroll, 100)
-
-// 监听内容变化，添加代码复制按钮
-watch(renderedContent, () => {
-  nextTick(() => {
-    // 立即添加一次
-    addCodeCopyButtons()
-
-    // 延迟再次添加，确保DOM完全渲染
-    setTimeout(() => {
-      addCodeCopyButtons()
-    }, 500)
-
-    // 再次延迟检查，确保所有内容都已加载
-    setTimeout(() => {
-      addCodeCopyButtons()
-    }, 1000)
-    // 设置图片双击放大/还原
-    setupImageZoom()
-    setTimeout(() => setupImageZoom(), 500)
-    setTimeout(() => setupImageZoom(), 1000)
-  })
-})
-
-// 添加代码复制按钮的函数
-const addCodeCopyButtons = () => {
-  console.log('开始添加代码复制按钮...')
-  const codeBlocks = document.querySelectorAll('pre code')
-  console.log('找到代码块数量:', codeBlocks.length)
-
-  codeBlocks.forEach((block, index) => {
-    // 检查是否已经添加了复制按钮
-    if (block.parentElement?.querySelector('.copy-code-btn')) {
-      console.log(`代码块 ${index} 已存在复制按钮，跳过`)
-      return
-    }
-
-    console.log(`为代码块 ${index} 添加复制按钮和折叠功能`)
-
-    // 创建按钮容器
-    const buttonContainer = document.createElement('div')
-    buttonContainer.className = 'code-controls'
-    buttonContainer.style.cssText = `
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      display: flex;
-      gap: 8px;
-      z-index: 10;
-    `
-
-    // 创建折叠展开按钮
-    const collapseButton = document.createElement('button')
-    collapseButton.className = 'collapse-code-btn'
-    collapseButton.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M6 9l6 6 6-6"/>
-      </svg>
-      <span>展开</span>
-    `
-
-    // 设置折叠按钮样式
-    collapseButton.style.cssText = `
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 8px 12px;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      opacity: 0.8;
-    `
-
-    // 创建复制按钮
-    const copyButton = document.createElement('button')
-    copyButton.className = 'copy-code-btn'
-    copyButton.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-      </svg>
-      <span>复制</span>
-    `
-
-    // 设置复制按钮样式
-    copyButton.style.cssText = `
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 8px 12px;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      opacity: 0.8;
-    `
-
-    // 将按钮添加到容器
-    buttonContainer.appendChild(collapseButton)
-    buttonContainer.appendChild(copyButton)
-
-    // 悬停效果
-    buttonContainer.addEventListener('mouseenter', () => {
-      collapseButton.style.opacity = '1'
-      collapseButton.style.background = 'rgba(0, 0, 0, 0.9)'
-      collapseButton.style.transform = 'scale(1.05)'
-      copyButton.style.opacity = '1'
-      copyButton.style.background = 'rgba(0, 0, 0, 0.9)'
-      copyButton.style.transform = 'scale(1.05)'
-    })
-
-    buttonContainer.addEventListener('mouseleave', () => {
-      collapseButton.style.opacity = '0.8'
-      collapseButton.style.background = 'rgba(0, 0, 0, 0.8)'
-      collapseButton.style.transform = 'scale(1)'
-      copyButton.style.opacity = '0.8'
-      copyButton.style.background = 'rgba(0, 0, 0, 0.8)'
-      copyButton.style.transform = 'scale(1)'
-    })
-
-    // 折叠展开功能
-    let isCollapsed = true // 默认折叠
-    const preElement = block.parentElement
-
-    if (preElement) {
-      // 保存原始高度
-      const originalHeight = preElement.scrollHeight
-      const maxHeight = Math.min(originalHeight, 200) // 最大显示200px高度
-
-      // 初始状态：折叠
-      preElement.style.maxHeight = `${maxHeight}px`
-      preElement.style.overflow = 'hidden'
-      preElement.style.transition = 'max-height 0.3s ease'
-
-      // 添加渐变遮罩
-      const overlay = document.createElement('div')
-      overlay.className = 'code-overlay'
-      overlay.style.cssText = `
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 40px;
-        background: linear-gradient(transparent, #1a202c);
-        pointer-events: none;
-        z-index: 5;
-      `
-      preElement.appendChild(overlay)
-
-      // 折叠展开点击事件
-      collapseButton.addEventListener('click', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-
-        if (isCollapsed) {
-          // 展开
-          preElement.style.maxHeight = `${originalHeight}px`
-          overlay.style.display = 'none'
-          collapseButton.innerHTML = `
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 15l-6-6-6 6"/>
-            </svg>
-            <span>折叠</span>
-          `
-          isCollapsed = false
-        } else {
-          // 折叠
-          preElement.style.maxHeight = `${maxHeight}px`
-          overlay.style.display = 'block'
-          collapseButton.innerHTML = `
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M6 9l6 6 6-6"/>
-            </svg>
-            <span>展开</span>
-          `
-          isCollapsed = true
-        }
-      })
-    }
-
-    // 点击复制功能
-    copyButton.addEventListener('click', async (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-
-      try {
-        const codeText = block.textContent || ''
-        await navigator.clipboard.writeText(codeText)
-
-        // 更新按钮状态
-        const span = copyButton.querySelector('span')
-        if (span) {
-          span.textContent = '已复制!'
-        }
-        copyButton.style.background = 'rgba(34, 197, 94, 0.9)'
-        copyButton.style.transform = 'scale(1.1)'
-
-        // 2秒后恢复原状态
-        setTimeout(() => {
-          if (span) {
-            span.textContent = '复制'
-          }
-          copyButton.style.background = 'rgba(0, 0, 0, 0.8)'
-          copyButton.style.transform = 'scale(1)'
-        }, 2000)
-
-        ElMessage.success('代码已复制到剪贴板')
-      } catch (err) {
-        console.error('复制失败:', err)
-        ElMessage.error('复制失败，请手动复制')
-      }
-    })
-
-    // 将按钮容器添加到pre元素
-    if (preElement) {
-      preElement.style.position = 'relative'
-      preElement.appendChild(buttonContainer)
-
-      // 确保pre元素有足够的右边距来显示按钮
-      if (!preElement.style.paddingRight || parseInt(preElement.style.paddingRight) < 160) {
-        preElement.style.paddingRight = '160px'
-      }
-
-      console.log(`代码块 ${index} 的复制按钮和折叠功能已添加`)
-    } else {
-      console.error(`代码块 ${index} 的父元素不存在`)
-    }
-  })
-
-  console.log('代码复制按钮和折叠功能添加完成')
-}
-
-// 图片双击放大/还原功能
-let currentZoomedImg: HTMLImageElement | null = null
-let imageOverlayEl: HTMLDivElement | null = null
-
-const createImageOverlay = () => {
-  if (imageOverlayEl) return imageOverlayEl
-  const overlay = document.createElement('div')
-  overlay.className = 'image-zoom-overlay'
-  overlay.style.position = 'fixed'
-  overlay.style.inset = '0'
-  overlay.style.background = 'rgba(0,0,0,0.6)'
-  overlay.style.zIndex = '9998'
-  overlay.style.opacity = '1'
-  overlay.style.cursor = 'zoom-out'
-  overlay.addEventListener('dblclick', () => {
-    if (currentZoomedImg) {
-      toggleImageZoom(currentZoomedImg)
-    }
-  })
-  document.body.appendChild(overlay)
-  imageOverlayEl = overlay
-  return overlay
-}
-
-const removeImageOverlay = () => {
-  if (imageOverlayEl) {
-    imageOverlayEl.remove()
-    imageOverlayEl = null
+  
+  if (currentId && currentId !== activeTocId.value) {
+    activeTocId.value = currentId
   }
-}
-
-const toggleImageZoom = (img: HTMLImageElement) => {
-  const isZoomed = img.classList.contains('zoomed')
-  if (isZoomed) {
-    img.classList.remove('zoomed')
-    currentZoomedImg = null
-    removeImageOverlay()
-    // 若未处于全文全屏模式，恢复滚动
-    if (!isFullscreen.value) {
-      document.body.style.overflow = ''
-    }
-    document.body.classList.remove('image-zoom-active')
-    img.style.removeProperty('will-change')
-  } else {
-    // 关闭其他已放大图片
-    if (currentZoomedImg && currentZoomedImg !== img) {
-      currentZoomedImg.classList.remove('zoomed')
-    }
-    currentZoomedImg = img
-    createImageOverlay()
-    img.classList.add('zoomed')
-    document.body.style.overflow = 'hidden'
-    document.body.classList.add('image-zoom-active')
-    img.style.willChange = 'transform'
-  }
-}
-
-const setupImageZoom = () => {
-  const imgs = Array.from(document.querySelectorAll('.blog-content img')) as HTMLImageElement[]
-  imgs.forEach((img) => {
-    if ((img as any)._zoomBound) return
-    ;(img as any)._zoomBound = true
-    img.style.cursor = 'zoom-in'
-    // 避免浏览器在图片上触发默认的拖拽、选择等引起抖动
-    img.setAttribute('draggable', 'false')
-    img.style.userSelect = 'none'
-    img.style.webkitUserSelect = 'none'
-    // 兼容性属性移除，TypeScript下不再设置 msUserSelect
-    img.addEventListener('dblclick', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      toggleImageZoom(img)
-      // 切换指针样式
-      img.style.cursor = img.classList.contains('zoomed') ? 'zoom-out' : 'zoom-in'
-    })
-  })
 }
 
 // 生命周期
@@ -850,20 +547,15 @@ onMounted(() => {
     fetchBlogPost(blogId)
   }
 
-  window.addEventListener('scroll', throttledHandleScroll, { passive: true })
-  window.addEventListener('resize', updateCurrentHeading, { passive: true })
-  // 初次挂载后，确保图片放大功能绑定
-  setTimeout(() => setupImageZoom(), 300)
-  // 如果直接带有查询参数，尝试高亮
   setTimeout(() => highlightQueryInContent(), 400)
+  
+  // 添加滚动监听
+  window.addEventListener('scroll', updateActiveToc)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('scroll', throttledHandleScroll)
-  window.removeEventListener('resize', updateCurrentHeading)
   document.body.style.overflow = ''
-  // 清理可能残留的遮罩
-  removeImageOverlay()
+  window.removeEventListener('scroll', updateActiveToc)
 })
 
 // ========= 全文搜索高亮与定位 =========
@@ -935,9 +627,17 @@ const highlightQueryInContent = () => {
 
   if (hits.length > 0) {
     console.log('BlogDetail - 滚动到第一个命中位置')
+    // 增加延迟确保DOM完全渲染
     setTimeout(() => {
-      hits[0].scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 50)
+      const firstHit = hits[0]
+      const elementTop = firstHit.getBoundingClientRect().top + window.pageYOffset
+      const offsetTop = 100 // 距离顶部的偏移量，避免被导航栏遮挡
+      
+      window.scrollTo({
+        top: elementTop - offsetTop,
+        behavior: 'smooth'
+      })
+    }, 200)
   }
 }
 
@@ -980,21 +680,152 @@ watch(
 
 .blog-layout {
   display: flex;
-  gap: 30px;
-  align-items: flex-start;
+  gap: 24px;
+  /* align-items: flex-start;  <-- 已移除，使侧边栏高度自动撑开 */
+  max-width: 1400px;
+  margin: 0 auto;
+  position: relative;
 }
 
-.main-content {
+.blog-main {
   flex: 1;
-  min-width: 0;
+  min-width: 0; /* 防止内容溢出 */
 }
 
-.sidebar {
-  width: 320px;
+.blog-sidebar {
+  width: 280px;
   flex-shrink: 0;
+}
+
+.sidebar-sticky {
   position: sticky;
-  top: 20px;
-  align-self: flex-start;
+  top: 24px; /* 距离顶部的距离 */
+}
+
+/* 目录卡片 */
+.toc-card {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 100px); /* 限制最大高度，留出更多上下间距 */
+}
+
+.toc-card :deep(.el-card__header) {
+  padding: 15px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0; /* 防止头部被压缩 */
+}
+
+.toc-card :deep(.el-card__body) {
+  flex: 1;
+  overflow-y: auto; /* 让卡片主体内容区域可滚动 */
+  min-height: 0; /* 关键：防止 flex 子项溢出 */
+  padding: 10px 0; /* 调整内边距 */
+}
+
+.toc-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.toc-header .el-icon {
+  color: #667eea;
+}
+
+.toc-content {
+  /* 移除之前的滚动设置，交给 el-card__body 管理 */
+  padding: 0 10px; 
+}
+
+/* 自定义滚动条 - 作用于 el-card__body */
+.toc-card :deep(.el-card__body)::-webkit-scrollbar {
+  width: 4px;
+}
+
+.toc-card :deep(.el-card__body)::-webkit-scrollbar-thumb {
+  background: #ddd;
+  border-radius: 2px;
+}
+
+.toc-card :deep(.el-card__body)::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 目录列表样式 */
+.toc-list {
+  padding: 0;
+}
+
+.toc-item {
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: #666;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  border-left: 3px solid transparent;
+  margin-bottom: 2px;
+}
+
+.toc-item:hover {
+  background-color: #f5f7fa;
+  color: #409eff;
+}
+
+.toc-item.toc-active {
+  background-color: #f0f4ff;
+  color: #667eea;
+  font-weight: 600;
+  border-left-color: #667eea;
+}
+
+.toc-level-1 {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.toc-level-2 {
+  padding-left: 24px;
+  font-size: 0.92rem;
+}
+
+.toc-level-3 {
+  padding-left: 36px;
+  font-size: 0.88rem;
+  color: #909399;
+}
+
+.toc-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #909399;
+  font-size: 0.9rem;
+}
+
+.toc-empty .el-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
 }
 
 /* 加载状态 */
@@ -1015,6 +846,7 @@ watch(
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   transition: all 0.3s ease;
+  border: none;
 }
 
 .blog-card:hover {
@@ -1058,6 +890,7 @@ watch(
   background: rgba(255, 255, 255, 0.8);
   border-radius: 20px;
   backdrop-filter: blur(5px);
+  border: 1px solid #eee;
 }
 
 .meta-item .el-icon {
@@ -1089,7 +922,7 @@ watch(
   box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
 }
 
-/* 博客内容 */
+/* 博客内容样式 */
 .blog-content {
   padding: 30px;
   line-height: 1.8;
@@ -1097,271 +930,200 @@ watch(
   font-size: 1.05rem;
 }
 
-.blog-content :deep(h1) {
-  font-size: 2rem;
+.markdown-body {
+  font-family: 'Segoe UI', 'PingFang SC', 'Hiragino Sans', Arial, sans-serif;
+}
+
+/* 标题样式 */
+.markdown-body :deep(h1) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   border-bottom: 2px solid #667eea;
-  padding-bottom: 10px;
-  margin: 30px 0 20px 0;
-  color: #2c3e50;
+  padding-bottom: 12px;
+  margin-top: 24px;
+  margin-bottom: 16px;
+  scroll-margin-top: 20px;
 }
 
-.blog-content :deep(h2) {
-  font-size: 1.7rem;
+.markdown-body :deep(h2) {
+  color: #2c3e50;
   border-bottom: 1px solid #eee;
-  padding-bottom: 8px;
-  margin: 25px 0 18px 0;
+  padding-bottom: 10px;
+  margin-top: 20px;
+  margin-bottom: 14px;
+  scroll-margin-top: 20px;
+}
+
+.markdown-body :deep(h3) {
   color: #2c3e50;
+  margin-top: 18px;
+  margin-bottom: 12px;
+  scroll-margin-top: 20px;
 }
 
-.blog-content :deep(h3) {
-  font-size: 1.4rem;
-  margin: 20px 0 16px 0;
-  color: #2c3e50;
+/* 引用样式 */
+.markdown-body :deep(blockquote) {
+  border-left: 4px solid #667eea;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+  border-radius: 0 8px 8px 0;
+  padding: 15px 20px;
+  margin: 20px 0;
 }
 
-.blog-content :deep(h4) {
-  font-size: 1.2rem;
-  margin: 18px 0 14px 0;
-  color: #2c3e50;
-}
-
-.blog-content :deep(h5) {
-  font-size: 1.1rem;
-  margin: 16px 0 12px 0;
-  color: #2c3e50;
-}
-
-.blog-content :deep(h6) {
-  font-size: 1rem;
-  margin: 14px 0 10px 0;
-  color: #2c3e50;
-}
-
-.blog-content :deep(p) {
-  margin: 12px 0;
-  font-size: 1rem;
-  line-height: 1.8;
-}
-
-.blog-content :deep(a) {
+/* 链接样式 */
+.markdown-body :deep(a) {
   color: #667eea;
   text-decoration: none;
   border-bottom: 1px solid transparent;
   transition: all 0.3s ease;
 }
 
-.blog-content :deep(a:hover) {
+.markdown-body :deep(a:hover) {
   border-bottom-color: #667eea;
 }
 
-.blog-content :deep(strong) {
-  font-weight: 700;
-  color: #1a202c;
-}
-
-.blog-content :deep(em) {
-  font-style: italic;
-  color: #4a5568;
-}
-
-.blog-content :deep(blockquote) {
-  margin: 20px 0;
-  padding: 15px 20px;
-  border-left: 4px solid #667eea;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
-  border-radius: 0 8px 8px 0;
-  color: #4a5568;
-}
-
-.blog-content :deep(blockquote p) {
-  margin: 0;
-}
-
-.blog-content :deep(ul),
-.blog-content :deep(ol) {
-  padding-left: 30px;
-  margin: 15px 0;
-}
-
-.blog-content :deep(ul li),
-.blog-content :deep(ol li) {
-  margin: 8px 0;
-}
-
-.blog-content :deep(img) {
-  max-width: 100%;
-  height: auto;
+/* 表格样式 */
+.markdown-body :deep(table) {
   border-radius: 8px;
-  display: block;
-  margin: 15px auto;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  margin: 20px 0;
+}
+
+.markdown-body :deep(th) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 12px;
+}
+
+.markdown-body :deep(td) {
+  padding: 10px 12px;
+}
+
+.markdown-body :deep(tr:nth-child(even)) {
+  background-color: #f8fafc;
+}
+
+.markdown-body :deep(tr:hover) {
+  background-color: #f1f5f9;
+}
+
+/* 图片样式 */
+.markdown-body :deep(img) {
+  border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
+  max-width: 100%;
 }
 
-.blog-content :deep(img:hover) {
+.markdown-body :deep(img:hover) {
   transform: scale(1.02);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
-/* 图片双击放大样式 */
-.blog-content :deep(img) {
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.blog-content :deep(img.zoomed) {
-  position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) translateZ(0) !important;
-  max-width: 92vw !important;
-  max-height: 92vh !important;
-  width: auto !important;
-  height: auto !important;
-  z-index: 9999 !important;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35) !important;
-  cursor: zoom-out !important;
-  pointer-events: none !important; /* 避免图片拦截鼠标事件导致布局反复计算 */
-  backface-visibility: hidden !important;
-  -webkit-backface-visibility: hidden !important;
-  user-select: none !important;
-  transition: none !important; /* 放大状态禁用过渡，避免抖动 */
-}
-
-/* 当图片放大时，将鼠标事件交给遮罩，避免hover/布局抖动 */
-.image-zoom-overlay {
-  cursor: zoom-out !important;
-  will-change: opacity;
-}
-
-/* 放大模式下，禁用正文区域图片的悬停过渡，避免闪烁 */
-:global(body.image-zoom-active) .blog-content :deep(img) {
-  transition: none !important;
-}
-
-:global(body.image-zoom-active) .blog-content :deep(img:hover) {
-  transform: none !important;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15) !important;
-}
-
-.blog-content :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 20px 0;
+/* 代码块样式 */
+.markdown-body :deep(pre) {
   border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-}
-
-.blog-content :deep(th),
-.blog-content :deep(td) {
-  border: 1px solid #e2e8f0;
-  padding: 12px 16px;
-  text-align: left;
-}
-
-.blog-content :deep(th) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  font-weight: 600;
-}
-
-.blog-content :deep(tr:nth-child(even)) {
-  background-color: #f8fafc;
-}
-
-.blog-content :deep(tr:hover) {
-  background-color: #f1f5f9;
-}
-
-.blog-content :deep(hr) {
-  border: none;
-  border-top: 2px solid #e2e8f0;
-  margin: 30px 0;
-}
-
-.blog-content :deep(pre) {
-  background: #1a202c;
-  color: #f8f8f2;
-  border-radius: 8px;
-  padding: 20px;
-  margin: 20px 0;
-  overflow: auto;
+  margin: 16px 0;
   position: relative;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  background: #f6f8fa !important;
+  padding: 0 !important;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
 }
 
-.blog-content :deep(code) {
-  background: rgba(102, 126, 234, 0.1);
+.markdown-body :deep(pre code) {
+  font-family: 'Monaco', 'Courier New', monospace;
+  display: block;
+  padding: 16px;
+  overflow-x: auto;
+  max-height: none;
+  transition: max-height 0.3s ease;
+}
+
+/* 代码块收起状态 */
+.markdown-body :deep(pre.code-collapsed code) {
+  max-height: 100px;
+  overflow: hidden;
+  position: relative;
+}
+
+.markdown-body :deep(pre.code-collapsed code::after) {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: linear-gradient(to bottom, transparent, #f6f8fa);
+  pointer-events: none;
+}
+
+/* 代码工具栏 */
+.markdown-body :deep(.code-toolbar) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #e8eaed;
+  border-bottom: 1px solid #d0d4d9;
+}
+
+.markdown-body :deep(.code-lang) {
+  font-size: 12px;
+  font-weight: 600;
   color: #667eea;
-  padding: 2px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.markdown-body :deep(.code-btn-group) {
+  display: flex;
+  gap: 8px;
+}
+
+.markdown-body :deep(.code-btn) {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #606266;
+  background: white;
+  border: 1px solid #d0d4d9;
   border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.markdown-body :deep(.code-btn:hover) {
+  color: #409eff;
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+.markdown-body :deep(.code-btn.copied) {
+  color: #67c23a;
+  border-color: #67c23a;
+  background: #f0f9ff;
+}
+
+.markdown-body :deep(.code-btn span) {
+  display: inline-block;
+}
+
+/* 行内代码 */
+.markdown-body :deep(code:not(pre code)) {
+  font-family: 'Monaco', 'Courier New', monospace;
+  background: #f0f2f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: #e83e8c;
   font-size: 0.9em;
-}
-
-.blog-content :deep(pre code) {
-  background: transparent;
-  color: inherit;
-  padding: 0;
-  border-radius: 0;
-  font-size: inherit;
-}
-
-/* 代码复制按钮样式 */
-.blog-content :deep(.code-controls) {
-  position: absolute !important;
-  top: 12px !important;
-  right: 12px !important;
-  display: flex !important;
-  gap: 8px !important;
-  z-index: 10 !important;
-}
-
-.blog-content :deep(.copy-code-btn),
-.blog-content :deep(.collapse-code-btn) {
-  background: rgba(0, 0, 0, 0.8) !important;
-  color: white !important;
-  border: none !important;
-  border-radius: 6px !important;
-  padding: 8px 12px !important;
-  font-size: 12px !important;
-  cursor: pointer !important;
-  transition: all 0.3s ease !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 6px !important;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-  opacity: 0.8 !important;
-}
-
-.blog-content :deep(.copy-code-btn:hover),
-.blog-content :deep(.collapse-code-btn:hover) {
-  opacity: 1 !important;
-  background: rgba(0, 0, 0, 0.9) !important;
-  transform: scale(1.05) !important;
-}
-
-.blog-content :deep(.copy-code-btn svg),
-.blog-content :deep(.collapse-code-btn svg) {
-  flex-shrink: 0;
-}
-
-.blog-content :deep(.copy-code-btn span),
-.blog-content :deep(.collapse-code-btn span) {
-  white-space: nowrap;
-}
-
-/* 代码渐变遮罩 */
-.blog-content :deep(.code-overlay) {
-  position: absolute !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: 40px !important;
-  background: linear-gradient(transparent, #1a202c) !important;
-  pointer-events: none !important;
-  z-index: 5 !important;
 }
 
 /* 博客底部 */
@@ -1396,179 +1158,6 @@ watch(
   font-style: italic;
 }
 
-/* 推荐内容 */
-
-/* 目录容器 */
-.toc-container {
-  width: 100%;
-}
-
-.toc-card {
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
-
-.toc-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-}
-
-.toc-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-}
-
-.toc-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.toc-title .el-icon {
-  font-size: 1.2rem;
-}
-
-.toc-actions .el-button {
-  color: white;
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-.toc-actions .el-button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-/* 目录内容 */
-.toc-content {
-  max-height: 400px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  transition: max-height 0.3s ease;
-}
-
-.toc-content.expanded {
-  max-height: 600px;
-}
-
-/* 自定义滚动条样式 */
-.toc-content::-webkit-scrollbar {
-  width: 6px;
-}
-
-.toc-content::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
-}
-
-.toc-content::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
-}
-
-.toc-content::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
-}
-
-/* 目录列表 */
-.toc-list {
-  padding: 16px 0;
-}
-
-.toc-item {
-  padding: 12px 24px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border-left: 3px solid transparent;
-  position: relative;
-}
-
-.toc-item:hover {
-  background: rgba(102, 126, 234, 0.05);
-  border-left-color: #667eea;
-  transform: translateX(4px);
-}
-
-.toc-item.active {
-  background: rgba(102, 126, 234, 0.1);
-  border-left-color: #667eea;
-  color: #667eea;
-  font-weight: 600;
-}
-
-.toc-text {
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
-/* 目录层级样式 */
-.toc-level-1 {
-  padding-left: 24px;
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-.toc-level-2 {
-  padding-left: 40px;
-  font-weight: 500;
-  font-size: 0.9rem;
-}
-
-.toc-level-3 {
-  padding-left: 56px;
-  font-weight: 400;
-  font-size: 0.85rem;
-}
-
-.toc-level-4 {
-  padding-left: 72px;
-  font-weight: 400;
-  font-size: 0.8rem;
-}
-
-.toc-level-5 {
-  padding-left: 88px;
-  font-weight: 400;
-  font-size: 0.75rem;
-}
-
-.toc-level-6 {
-  padding-left: 104px;
-  font-weight: 400;
-  font-size: 0.7rem;
-}
-
-/* 空目录状态 */
-.toc-empty {
-  text-align: center;
-  padding: 40px 20px;
-  color: #999;
-}
-
-.empty-tip {
-  margin-top: 10px;
-  font-size: 0.9rem;
-  color: #bbb;
-}
-
-/* 目录统计 */
-.toc-stats {
-  padding: 16px 24px;
-  text-align: center;
-  background: rgba(102, 126, 234, 0.05);
-  border-top: 1px solid #e2e8f0;
-  color: #667eea;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
 /* 空状态容器 */
 .empty-container {
   max-width: 600px;
@@ -1581,29 +1170,20 @@ watch(
 }
 
 /* 响应式设计 */
-@media (max-width: 1200px) {
-  .blog-layout {
-    gap: 20px;
+@media (max-width: 1100px) {
+  .blog-sidebar {
+    display: none; /* 在中等屏幕及以下隐藏侧边栏 */
   }
-
-  .sidebar {
-    width: 280px;
+  
+  .blog-layout {
+    display: block;
+    max-width: 1000px;
   }
 }
 
 @media (max-width: 768px) {
   .blog-detail-container {
     padding: 10px;
-  }
-
-  .blog-layout {
-    flex-direction: column;
-    gap: 20px;
-  }
-
-  .sidebar {
-    width: 100%;
-    position: static;
   }
 
   .blog-title {
@@ -1633,15 +1213,6 @@ watch(
   .footer-actions {
     justify-content: center;
   }
-
-  .toc-content {
-    max-height: none;
-    overflow: visible;
-  }
-
-  .toc-content.expanded {
-    max-height: none;
-  }
 }
 
 @media (max-width: 480px) {
@@ -1656,13 +1227,25 @@ watch(
   .blog-footer {
     padding: 15px 20px;
   }
+}
 
-  .toc-header {
-    padding: 15px 20px;
+/* 全文搜索高亮样式 */
+.blog-content :deep(mark.search-hit) {
+  background: #fef3c7;
+  color: #92400e;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-weight: 600;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
+  animation: highlight-pulse 1s ease-in-out;
+}
+
+@keyframes highlight-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
   }
-
-  .toc-item {
-    padding: 10px 20px;
+  50% {
+    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.5);
   }
 }
 </style>

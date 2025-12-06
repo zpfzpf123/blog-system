@@ -14,11 +14,22 @@ import {
   ElSkeleton,
   ElIcon,
 } from 'element-plus'
-import { Picture } from '@element-plus/icons-vue'
+import { Picture, Star, Setting } from '@element-plus/icons-vue'
 import axios from '@/utils/axios'
-import { marked } from 'marked'
-import { normalizeImageUrl } from '@/utils/imageUtils'
-import Breadcrumb from '@/components/Breadcrumb.vue'
+import { normalizeImageUrl, processImageUrlsInMarkdown } from '@/utils/imageUtils'
+import MarkdownIt from 'markdown-it'
+import markdownItAnchor from 'markdown-it-anchor'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/github.css'
+import 'github-markdown-css/github-markdown-light.css'
+import AIConfigDialog from '@/components/AIConfigDialog.vue'
+import {
+  generateBlogSummary,
+  generateBlogTitle,
+  generateBlogCategory,
+  generateBlogTags,
+  generateBlogAllInfo,
+} from '@/utils/aiService'
 
 // 定义分类类型
 interface Category {
@@ -43,6 +54,13 @@ interface BlogPost {
   tagIds: number[]
 }
 
+// 定义可编辑的新标签类型
+interface EditableNewTag {
+  original: string
+  name: string
+  selected: boolean
+}
+
 // 表单数据
 const form = ref({
   title: '',
@@ -62,6 +80,14 @@ const tags = ref<Tag[]>([])
 const loading = ref(false)
 const dataLoading = ref(true)
 const submitting = ref(false)
+const aiGenerating = ref(false)
+const aiConfigDialogVisible = ref(false)
+// AI服务配置 - 已重构，不再需要复杂的配置
+const aiService = ref({
+  provider: 'ollama',
+  baseUrl: 'http://localhost:11434',
+  model: 'deepseek-r1:14b',
+})
 const router = useRouter()
 const route = useRoute()
 const postId = ref(Number(route.params.id))
@@ -73,6 +99,11 @@ const creatingCategory = ref(false)
 const newTagDialogVisible = ref(false)
 const newTagName = ref('')
 const creatingTag = ref(false)
+// 新标签确认对话框
+const newTagsConfirmVisible = ref(false)
+const editableNewTags = ref<EditableNewTag[]>([])
+// 更新确认对话框
+const updateConfirmVisible = ref(false)
 
 // 获取所有分类
 const fetchCategories = async () => {
@@ -529,15 +560,45 @@ const createTag = async () => {
   }
 }
 
+// 初始化 markdown-it
+const md = new MarkdownIt({
+  html: true,
+  linkify: true,
+  typographer: true,
+  highlight: function (str, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return '<pre class="hljs"><code>' +
+               hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
+               '</code></pre>'
+      } catch (__) {}
+    }
+    return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>'
+  }
+})
+
+// 配置插件 - 自动为标题生成 ID
+md.use(markdownItAnchor, {
+  permalink: false,
+  level: [1, 2, 3, 4, 5, 6],
+  slugify: (s: string) => {
+    return encodeURIComponent(s.trim())
+  }
+})
+
 // Markdown 实时预览
 const previewHtml = computed(() => {
   const content = form.value.content || ''
-  return marked.parse(content)
+  if (!content) return ''
+  const processed = processImageUrlsInMarkdown(content)
+  return md.render(processed)
 })
 
 // 编辑/预览融合视图控制
-const viewMode = ref<'split' | 'edit' | 'preview'>('split')
+const viewMode = ref<'edit' | 'preview'>('edit')
 const editorWidth = ref(50) // 分屏时左侧编辑区宽度百分比
+const tocWidth = ref(220) // 目录宽度（px）
+const activeIndex = ref(-1) // 当前激活的目录项索引
 const mdBodyRef = ref<HTMLDivElement | null>(null)
 const editorPaneRef = ref<HTMLDivElement | null>(null)
 const previewPaneRef = ref<HTMLDivElement | null>(null)
@@ -726,11 +787,180 @@ const cancel = () => {
   returnToSource()
 }
 
+// AI一键生成所有内容
+const generateAIAll = async () => {
+  if (!form.value.content || form.value.content.trim().length < 50) {
+    ElMessage.warning('请先输入文章内容（至少50个字符）')
+    return
+  }
+
+  try {
+    aiGenerating.value = true
+
+    const content = form.value.content.trim()
+
+    // 使用统一的AI生成函数，一次性获取所有信息
+    const result = await generateBlogAllInfo(content, categories.value, tags.value)
+
+    // 自动填充表单字段
+    if (result.title && result.title !== '未生成标题') {
+      form.value.title = result.title
+    }
+
+    if (result.summary && result.summary !== '未生成摘要') {
+      form.value.desc = result.summary
+    }
+
+    if (result.categoryId) {
+      form.value.categoryId = result.categoryId
+    }
+
+    if (result.tagIds && result.tagIds.length > 0) {
+      form.value.tagIds = result.tagIds
+    }
+
+    // 处理新标签推荐
+    if (result.newTags && result.newTags.length > 0) {
+      // 显示新标签确认弹窗
+      showNewTagsConfirm(result.newTags)
+      // 等待用户确认后再继续
+      return
+    }
+
+    ElMessage.success('AI一键生成完成！请检查生成的内容')
+
+    // 显示更新确认弹窗
+    showUpdateConfirm()
+  } catch (error) {
+    ElMessage.error('AI生成失败，请稍后重试')
+    console.error('AI生成失败:', error)
+  } finally {
+    aiGenerating.value = false
+  }
+}
+
+// 更新确认弹窗
+const showUpdateConfirm = () => {
+  updateConfirmVisible.value = true
+}
+
+// 确认更新
+const confirmUpdate = async () => {
+  updateConfirmVisible.value = false
+  await submitForm()
+}
+
+// 取消更新，继续编辑
+const cancelUpdate = () => {
+  updateConfirmVisible.value = false
+  ElMessage.info('您可以继续编辑文章内容，完成后手动更新')
+}
+
+// 新标签确认弹窗
+const showNewTagsConfirm = (tags: string[]) => {
+  editableNewTags.value = tags.map((t) => ({ original: t, name: t, selected: true }))
+  newTagsConfirmVisible.value = true
+}
+
+// 确认创建新标签
+const confirmCreateTags = async () => {
+  try {
+    const createdTagIds: number[] = []
+
+    // 处理用户选择并可编辑后的新标签
+    for (const item of editableNewTags.value) {
+      if (!item.selected) continue
+      const tagName = item.name.trim()
+      if (!tagName) continue
+
+      // 如果与现有标签重名，则直接复用现有标签ID
+      const existing = tags.value.find((t) => t.name.trim().toLowerCase() === tagName.toLowerCase())
+      if (existing) {
+        createdTagIds.push(existing.id)
+        continue
+      }
+
+      // 创建新的标签
+      const response = await axios.post('/api/tags', { name: tagName })
+      if (response.data && response.data.id) {
+        createdTagIds.push(response.data.id)
+        // 将新创建的标签添加到本地标签列表
+        tags.value.push({
+          id: response.data.id,
+          name: tagName,
+        })
+      }
+    }
+
+    // 将新创建的标签ID添加到当前选择的标签中
+    if (createdTagIds.length > 0) {
+      form.value.tagIds = [...(form.value.tagIds || []), ...createdTagIds]
+    }
+
+    if (createdTagIds.length > 0) {
+      // 去重合并到已选标签ID
+      const current = new Set(form.value.tagIds || [])
+      createdTagIds.forEach((id) => current.add(id))
+      form.value.tagIds = Array.from(current)
+      ElMessage.success(`已添加 ${createdTagIds.length} 个标签`)
+    } else {
+      ElMessage.info('未选择新标签，已跳过创建')
+    }
+    newTagsConfirmVisible.value = false
+    editableNewTags.value = []
+
+    // 继续完成AI一键生成流程
+    ElMessage.success('AI一键生成完成！请检查生成的内容')
+    showUpdateConfirm()
+  } catch (error) {
+    ElMessage.error('创建标签失败，请稍后重试')
+    console.error('创建标签失败:', error)
+  }
+}
+
+// 取消创建新标签
+const cancelCreateTags = () => {
+  newTagsConfirmVisible.value = false
+  editableNewTags.value = []
+  ElMessage.info('已取消创建新标签')
+}
+
+// 打开AI配置对话框
+const openAIConfig = () => {
+  aiConfigDialogVisible.value = true
+}
+
+// 保存AI配置
+const saveAIConfig = (newConfig: any) => {
+  aiService.value = newConfig
+  // 保存到本地存储
+  localStorage.setItem('aiConfig', JSON.stringify(newConfig))
+  ElMessage.success('AI配置已保存')
+}
+
 // 返回上一页 - 已删除，使用面包屑导航替代
 
 // 组件挂载时获取数据
 onMounted(() => {
   Promise.all([fetchCategories(), fetchTags(), fetchBlogPost()])
+
+  // 加载AI配置
+  const savedConfig = localStorage.getItem('aiConfig')
+  if (savedConfig) {
+    try {
+      const config = JSON.parse(savedConfig)
+      aiService.value = config
+    } catch (error) {
+      console.error('加载AI配置失败:', error)
+    }
+  } else {
+    // 使用默认Ollama配置
+    aiService.value = {
+      provider: 'ollama',
+      baseUrl: 'http://localhost:11434',
+      model: 'deepseek-r1:14b',
+    }
+  }
 
   // 添加粘贴事件监听器
   // 使用nextTick确保DOM已经渲染完成
@@ -753,16 +983,6 @@ router.afterEach((to, from) => {
 
 <template>
   <div class="post-edit-container">
-    <!-- 面包屑导航 -->
-    <Breadcrumb />
-
-    <div class="header">
-      <div class="header-top">
-        <h1>编辑博客文章</h1>
-      </div>
-      <p>修改博客文章内容</p>
-    </div>
-
     <el-card class="form-card" v-loading="loading">
       <el-skeleton v-if="loading" :rows="10" animated />
 
@@ -812,27 +1032,43 @@ router.afterEach((to, from) => {
         <el-form-item label="内容" required>
           <div class="md-editor">
             <div class="md-toolbar">
-              <el-radio-group v-model="viewMode" size="small">
-                <el-radio-button label="split">分屏</el-radio-button>
-                <el-radio-button label="edit">编辑</el-radio-button>
-                <el-radio-button label="preview">预览</el-radio-button>
-              </el-radio-group>
+              <div class="toolbar-left">
+                <el-radio-group v-model="viewMode" size="small">
+                  <el-radio-button label="edit">编辑</el-radio-button>
+                  <el-radio-button label="preview">预览</el-radio-button>
+                </el-radio-group>
+              </div>
+              <div class="toolbar-right">
+                <el-button
+                  class="ai-config-btn"
+                  type="info"
+                  :icon="Setting"
+                  size="small"
+                  @click="openAIConfig"
+                  title="配置AI模型"
+                >
+                  AI配置
+                </el-button>
+                <el-button
+                  class="ai-generate-all-btn"
+                  type="primary"
+                  :icon="Star"
+                  :loading="aiGenerating"
+                  @click="generateAIAll"
+                  title="AI一键生成标题、摘要、分类和标签"
+                  size="small"
+                >
+                  AI一键生成
+                </el-button>
+              </div>
             </div>
 
             <div
               class="md-body"
               :class="`mode-${viewMode}`"
-              :style="
-                viewMode === 'split'
-                  ? {
-                      gridTemplateColumns:
-                        tocWidth + 'px ' + editorWidth + '% ' + (100 - editorWidth) + '%',
-                    }
-                  : {}
-              "
               ref="mdBodyRef"
             >
-              <div class="md-toc" v-show="viewMode !== 'edit'">
+              <div class="md-toc">
                 <div class="toc-title">目录</div>
                 <ul class="toc-list">
                   <li
@@ -844,7 +1080,6 @@ router.afterEach((to, from) => {
                     <a href="javascript:void(0)" @click="jumpToHeading(i)">{{ item.text }}</a>
                   </li>
                 </ul>
-                <div class="toc-resizer" @mousedown="startResize('toc')"></div>
               </div>
               <div
                 v-show="viewMode !== 'preview'"
@@ -872,14 +1107,8 @@ router.afterEach((to, from) => {
                 ref="previewPaneRef"
                 @scroll="syncScroll('preview')"
               >
-                <div class="markdown-preview" ref="previewContentRef" v-html="previewHtml"></div>
+                <div class="markdown-body markdown-preview" ref="previewContentRef" v-html="previewHtml"></div>
               </div>
-              <div
-                v-if="viewMode === 'split'"
-                class="md-resizer"
-                :style="{ left: `calc(${tocWidth}px + ${editorWidth}% - 3px)` }"
-                @mousedown="startResize('main')"
-              ></div>
             </div>
           </div>
         </el-form-item>
@@ -1018,6 +1247,62 @@ router.afterEach((to, from) => {
         </span>
       </template>
     </el-dialog>
+
+    <!-- AI配置对话框 -->
+    <AIConfigDialog
+      v-model:visible="aiConfigDialogVisible"
+      :config="aiService"
+      @save="saveAIConfig"
+    />
+
+    <!-- 新标签确认对话框 -->
+    <el-dialog
+      v-model="newTagsConfirmVisible"
+      title="确认新标签"
+      width="500px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+    >
+      <div class="new-tags-confirm">
+        <p style="margin-bottom: 16px; color: #606266">
+          AI推荐了以下新标签，请选择需要创建的标签，并可修改名称：
+        </p>
+        <div v-for="(tag, index) in editableNewTags" :key="index" class="new-tag-item">
+          <el-checkbox v-model="tag.selected" />
+          <el-input
+            v-model="tag.name"
+            placeholder="标签名称"
+            :disabled="!tag.selected"
+            style="flex: 1; margin-left: 12px"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="cancelCreateTags">取消</el-button>
+          <el-button type="primary" @click="confirmCreateTags">确认创建</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 更新确认对话框 -->
+    <el-dialog
+      v-model="updateConfirmVisible"
+      title="确认更新"
+      width="420px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+    >
+      <p style="margin-bottom: 16px; color: #606266">
+        AI已生成标题、摘要、分类和标签，是否立即更新文章？
+      </p>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="cancelUpdate">继续编辑</el-button>
+          <el-button type="primary" @click="confirmUpdate">立即更新</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -1032,22 +1317,11 @@ router.afterEach((to, from) => {
 .header {
   text-align: center;
   margin-bottom: 30px;
-  position: relative;
 }
 
-.header-top {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  position: relative;
-}
-
-.header-top h1 {
+.header h1 {
   margin: 0;
 }
-
-/* 返回按钮样式已删除 */
 
 .header p {
   font-size: 1.2rem;
@@ -1071,14 +1345,11 @@ router.afterEach((to, from) => {
   display: grid;
   gap: 12px;
 }
-.md-body.mode-split {
-  grid-template-columns: 220px 1fr 1fr; /* 初始：TOC + 编辑 + 预览，运行时用内联样式覆盖 */
-}
 .md-body.mode-edit {
-  grid-template-columns: 1fr;
+  grid-template-columns: 220px 1fr;
 }
 .md-body.mode-preview {
-  grid-template-columns: 1fr;
+  grid-template-columns: 220px 1fr;
 }
 .md-editor-pane,
 .md-preview-pane {
@@ -1092,14 +1363,6 @@ router.afterEach((to, from) => {
   max-height: 600px;
   overflow: auto;
   position: relative;
-}
-.md-toc .toc-resizer {
-  position: absolute;
-  right: -3px;
-  top: 0;
-  width: 6px;
-  bottom: 0;
-  cursor: col-resize;
 }
 .toc-title {
   font-weight: 600;
@@ -1130,38 +1393,114 @@ router.afterEach((to, from) => {
 .md-preview-pane {
   overflow: auto;
 }
-.md-resizer {
-  position: absolute;
-  width: 6px;
-  top: 0;
-  bottom: 0;
-  cursor: col-resize;
-  background: transparent;
-}
-
 .markdown-preview {
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   padding: 16px;
-  background: #fafafa;
+  background: #fff;
   max-height: 600px;
   overflow: auto;
+  font-family: 'Segoe UI', 'PingFang SC', 'Hiragino Sans', Arial, sans-serif;
 }
 
-.markdown-preview :deep(h1),
-.markdown-preview :deep(h2),
-.markdown-preview :deep(h3),
-.markdown-preview :deep(h4),
-.markdown-preview :deep(h5),
-.markdown-preview :deep(h6) {
-  margin: 16px 0 8px;
+/* 使用与文章详情页相同的样式 */
+.markdown-preview :deep(h1) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  border-bottom: 2px solid #667eea;
+  padding-bottom: 12px;
+  margin-top: 24px;
+  margin-bottom: 16px;
+}
+
+.markdown-preview :deep(h2) {
+  color: #2c3e50;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+  margin-top: 20px;
+  margin-bottom: 14px;
+}
+
+.markdown-preview :deep(h3) {
+  color: #2c3e50;
+  margin-top: 18px;
+  margin-bottom: 12px;
+}
+
+.markdown-preview :deep(blockquote) {
+  border-left: 4px solid #667eea;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+  border-radius: 0 8px 8px 0;
+  padding: 15px 20px;
+  margin: 20px 0;
+}
+
+.markdown-preview :deep(a) {
+  color: #667eea;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.markdown-preview :deep(a:hover) {
+  border-bottom-color: #667eea;
 }
 
 .markdown-preview :deep(img) {
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
   max-width: 100%;
-  height: auto;
-  display: block;
-  margin: 8px 0;
+}
+
+.markdown-preview :deep(img:hover) {
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.markdown-preview :deep(pre) {
+  border-radius: 8px;
+  margin: 16px 0;
+  background: #f6f8fa !important;
+  padding: 16px;
+  overflow-x: auto;
+}
+
+.markdown-preview :deep(code:not(pre code)) {
+  font-family: 'Monaco', 'Courier New', monospace;
+  background: #f0f2f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: #e83e8c;
+  font-size: 0.9em;
+}
+
+.markdown-preview :deep(table) {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  margin: 20px 0;
+}
+
+.markdown-preview :deep(th) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 12px;
+}
+
+.markdown-preview :deep(td) {
+  padding: 10px 12px;
+}
+
+.markdown-preview :deep(tr:nth-child(even)) {
+  background-color: #f8fafc;
+}
+
+.markdown-preview :deep(tr:hover) {
+  background-color: #f1f5f9;
 }
 
 /* 响应式设计 */
@@ -1177,12 +1516,6 @@ router.afterEach((to, from) => {
   .header p {
     font-size: 1rem;
   }
-
-  .header-top {
-    justify-content: center;
-  }
-
-  /* 返回按钮样式已删除 */
 }
 
 /* 图片上传对话框样式 */
@@ -1254,5 +1587,86 @@ router.afterEach((to, from) => {
 
 .upload-form {
   margin-top: 10px;
+}
+
+/* 工具栏样式 */
+.md-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.ai-config-btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #909399 0%, #a6a9ad 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(144, 147, 153, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 12px;
+}
+
+.ai-config-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(144, 147, 153, 0.4);
+  background: linear-gradient(135deg, #a6a9ad 0%, #b8bbbf 100%);
+}
+
+.ai-generate-all-btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.ai-generate-all-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
+  background: linear-gradient(135deg, #66b1ff 0%, #85c8ff 100%);
+}
+
+.ai-generate-all-btn:active {
+  transform: translateY(0);
+}
+
+.ai-generate-all-btn .el-icon {
+  margin-right: 4px;
+  font-size: 16px;
+}
+
+/* 新标签确认对话框样式 */
+.new-tags-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.new-tag-item {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fafafa;
+  transition: all 0.2s;
+}
+
+.new-tag-item:hover {
+  background: #f0f0f0;
+  border-color: #409eff;
 }
 </style>

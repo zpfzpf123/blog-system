@@ -14,8 +14,12 @@ import {
 } from 'element-plus'
 import { Star, Setting } from '@element-plus/icons-vue'
 import axios from '@/utils/axios'
-import { marked } from 'marked'
-import Breadcrumb from '@/components/Breadcrumb.vue'
+import { normalizeImageUrl, processImageUrlsInMarkdown } from '@/utils/imageUtils'
+import MarkdownIt from 'markdown-it'
+import markdownItAnchor from 'markdown-it-anchor'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/github.css'
+import 'github-markdown-css/github-markdown-light.css'
 import AIConfigDialog from '@/components/AIConfigDialog.vue'
 import {
   generateBlogSummary,
@@ -361,14 +365,42 @@ const cancelUploadImage = () => {
   imageNaturalHeight.value = 0
 }
 
+// 初始化 markdown-it
+const md = new MarkdownIt({
+  html: true,
+  linkify: true,
+  typographer: true,
+  highlight: function (str, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return '<pre class="hljs"><code>' +
+               hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
+               '</code></pre>'
+      } catch (__) {}
+    }
+    return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>'
+  }
+})
+
+// 配置插件 - 自动为标题生成 ID
+md.use(markdownItAnchor, {
+  permalink: false,
+  level: [1, 2, 3, 4, 5, 6],
+  slugify: (s: string) => {
+    return encodeURIComponent(s.trim())
+  }
+})
+
 // Markdown 实时预览
 const previewHtml = computed(() => {
   const content = form.value.content || ''
-  return marked.parse(content)
+  if (!content) return ''
+  const processed = processImageUrlsInMarkdown(content)
+  return md.render(processed)
 })
 
 // 编辑/预览融合视图控制
-const viewMode = ref<'split' | 'edit' | 'preview'>('split')
+const viewMode = ref<'edit' | 'preview'>('edit')
 const editorWidth = ref(50) // 分屏时中间编辑区在(编辑+预览)中的百分比
 const tocWidth = ref(220) // 目录宽度（px）
 const mdBodyRef = ref<HTMLDivElement | null>(null)
@@ -950,29 +982,7 @@ router.afterEach((to, from) => {
 
 <template>
   <div class="post-create-container">
-    <!-- 面包屑导航 -->
-    <Breadcrumb />
-
-    <div class="header">
-      <div class="header-top">
-        <h1>创建博客文章</h1>
-        <div class="header-actions">
-          <el-button
-            class="ai-config-btn"
-            type="info"
-            :icon="Setting"
-            size="small"
-            @click="openAIConfig"
-            title="配置AI模型"
-          >
-            AI模型配置
-          </el-button>
-        </div>
-      </div>
-      <p>填写表单创建新的博客文章</p>
-    </div>
-
-    <el-card class="form-card">
+    <el-card class="form-card" v-loading="loading">
       <el-form :model="form" label-width="100px">
         <el-form-item label="标题" required>
           <el-input v-model="form.title" placeholder="请输入文章标题" />
@@ -1027,12 +1037,21 @@ router.afterEach((to, from) => {
             <div class="md-toolbar">
               <div class="toolbar-left">
                 <el-radio-group v-model="viewMode" size="small">
-                  <el-radio-button label="split">分屏</el-radio-button>
                   <el-radio-button label="edit">编辑</el-radio-button>
                   <el-radio-button label="preview">预览</el-radio-button>
                 </el-radio-group>
               </div>
               <div class="toolbar-right">
+                <el-button
+                  class="ai-config-btn"
+                  type="info"
+                  :icon="Setting"
+                  size="small"
+                  @click="openAIConfig"
+                  title="配置AI模型"
+                >
+                  AI配置
+                </el-button>
                 <el-button
                   class="ai-generate-all-btn"
                   type="primary"
@@ -1050,17 +1069,9 @@ router.afterEach((to, from) => {
             <div
               class="md-body"
               :class="`mode-${viewMode}`"
-              :style="
-                viewMode === 'split'
-                  ? {
-                      gridTemplateColumns:
-                        tocWidth + 'px ' + editorWidth + '% ' + (100 - editorWidth) + '%',
-                    }
-                  : {}
-              "
               ref="mdBodyRef"
             >
-              <div class="md-toc" v-show="viewMode !== 'edit'">
+              <div class="md-toc">
                 <div class="toc-title">目录</div>
                 <ul class="toc-list">
                   <li
@@ -1072,7 +1083,6 @@ router.afterEach((to, from) => {
                     <a href="javascript:void(0)" @click="jumpToHeading(i)">{{ item.text }}</a>
                   </li>
                 </ul>
-                <div class="toc-resizer" @mousedown="startResize('toc')"></div>
               </div>
               <div
                 v-show="viewMode !== 'preview'"
@@ -1100,14 +1110,8 @@ router.afterEach((to, from) => {
                 ref="previewPaneRef"
                 @scroll="syncScroll('preview')"
               >
-                <div class="markdown-preview" ref="previewContentRef" v-html="previewHtml"></div>
+                <div class="markdown-body markdown-preview" ref="previewContentRef" v-html="previewHtml"></div>
               </div>
-              <div
-                v-if="viewMode === 'split'"
-                class="md-resizer"
-                :style="{ left: `calc(${tocWidth}px + ${editorWidth}% - 3px)` }"
-                @mousedown="startResize('main')"
-              ></div>
             </div>
           </div>
         </el-form-item>
@@ -1336,35 +1340,6 @@ router.afterEach((to, from) => {
   flex: 1;
 }
 
-.header {
-  text-align: center;
-  margin-bottom: 30px;
-  position: relative;
-}
-
-.header-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.header-top h1 {
-  margin: 0;
-}
-
-/* 返回按钮样式已删除 */
-
-.header p {
-  font-size: 1.2rem;
-  color: #666;
-}
-
 .form-card {
   margin-bottom: 30px;
 }
@@ -1402,14 +1377,11 @@ router.afterEach((to, from) => {
   display: grid;
   gap: 12px;
 }
-.md-body.mode-split {
-  grid-template-columns: 220px 1fr 1fr; /* 初始：TOC + 编辑 + 预览，运行时用内联样式覆盖 */
-}
 .md-body.mode-edit {
-  grid-template-columns: 1fr;
+  grid-template-columns: 220px 1fr;
 }
 .md-body.mode-preview {
-  grid-template-columns: 1fr;
+  grid-template-columns: 220px 1fr;
 }
 .md-editor-pane,
 .md-preview-pane {
@@ -1423,14 +1395,6 @@ router.afterEach((to, from) => {
   max-height: 600px;
   overflow: auto;
   position: relative;
-}
-.md-toc .toc-resizer {
-  position: absolute;
-  right: -3px;
-  top: 0;
-  width: 6px;
-  bottom: 0;
-  cursor: col-resize;
 }
 .toc-title {
   font-weight: 600;
@@ -1461,29 +1425,114 @@ router.afterEach((to, from) => {
 .md-preview-pane {
   overflow: auto;
 }
-.md-resizer {
-  position: absolute;
-  width: 6px;
-  top: 0;
-  bottom: 0;
-  cursor: col-resize;
-  background: transparent;
+.markdown-preview {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 16px;
+  background: #fff;
+  max-height: 600px;
+  overflow: auto;
+  font-family: 'Segoe UI', 'PingFang SC', 'Hiragino Sans', Arial, sans-serif;
 }
 
-.markdown-preview :deep(h1),
-.markdown-preview :deep(h2),
-.markdown-preview :deep(h3),
-.markdown-preview :deep(h4),
-.markdown-preview :deep(h5),
-.markdown-preview :deep(h6) {
-  margin: 16px 0 8px;
+/* 使用与文章详情页相同的样式 */
+.markdown-preview :deep(h1) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  border-bottom: 2px solid #667eea;
+  padding-bottom: 12px;
+  margin-top: 24px;
+  margin-bottom: 16px;
+}
+
+.markdown-preview :deep(h2) {
+  color: #2c3e50;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+  margin-top: 20px;
+  margin-bottom: 14px;
+}
+
+.markdown-preview :deep(h3) {
+  color: #2c3e50;
+  margin-top: 18px;
+  margin-bottom: 12px;
+}
+
+.markdown-preview :deep(blockquote) {
+  border-left: 4px solid #667eea;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+  border-radius: 0 8px 8px 0;
+  padding: 15px 20px;
+  margin: 20px 0;
+}
+
+.markdown-preview :deep(a) {
+  color: #667eea;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.markdown-preview :deep(a:hover) {
+  border-bottom-color: #667eea;
 }
 
 .markdown-preview :deep(img) {
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
   max-width: 100%;
-  height: auto;
-  display: block;
-  margin: 8px 0;
+}
+
+.markdown-preview :deep(img:hover) {
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.markdown-preview :deep(pre) {
+  border-radius: 8px;
+  margin: 16px 0;
+  background: #f6f8fa !important;
+  padding: 16px;
+  overflow-x: auto;
+}
+
+.markdown-preview :deep(code:not(pre code)) {
+  font-family: 'Monaco', 'Courier New', monospace;
+  background: #f0f2f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: #e83e8c;
+  font-size: 0.9em;
+}
+
+.markdown-preview :deep(table) {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  margin: 20px 0;
+}
+
+.markdown-preview :deep(th) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 12px;
+}
+
+.markdown-preview :deep(td) {
+  padding: 10px 12px;
+}
+
+.markdown-preview :deep(tr:nth-child(even)) {
+  background-color: #f8fafc;
+}
+
+.markdown-preview :deep(tr:hover) {
+  background-color: #f1f5f9;
 }
 
 /* 分类选择器下拉框样式 */
@@ -1566,34 +1615,12 @@ router.afterEach((to, from) => {
     padding: 10px;
   }
 
-  .header h1 {
-    font-size: 2rem;
-  }
-
-  .header p {
-    font-size: 1rem;
-  }
-
-  .header-top {
-    justify-content: center;
-  }
-
   .form-actions {
     flex-direction: column;
     align-items: stretch;
   }
 
   .action-buttons {
-    justify-content: center;
-  }
-
-  /* AI按钮响应式 */
-  .header-top {
-    flex-direction: column;
-    gap: 15px;
-  }
-
-  .header-actions {
     justify-content: center;
   }
 

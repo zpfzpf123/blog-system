@@ -531,6 +531,11 @@ footer {
 }
 </style>
 <style>
+/* 全局平滑滚动 */
+html {
+  scroll-behavior: smooth;
+}
+
 body,
 #app {
   background: #f7f8fa !important;

@@ -1,0 +1,28 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+id	title	ai_generated_description	length	article_type
+40	npm 常用命令大全	npm 常用命令大全 一、项目初始化 npm init - npm init - 初始化项目，创建 package.json（交互式） - npm init -y / npm init --yes - 快速初始化，使用默认配置 二、包安装 基础安装 - npm install / npm i - 安装 package.json 中的所有依赖 - npm in...	183	工具类
+39	Vue3+Element Plus列表查询布局规范	Vue3 + Element Plus 列表查询项布局规范 > 适用范围：Vue 3 + Element Plus + Vite 项目   > 版本：v1.0   > 目标：统一列表页查询表单的布局、交互和体验 --- ⚠️ 使用前必读：前置准备 第一步：检查必需文件 在使用本规范之前，请先检查您的项目中是否已包含以下公共组件和公共样式： 必需的公共组件 |...	183	优化类
+38	Vue3 表格自适应高度通用方案	Vue3 表格自适应高度通用方案 --- 简介（Overview） useTableHeight 是一个基于 Vue3 Composition API 的可复用函数（Composable），用于实现数据表格高度的智能自适应。它能够根据页面布局动态计算表格的最佳显示高度，确保表格充分利用可视区域，避免出现双滚动条或大量留白。 适用于：任何使用 Vue3 框架的...	183	问题类
+36	浏览器内置tts语音播报功能	浏览器内置 TTS 技术文档   （基于 Web Speech API speechSynthesis） --- 简介（Overview） 浏览器内置 TTS（Text-To-Speech，文本转语音）是指使用浏览器提供的 Web Speech API 中的 speechSynthesis 能力，将文本实时转换为语音并在本地播放的功能。 它的核心优势是： -...	183	通用类
+35	公司部分地址	git地址  http://222.212.83.50:60080 账户:zhoupengfei@cbpm-kexin.com 密码:18582297328zpf...	84	通用类
+33	天衡系统访问地址	1 gitlab地址 js 网址：https://gitlab.office.iios.com.cn/ 账号：kxpengfeizhou 密码：18582297328zpf 2 天衡打包网址 js 网址：http://jenkins.office.iios.com.cn/ 账号：kxpengfeizhou 密码：eg5ju4ZQ5wuAQc2cpyUW 3 ...	183	通用类
+32	Vue 3 +router使用指南	1. 环境搭建 1.1 创建 Vue 3 + TypeScript 项目 创建 Vue 3 + TypeScript 项目是开始使用 Vue 3、TypeScript 和 Vue Router 的第一步。以下是详细的步骤和数据支持： - 使用 Vue CLI 创建项目：Vue CLI 是 Vue.js 的官方脚手架工具，可以帮助开发者快速搭建项目。运行以下命...	183	优化类
+31	Pinia入门：从基础到实践	1. Pinia 简介 1.1 Pinia 与 Vuex 的对比 Pinia 是 Vue.js 的新一代状态管理库，与传统的 Vuex 相比，它在多个方面进行了改进和优化。 - API 简化：Pinia 的 API 更加简洁直观，去掉了 Vuex 中复杂的 mutations，将状态的修改直接通过 actions 实现，减少了代码量和学习成本。例如，使用 P...	183	优化类
+30	Vue2 + ECharts 完整使用指南	📖 Vue2 + ECharts 完整使用指南 🎯 主要优化内容 1. 结构优化：重新组织了文档结构，使其更加清晰易读 2. 内容扩充：添加了更多实用的代码示例和最佳实践 3. 组件化设计：提供了完整的Vue组件示例 4. 性能优化：增加了性能优化和内存管理相关内容 5. 问题解决：完善了常见问题的诊断和解决方案 📋 优化后的文档结构 1. 简介与核心特性 ...	183	优化类
+29	Vue 大屏动态配置组件使用说明	Vue 大屏动态配置组件数量、占比和位置的组件使用说明文档 一、BigScreen 组件代码及注释 1. 模板部分 html <template>   <!-- 定义大屏容器的类名为 big-screen -->   <div class="big-screen">     <!-- 使用 v-for 指令遍历 screenList 数组，item 为数组中...	183	通用类
+28	深入理解Vuex核心概念与应用方法	1. Vuex 简介 1.1 定义与作用 Vuex 是一个专为 Vue.js 应用程序开发的状态管理模式，采用集中式存储管理应用的所有组件状态，并以相应的规则保证状态以一种可预测的方式发生变化。它借鉴了 Flux、Redux 和 The Elm Architecture 的思想，但专门为 Vue.js 设计，利用 Vue.js 的细粒度数据响应机制进行高效的...	183	优化类
+27	单页应用与多页应用的区别及Vue Router功能解析	1. 基础概念 1.1 单页应用与多页应用的区别 单页应用（SPA）与多页应用（MPA）是两种常见的 Web 应用架构模式，它们在用户体验、性能、开发方式等方面存在显著差异。 - 用户体验：     - 单页应用：用户在浏览过程中无需重新加载整个页面，页面的切换更加流畅，用户体验更加连贯。例如，当用户在社交媒体应用中切换不同的页面（如首页、消息、个人中心）时...	183	优化类
+26	数组去重技巧：对象与普通值处理方法	数组去重代码示例说明文档 一、数组对象去重代码及注释 javascript // 定义一个包含对象的数组 a，其中有重复的对象（根据 id 判断，这里有两个 id 为 1 的对象） let a = [{ id: 1, name: 'a' }, { id: 2, name: 'b' }, { id: 3, name: 'c' }, { id: 4, name:...	183	通用类
+25	性能观察：监控网页接口调用	监听网页行为（如是否调用某个接口）的说明文档 本部分内容介绍了如何使用 PerformanceObserver 来监听网页中是否调用了特定接口的相关代码及使用说明。 代码部分 javascript // 创建一个 PerformanceObserver 实例，该实例用于观察性能相关的事件 // 传入的回调函数会在有新的性能条目符合观察条件时被调用 const...	183	通用类
+24	git代码合并	和他人在不同分支开发 1 重新拉取远程分支 git fetch origin 2 将远程的develop代码合并到本地的dev-zhou分支 要将远程的develop分支代码合并到本地的dev-zhou分支，你可以按照以下步骤操作： 1. 确保你在dev-zhou分支上： 首先，你需要确保你当前在dev-zhou分支上工作。你可以使用git status查看...	183	通用类
+23	滚动条自定义CSS样式指南	滚动条样式自定义说明文档 一、滚动条样式代码及注释 css / 选择器用于匹配滚动条的整体部分，这里使用了 & 表示当前选择器的上下文元素，    然后通过 ::-webkit-scrollbar 伪元素来设置滚动条整体的样式，    适用于 Webkit 内核的浏览器（如 Chrome、Safari 等） / &::-webkit-scrollbar { ...	183	通用类
+22	使用 JavaScript 伪协议在 Axure 中动态引入 ECharts 图表	在 Axure 中通过 JavaScript 伪协议动态引入 ECharts 图表使用说明文档 简介 本教程旨在介绍如何在 Axure 中通过 JavaScript 伪协议直接执行 ECharts 代码，从而实现动态引入图表的功能。Axure 支持使用 JavaScript 伪协议执行 JavaScript 代码，借助此特性，我们可以引入 ECharts 的...	183	问题类
+21	Vue2+音频自动播放设置说明	在 Vue 页面中使用音频及浏览器自动播放设置说明文档 简介 本说明文档主要介绍如何在 Vue 页面中添加 audio 元素，并实现音频的控制播放，同时针对 Chrome 和 Edge 浏览器，提供使视频（音频同理）不静音自动播放的设置方法。 核心功能 1. 在 Vue 页面添加音频元素：通过在模板中使用 audio 标签引入音频文件。 2. 控制音频播放：...	183	问题类
+20	高效管理HTTP请求：Vue 3+TypeScript Axios封装使用说明	Vue 3 + TypeScript 封装 Axios 使用说明文档 简介 在 Vue 3 和 TypeScript 项目中，为了更高效地管理 HTTP 请求，我们对 Axios 进行了封装。通过创建 AxiosService 类，将 Axios 实例、请求拦截、响应拦截以及常用的 HTTP 请求方法整合在一起，提高了代码的复用性和可维护性。 核心功能 2....	183	问题类
+19	使用 Vue.js 插件实现全局 HLSPlay 组件	使用 HLSPlay 组件的 Vue.js 插件使用说明文档 该插件允许你在 Vue.js 应用中全局使用 HLSPlay 组件。 下载 npm install vue-video-player@5.0.2 npm install videojs-contrib-hls@5.14.1 代码 模板部分 html <template>   <section cl...	183	通用类
+18	Vue.js中使用flv.js播放FLV视频	使用 flv.js 实现 FLV 视频播放的 Vue.js 示例文档 该文档介绍了如何在 Vue.js 应用中使用 flv.js 来播放 FLV 格式的视频。 下载 npm install --save flv.js 代码示例 模板部分 html <template>   <div>     <!-- 定义一个 video 标签，用于显示视频。id 为 vi...	183	通用类
+17	Vue插件vue-contextmenujs使用指南	vue-contextmenujs 插件使用说明文档 一、安装 通过 npm 安装 vue-contextmenujs 插件，命令如下： npm install vue-contextmenujs 二、使用 在 Vue 项目中引入并使用该插件，代码如下： javascript // 导入 vue-contextmenujs 插件中的 Contextmenu ...	183	通用类
+16	基于Axios的HTTP请求模块使用说明	基于 axios 的 HTTP 请求模块使用说明文档 一、模块代码及注释 javascript // 引入 axios 库，用于发送 HTTP 请求 import axios from 'axios'; // 引入 element-ui 中的 Message 组件，用于显示提示信息 import {Message} from 'element-ui'; //...	183	通用类
+14	vue2+ MQTT.js	使用 MQTT.js 的 Vue.js 插件使用说明文档 一、插件概述 这是一个使用 MQTT.js 的 Vue.js 插件，允许在 Vue.js 应用中全局使用 MQTT.js。 二、安装 首先，需要在项目中安装 MQTT.js，通过 npm 安装的命令如下： npm install mqtt --save 三、封装插件 插件代码及注释 javascrip...	183	通用类
+13	uniapp存储和获取文件	文件读取模块 函数定义 javascript /   读取本地文件内容   @param {string} fileName - 目标文件名（需包含扩展名）   @param {Function} callback - 带结果回调函数（参数：data, error）  / fetchFileData(fileName, callback) {     plu...	183	优化类
+12	Vue2 WebSocket 插件封装方案使用说明文档	Vue2 WebSocket 插件封装方案使用说明文档 一、简介 本方案是基于 Vue2 的 WebSocket 插件完整封装，具备心跳检测、断线重连、全局注册等功能。该封装方案采用面向对象的编程方式，通过 SocketClient 类管理 WebSocket 连接，并实现了自动重连、心跳检测等机制。同时，使用全局单例模式，保证整个应用只有一个 WebSoc...	183	问题类

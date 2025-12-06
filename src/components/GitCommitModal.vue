@@ -34,6 +34,8 @@ const isProcessing = ref(false)
 const activeStep = ref(0)
 // 是否有冲突待解决
 const hasConflictPending = ref(false)
+// 冲突文件列表
+const conflictFiles = ref<string[]>([])
 // 失败的步骤（用于重试）
 const failedStep = ref<'fetch' | 'pull' | 'push' | null>(null)
 
@@ -92,6 +94,7 @@ const resetState = () => {
   commitMessage.value = ''
   isProcessing.value = false
   hasConflictPending.value = false
+  conflictFiles.value = []
   failedStep.value = null
   // 不重置分支选择，保留用户的选择
 }
@@ -270,7 +273,17 @@ const startSmartCommit = async () => {
     if (pullResponse.data.hasConflict) {
       stepStatus.value = 'error'
       addLog('检测到代码冲突！', 'error')
-      addLog('请在IDE中编辑解决冲突文件', 'warning')
+      
+      // 保存冲突文件列表
+      if (pullResponse.data.conflictFiles && pullResponse.data.conflictFiles.length > 0) {
+        conflictFiles.value = pullResponse.data.conflictFiles
+        addLog(`发现 ${pullResponse.data.conflictCount} 个冲突文件:`, 'warning')
+        pullResponse.data.conflictFiles.forEach((file: string) => {
+          addLog(`  - ${file}`, 'error')
+        })
+      }
+      
+      addLog('双击下方文件列表可在WebStorm中打开文件', 'info')
       addLog('解决完成后，点击下方"继续推送"按钮', 'warning')
       hasConflictPending.value = true
       isProcessing.value = false
@@ -413,7 +426,17 @@ const retryNetworkStep = async () => {
       if (pullResponse.data.hasConflict) {
         stepStatus.value = 'error'
         addLog('检测到代码冲突！', 'error')
-        addLog('请在IDE中编辑解决冲突文件', 'warning')
+        
+        // 保存冲突文件列表
+        if (pullResponse.data.conflictFiles && pullResponse.data.conflictFiles.length > 0) {
+          conflictFiles.value = pullResponse.data.conflictFiles
+          addLog(`发现 ${pullResponse.data.conflictCount} 个冲突文件:`, 'warning')
+          pullResponse.data.conflictFiles.forEach((file: string) => {
+            addLog(`  - ${file}`, 'error')
+          })
+        }
+        
+        addLog('双击下方文件列表可在WebStorm中打开文件', 'info')
         addLog('解决完成后，点击下方"继续推送"按钮', 'warning')
         hasConflictPending.value = true
         isProcessing.value = false
@@ -452,7 +475,17 @@ const retryNetworkStep = async () => {
       if (pullResponse.data.hasConflict) {
         stepStatus.value = 'error'
         addLog('检测到代码冲突！', 'error')
-        addLog('请在IDE中编辑解决冲突文件', 'warning')
+        
+        // 保存冲突文件列表
+        if (pullResponse.data.conflictFiles && pullResponse.data.conflictFiles.length > 0) {
+          conflictFiles.value = pullResponse.data.conflictFiles
+          addLog(`发现 ${pullResponse.data.conflictCount} 个冲突文件:`, 'warning')
+          pullResponse.data.conflictFiles.forEach((file: string) => {
+            addLog(`  - ${file}`, 'error')
+          })
+        }
+        
+        addLog('双击下方文件列表可在WebStorm中打开文件', 'info')
         addLog('解决完成后，点击下方"继续推送"按钮', 'warning')
         hasConflictPending.value = true
         isProcessing.value = false
@@ -543,6 +576,35 @@ const executePush = async () => {
   failedStep.value = null
   emit('success')
   isProcessing.value = false
+}
+
+// 双击冲突文件，通过WebStorm打开
+const openFileInWebStorm = async (fileName: string) => {
+  if (!props.projectId) {
+    ElMessage.error('项目ID不存在')
+    return
+  }
+
+  try {
+    addLog(`正在打开文件: ${fileName}`, 'info')
+    
+    const response = await axios.post(`/api/projects/${props.projectId}/open-file`, {
+      fileName: fileName
+    })
+    
+    if (response.data.success) {
+      addLog(`已在WebStorm中打开: ${fileName}`, 'success')
+      ElMessage.success('文件已在WebStorm中打开')
+    } else {
+      addLog(`打开文件失败: ${response.data.message}`, 'error')
+      ElMessage.error(response.data.message || '打开文件失败')
+    }
+  } catch (error: any) {
+    console.error('打开文件失败:', error)
+    const errorMsg = error.response?.data?.message || error.message || '打开文件失败'
+    addLog(`打开文件失败: ${errorMsg}`, 'error')
+    ElMessage.error(errorMsg)
+  }
 }
 
 </script>
@@ -652,6 +714,27 @@ const executePush = async () => {
             </span>
           </div>
           <div v-if="isProcessing" class="typing-cursor">_</div>
+        </div>
+      </div>
+
+      <!-- 冲突文件列表区 -->
+      <div v-if="hasConflictPending && conflictFiles.length > 0" class="conflict-files-section">
+        <div class="conflict-header">
+          <el-icon class="warning-icon"><Connection /></el-icon>
+          <span class="conflict-title">冲突文件列表 (双击打开)</span>
+          <el-tag type="danger" size="small">{{ conflictFiles.length }} 个文件</el-tag>
+        </div>
+        <div class="conflict-files-list">
+          <div 
+            v-for="(file, index) in conflictFiles" 
+            :key="index"
+            class="conflict-file-item"
+            @dblclick="openFileInWebStorm(file)"
+          >
+            <el-icon class="file-icon"><Document /></el-icon>
+            <span class="file-name">{{ file }}</span>
+            <el-icon class="open-hint"><VideoPlay /></el-icon>
+          </div>
         </div>
       </div>
     </div>
@@ -860,5 +943,111 @@ const executePush = async () => {
 
 :deep(.el-step__description) {
   font-size: 12px;
+}
+
+/* 冲突文件列表样式 */
+.conflict-files-section {
+  margin-top: 20px;
+  border: 2px solid #f56c6c;
+  border-radius: 8px;
+  background: #fef0f0;
+  overflow: hidden;
+}
+
+.conflict-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f56c6c;
+  color: white;
+  font-weight: 600;
+}
+
+.warning-icon {
+  font-size: 20px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.conflict-title {
+  flex: 1;
+  font-size: 15px;
+}
+
+.conflict-files-list {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.conflict-file-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  background: white;
+  border: 1px solid #f5c6cb;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.conflict-file-item:hover {
+  background: #fff5f5;
+  border-color: #f56c6c;
+  transform: translateX(5px);
+  box-shadow: 0 2px 8px rgba(245, 108, 108, 0.2);
+}
+
+.conflict-file-item:last-child {
+  margin-bottom: 0;
+}
+
+.file-icon {
+  color: #f56c6c;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.file-name {
+  flex: 1;
+  color: #303133;
+  font-size: 14px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  word-break: break-all;
+}
+
+.open-hint {
+  color: #909399;
+  font-size: 16px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  flex-shrink: 0;
+}
+
+.conflict-file-item:hover .open-hint {
+  opacity: 1;
+  color: #409eff;
+}
+
+/* 冲突文件列表滚动条美化 */
+.conflict-files-list::-webkit-scrollbar {
+  width: 6px;
+}
+.conflict-files-list::-webkit-scrollbar-track {
+  background: #fef0f0;
+}
+.conflict-files-list::-webkit-scrollbar-thumb {
+  background: #f56c6c;
+  border-radius: 3px;
+}
+.conflict-files-list::-webkit-scrollbar-thumb:hover {
+  background: #f45656;
 }
 </style>

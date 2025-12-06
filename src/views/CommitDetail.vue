@@ -46,12 +46,13 @@
             <el-icon><FolderOpened /></el-icon>
             <span>变更文件 ({{ fileStats.length }})</span>
           </div>
-          <div class="file-tree">
+          <div class="file-tree" ref="fileTreeContainer">
             <FileTreeNode 
               v-for="node in fileTree" 
               :key="node.path"
               :node="node"
               :selected-path="selectedFilePath"
+              :data-file-path="node.path"
               @select="handleSelectFile"
             />
           </div>
@@ -137,6 +138,7 @@ const rawDiff = ref('')
 const selectedFilePath = ref('')
 const fileDiffs = ref<Map<string, string>>(new Map())
 const diffContentContainer = ref<HTMLElement | null>(null)
+const fileTreeContainer = ref<HTMLElement | null>(null)
 const currentHunkIndex = ref(0)
 const hunkCount = ref(0)
 
@@ -516,9 +518,18 @@ async function fetchCommitDetail() {
 // 返回项目详情
 function goBack() {
   if (projectId.value) {
-    // 带上returnTab和scrollToHash参数返回到提交记录tab的对应位置
     const returnTab = route.query.returnTab as string
     const scrollToHash = route.query.scrollToHash as string
+    const filePath = route.query.filePath as string
+    
+    // 如果是从文件历史记录跳转来的，保存信息以便返回时重新打开文件历史记录
+    if (filePath) {
+      sessionStorage.setItem('returnToFileHistory', 'true')
+      sessionStorage.setItem('fileHistoryFilePath', filePath)
+      if (scrollToHash) {
+        sessionStorage.setItem('fileHistoryCommitHash', scrollToHash)
+      }
+    }
     
     const query: any = {}
     if (returnTab) query.returnTab = returnTab
@@ -536,6 +547,66 @@ function goBack() {
 // 组件挂载时获取数据
 onMounted(() => {
   fetchCommitDetail()
+  
+  // 如果有filePath参数，自动选中该文件
+  const filePath = route.query.filePath as string
+  if (filePath) {
+    console.log('需要定位的文件路径:', filePath)
+    
+    // 等待数据加载完成后选中文件
+    const checkAndSelect = () => {
+      if (fileStats.value.length > 0) {
+        const file = fileStats.value.find(f => f.name === filePath)
+        console.log('找到的文件:', file)
+        
+        if (file) {
+          // 选中文件
+          selectedFilePath.value = filePath
+          
+          // 等待DOM更新后滚动到文件位置
+          nextTick(() => {
+            // 尝试多种方式找到文件元素
+            let fileElement = null
+            
+            // 方法1：通过data-file-path属性
+            fileElement = document.querySelector(`[data-file-path="${filePath}"]`)
+            
+            // 方法2：如果方法1失败，遍历所有文件节点
+            if (!fileElement && fileTreeContainer.value) {
+              const allNodes = fileTreeContainer.value.querySelectorAll('.file-node')
+              for (const node of allNodes) {
+                const title = node.getAttribute('title')
+                if (title === filePath) {
+                  fileElement = node
+                  break
+                }
+              }
+            }
+            
+            console.log('找到的文件元素:', fileElement)
+            
+            if (fileElement && fileTreeContainer.value) {
+              // 高亮该文件
+              fileElement.classList.add('highlight-file')
+              setTimeout(() => {
+                fileElement?.classList.remove('highlight-file')
+              }, 2000)
+              
+              // 滚动到文件位置
+              fileElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
+          })
+        } else {
+          console.log('未找到匹配的文件')
+        }
+      } else {
+        // 如果数据还没加载完，等待一会儿再试
+        console.log('数据未加载，继续等待...')
+        setTimeout(checkAndSelect, 100)
+      }
+    }
+    setTimeout(checkAndSelect, 500)
+  }
 })
 </script>
 
@@ -996,5 +1067,22 @@ onMounted(() => {
 
 .diff-navigation :deep(.el-button:active) {
   transform: scale(0.95);
+}
+
+/* 文件高亮动画 */
+.highlight-file {
+  animation: highlightPulse 2s ease-in-out;
+  background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%) !important;
+  border-left: 4px solid #ffc107 !important;
+  padding-left: 21px !important;
+}
+
+@keyframes highlightPulse {
+  0%, 100% {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+  }
+  50% {
+    background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+  }
 }
 </style>

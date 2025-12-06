@@ -16,11 +16,11 @@ public class Post {
     @NotBlank(message = "文章标题不能为空")
     private String title;
 
-    @Column(name = "post_desc", length = 500)
+    @Column(name = "`desc`", length = 500)
     private String desc;
 
     @NotBlank(message = "文章内容不能为空")
-    @Column(length = 10000)
+    @Column(columnDefinition = "LONGTEXT")
     private String content;
 
     private String author;

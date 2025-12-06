@@ -146,18 +146,25 @@ const handleResultClick = (item: SearchResultItem) => {
 const scrollToSelectedResult = () => {
   nextTick(() => {
     const selectedElement = document.querySelector('.result-item.is-selected') as HTMLElement
-    const resultList = document.querySelector('.result-list') as HTMLElement
+    const searchBody = document.querySelector('.search-body') as HTMLElement
     
-    if (selectedElement && resultList) {
-      const containerRect = resultList.getBoundingClientRect()
+    if (selectedElement && searchBody) {
+      const containerRect = searchBody.getBoundingClientRect()
       const elementRect = selectedElement.getBoundingClientRect()
+      const elementTop = selectedElement.offsetTop
+      const containerScrollTop = searchBody.scrollTop
       
-      if (elementRect.top < containerRect.top || elementRect.bottom > containerRect.bottom) {
-        selectedElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-          inline: 'nearest'
-        })
+      // 计算元素相对于容器的位置
+      const elementRelativeTop = elementTop - containerScrollTop
+      const elementRelativeBottom = elementRelativeTop + selectedElement.offsetHeight
+      
+      // 如果元素在可视区域外，滚动到合适位置
+      if (elementRelativeTop < 60) {
+        // 元素在顶部被遮挡，向上滚动
+        searchBody.scrollTop = elementTop - 80
+      } else if (elementRelativeBottom > containerRect.height) {
+        // 元素在底部被遮挡，向下滚动
+        searchBody.scrollTop = elementTop - containerRect.height + selectedElement.offsetHeight + 80
       }
     }
   })
@@ -193,8 +200,13 @@ const handleKeydown = (e: KeyboardEvent) => {
         selectedResultIndex.value >= 0 &&
         selectedResultIndex.value < searchResults.value.length
       ) {
+        // 有选中项，跳转到选中的结果
         handleResultClick(searchResults.value[selectedResultIndex.value])
+      } else if (searchResults.value.length > 0) {
+        // 没有选中项但有搜索结果，跳转到第一个结果
+        handleResultClick(searchResults.value[0])
       } else if (searchQuery.value.trim()) {
+        // 没有搜索结果，执行搜索
         performSearch()
       }
       break
@@ -213,8 +225,14 @@ watch(searchQuery, () => {
   }, 250)
 })
 
-watch(searchResults, () => {
-  selectedResultIndex.value = -1
+watch(searchResults, (newResults) => {
+  // 当有搜索结果时，自动选中第一项，方便键盘导航
+  if (newResults.length > 0) {
+    selectedResultIndex.value = 0
+    scrollToSelectedResult()
+  } else {
+    selectedResultIndex.value = -1
+  }
 })
 
 // Lifecycle

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElPagination, ElEmpty, ElSkeleton, ElInput, ElButton, ElIcon, ElTooltip } from 'element-plus'
 import { Search, DataLine, RefreshLeft, Timer, Top, Grid, List, Delete, Edit, Download, CopyDocument } from '@element-plus/icons-vue'
@@ -93,6 +93,8 @@ const fetchBlogPosts = async (page = 1) => {
     const params: any = {
       page: page,
       limit: pageSize.value,
+      sortBy: 'id',           // 改为按 ID 排序
+      sortOrder: 'desc'       // 降序（ID大的在前面）
     }
 
     if (selectedCategoryIds.value?.length > 0) {
@@ -256,6 +258,15 @@ watch(
   { deep: true }
 )
 
+// 全局快捷键处理函数
+const handleGlobalKeydown = (e: KeyboardEvent) => {
+  // Ctrl+K 或 Cmd+K 打开全局搜索
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault() // 阻止浏览器默认行为
+    openGlobalSearch()
+  }
+}
+
 // Lifecycle
 onMounted(async () => {
   const savedPage = localStorage.getItem('homeCurrentPage')
@@ -308,6 +319,14 @@ onMounted(async () => {
     fetchTags()
     fetchBlogPosts()
   }
+  
+  // 添加全局键盘事件监听
+  window.addEventListener('keydown', handleGlobalKeydown)
+})
+
+onUnmounted(() => {
+  // 清理事件监听器
+  window.removeEventListener('keydown', handleGlobalKeydown)
 })
 </script>
 

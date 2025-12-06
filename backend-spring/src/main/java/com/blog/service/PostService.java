@@ -1,16 +1,16 @@
 package com.blog.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.blog.entity.Post;
 import com.blog.entity.Category;
 import com.blog.entity.Tag;
+import com.blog.mapper.PostMapper;
 import com.blog.repository.PostRepository;
 import com.blog.repository.CategoryRepository;
 import com.blog.repository.TagRepository;
 import com.blog.dto.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
@@ -22,6 +22,9 @@ import java.util.ArrayList;
 public class PostService {
     
     @Autowired
+    private PostMapper postMapper;
+    
+    @Autowired
     private PostRepository postRepository;
     
     @Autowired
@@ -31,27 +34,83 @@ public class PostService {
     private TagRepository tagRepository;
     
     public PostsResponseDTO getPosts(Integer page, Integer limit, List<Long> categoryIds, 
-                                     List<Long> tagIds, String search) {
+                                     List<Long> tagIds, String search, String sortBy, String sortOrder) {
         page = (page == null || page < 1) ? 1 : page;
         limit = (limit == null || limit < 1) ? 10 : limit;
+        sortBy = (sortBy == null || sortBy.isEmpty()) ? "id" : sortBy;
+        sortOrder = (sortOrder == null || sortOrder.isEmpty()) ? "desc" : sortOrder;
         
-        Pageable pageable = PageRequest.of(page - 1, limit);
-        // 修复参数传递，确保正确处理null值
-        Page<Post> postPage = postRepository.findPostsByFilters(
-            categoryIds != null && !categoryIds.isEmpty() ? categoryIds : null,
-            tagIds != null && !tagIds.isEmpty() ? tagIds : null,
-            search,
-            pageable
+        // 创建 MyBatis-Plus 分页对象
+        Page<Post> mybatisPage = new Page<>(page, limit);
+        
+        // 转换 Java 字段名为数据库列名（驼峰转下划线）
+        String dbColumnName = camelToUnderscore(sortBy);
+        
+        System.out.println("【MyBatis-Plus分页】排序字段转换 - Java字段: " + sortBy + " -> 数据库列: " + dbColumnName);
+        
+        // 设置排序字段（使用数据库列名）
+        com.baomidou.mybatisplus.core.metadata.OrderItem orderItem;
+        if ("asc".equalsIgnoreCase(sortOrder)) {
+            orderItem = new com.baomidou.mybatisplus.core.metadata.OrderItem();
+            orderItem.setColumn(dbColumnName);
+            orderItem.setAsc(true);
+            mybatisPage.addOrder(orderItem);
+        } else {
+            orderItem = new com.baomidou.mybatisplus.core.metadata.OrderItem();
+            orderItem.setColumn(dbColumnName);
+            orderItem.setAsc(false);
+            mybatisPage.addOrder(orderItem);
+        }
+        // 添加 ID 作为辅助排序，确保顺序稳定
+        if (!"id".equals(sortBy)) {
+            com.baomidou.mybatisplus.core.metadata.OrderItem idOrder = new com.baomidou.mybatisplus.core.metadata.OrderItem();
+            idOrder.setColumn("id");
+            idOrder.setAsc(false);
+            mybatisPage.addOrder(idOrder);
+        }
+        
+        System.out.println("【MyBatis-Plus分页】查询文章列表 - Page: " + page + ", Size: " + limit + 
+                           ", SortBy: " + dbColumnName + ", Order: " + sortOrder);
+        
+        // 执行分页查询
+        IPage<Post> resultPage = postMapper.selectPostsByFilters(
+            mybatisPage,
+            categoryIds,
+            tagIds,
+            search
         );
         
-        List<PostDTO> postDTOs = postPage.getContent().stream()
+        // 手动加载关联数据（category 和 tags）
+        List<Post> posts = resultPage.getRecords();
+        for (Post post : posts) {
+            // 通过 JPA Repository 重新加载完整数据
+            Post fullPost = postRepository.findById(post.getId()).orElse(post);
+            // 强制加载懒加载的关联数据
+            if (fullPost.getCategory() != null) {
+                fullPost.getCategory().getName(); // 触发加载
+            }
+            if (fullPost.getTags() != null && !fullPost.getTags().isEmpty()) {
+                fullPost.getTags().size(); // 触发加载
+            }
+            // 用完整数据替换
+            post.setCategory(fullPost.getCategory());
+            post.setTags(fullPost.getTags());
+        }
+        
+        // 转换为 DTO
+        List<PostDTO> postDTOs = posts.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
         
+        // 构建分页信息
         PaginationDTO pagination = new PaginationDTO(
-                page, 
-                postPage.getTotalPages(), 
-                postPage.getTotalElements());
+                (int) resultPage.getCurrent(),
+                (int) resultPage.getPages(),
+                resultPage.getTotal()
+        );
+        
+        System.out.println("【MyBatis-Plus分页】查询完成 - 总记录数: " + resultPage.getTotal() + 
+                           ", 总页数: " + resultPage.getPages() + ", 当前页记录数: " + resultPage.getRecords().size());
         
         return new PostsResponseDTO(postDTOs, pagination);
     }
@@ -59,25 +118,10 @@ public class PostService {
 
     
     public PostsResponseDTO getPostsByCategory(Long categoryId, Integer page, Integer limit) {
-        page = (page == null || page < 1) ? 1 : page;
-        limit = (limit == null || limit < 1) ? 10 : limit;
-        
-        Category category = categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new RuntimeException("分类未找到"));
-        
-        Pageable pageable = PageRequest.of(page - 1, limit);
-        Page<Post> postPage = postRepository.findByCategory(category, pageable);
-        
-        List<PostDTO> postDTOs = postPage.getContent().stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-        
-        PaginationDTO pagination = new PaginationDTO(
-                page, 
-                postPage.getTotalPages(), 
-                postPage.getTotalElements());
-        
-        return new PostsResponseDTO(postDTOs, pagination);
+        // 使用 MyBatis-Plus 实现，传入分类ID列表
+        List<Long> categoryIds = new ArrayList<>();
+        categoryIds.add(categoryId);
+        return getPosts(page, limit, categoryIds, null, null, "id", "desc");
     }
     
     public PostDTO getPostById(Long id) {
@@ -178,12 +222,9 @@ public class PostService {
             return new ArrayList<>();
         }
         
-        Pageable pageable = PageRequest.of(0, limit);
-        Page<Post> postPage = postRepository.findPostsByFilters(null, tagIds, null, pageable);
-        
-        return postPage.getContent().stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        // 使用 MyBatis-Plus 实现
+        PostsResponseDTO response = getPosts(1, limit, null, tagIds, null, "id", "desc");
+        return response.getPosts();
     }
     
     /**
@@ -210,21 +251,36 @@ public class PostService {
             categoryIds.add(currentPost.getCategory().getId());
         }
         
-        // 查询相关文章
-        Pageable pageable = PageRequest.of(0, limit + 1); // 多查一个，后面会过滤掉当前文章
-        Page<Post> postPage = postRepository.findPostsByFilters(
-                categoryIds.isEmpty() ? null : categoryIds,
-                tagIds.isEmpty() ? null : tagIds,
-                null,
-                pageable
-        );
+        // 使用 MyBatis-Plus 查询相关文章
+        PostsResponseDTO response = getPosts(1, limit + 1, categoryIds, tagIds, null, "id", "desc");
         
         // 过滤掉当前文章，并限制数量
-        return postPage.getContent().stream()
+        return response.getPosts().stream()
                 .filter(post -> !post.getId().equals(postId))
-                .map(this::convertToDTO)
                 .limit(limit)
                 .collect(Collectors.toList());
+    }
+    
+    /**
+     * 驼峰转下划线工具方法
+     * 例如：createdAt -> created_at
+     */
+    private String camelToUnderscore(String camelCase) {
+        if (camelCase == null || camelCase.isEmpty()) {
+            return camelCase;
+        }
+        StringBuilder result = new StringBuilder();
+        result.append(Character.toLowerCase(camelCase.charAt(0)));
+        for (int i = 1; i < camelCase.length(); i++) {
+            char ch = camelCase.charAt(i);
+            if (Character.isUpperCase(ch)) {
+                result.append('_');
+                result.append(Character.toLowerCase(ch));
+            } else {
+                result.append(ch);
+            }
+        }
+        return result.toString();
     }
     
     private PostDTO convertToDTO(Post post) {

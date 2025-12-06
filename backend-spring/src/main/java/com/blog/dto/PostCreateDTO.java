@@ -6,20 +6,19 @@ import java.util.List;
 public class PostCreateDTO {
     @NotBlank(message = "文章标题不能为空")
     private String title;
-    
+
     private String desc;
-    
+
     @NotBlank(message = "文章内容不能为空")
     private String content;
-    
+
     private String author;
     private Long categoryId;
     private List<Long> tagIds;
 
-    // Constructors
-    public PostCreateDTO() {}
+    public PostCreateDTO() {
+    }
 
-    // Getters and Setters
     public String getTitle() {
         return title;
     }
