@@ -78,8 +78,9 @@ public class GitSmartCommitService {
             return result;
         }
         
-        // 执行 git status --porcelain
-        Map<String, Object> statusResult = executeGitCommand(projectDir, "git", "status", "--porcelain");
+        // 执行 git status --porcelain，使用 -c core.quotepath=false 正确显示中文
+        Map<String, Object> statusResult = executeGitCommand(projectDir, 
+            "git", "-c", "core.quotepath=false", "status", "--porcelain");
         
         if (!(Boolean) statusResult.get("success")) {
             result.put("success", false);
@@ -104,8 +105,11 @@ public class GitSmartCommitService {
             for (String line : lines) {
                 if (line.length() < 3) continue;
                 
+                // 过滤Git警告信息
+                if (isGitWarningOrInfo(line)) continue;
+                
                 String status = line.substring(0, 2);
-                String file = line.substring(3);
+                String file = decodeGitPath(line.substring(3));
                 
                 if (status.contains("M") || status.contains("A")) {
                     modifiedFiles.add(file);
@@ -222,9 +226,9 @@ public class GitSmartCommitService {
     private List<String> parseConflictFiles(File projectDir) {
         List<String> conflictFiles = new ArrayList<>();
         
-        // 执行 git diff --name-only --diff-filter=U
+        // 执行 git diff --name-only --diff-filter=U，使用 -c core.quotepath=false 正确显示中文
         Map<String, Object> diffResult = executeGitCommand(projectDir, 
-            "git", "diff", "--name-only", "--diff-filter=U");
+            "git", "-c", "core.quotepath=false", "diff", "--name-only", "--diff-filter=U");
         
         if ((Boolean) diffResult.get("success")) {
             String output = (String) diffResult.get("output");
@@ -234,7 +238,8 @@ public class GitSmartCommitService {
                     String trimmedLine = line.trim();
                     // 过滤掉空行和Git警告信息
                     if (!trimmedLine.isEmpty() && !isGitWarningOrInfo(trimmedLine)) {
-                        conflictFiles.add(trimmedLine);
+                        // 解码可能的八进制编码路径
+                        conflictFiles.add(decodeGitPath(trimmedLine));
                     }
                 }
             }
@@ -701,21 +706,29 @@ public class GitSmartCommitService {
         Map<String, Object> result = new HashMap<>();
         File projectDir = new File(projectPath);
         
-        // git show --name-status --format="" commitHash
+        // 使用 -c core.quotepath=false 来正确显示中文文件名
+        // git -c core.quotepath=false show --name-status --format="" commitHash
         Map<String, Object> showResult = executeGitCommand(projectDir, 
-            "git", "show", "--name-status", "--format=", commitHash);
+            "git", "-c", "core.quotepath=false", "show", "--name-status", "--format=", commitHash);
         
         List<Map<String, String>> files = new ArrayList<>();
         
         if ((Boolean) showResult.get("success")) {
             String output = (String) showResult.get("output");
             for (String line : output.trim().split("\n")) {
-                if (line.trim().isEmpty()) continue;
+                String trimmedLine = line.trim();
+                if (trimmedLine.isEmpty()) continue;
                 
-                if (line.length() >= 2) {
+                // 过滤掉Git警告信息
+                if (isGitWarningOrInfo(trimmedLine)) continue;
+                
+                if (trimmedLine.length() >= 2) {
                     Map<String, String> file = new HashMap<>();
-                    String status = line.substring(0, 1);
-                    String path = line.substring(1).trim();
+                    String status = trimmedLine.substring(0, 1);
+                    String path = trimmedLine.substring(1).trim();
+                    
+                    // 解码可能的八进制编码路径（兼容旧版本Git）
+                    path = decodeGitPath(path);
                     
                     file.put("status", status);
                     file.put("statusText", getStatusText(status));
@@ -730,6 +743,57 @@ public class GitSmartCommitService {
         result.put("total", files.size());
         
         return result;
+    }
+    
+    /**
+     * 解码Git路径中的八进制编码（如中文文件名）
+     * Git会将非ASCII字符编码为 \xxx 格式
+     */
+    private String decodeGitPath(String path) {
+        if (path == null || !path.contains("\\")) {
+            return path;
+        }
+        
+        // 如果路径被引号包围，去掉引号
+        if (path.startsWith("\"") && path.endsWith("\"")) {
+            path = path.substring(1, path.length() - 1);
+        }
+        
+        try {
+            // 解析八进制编码
+            StringBuilder decoded = new StringBuilder();
+            byte[] bytes = new byte[path.length()];
+            int byteIndex = 0;
+            
+            for (int i = 0; i < path.length(); i++) {
+                char c = path.charAt(i);
+                if (c == '\\' && i + 3 < path.length()) {
+                    // 检查是否是八进制编码 \xxx
+                    String octal = path.substring(i + 1, i + 4);
+                    if (octal.matches("[0-7]{3}")) {
+                        bytes[byteIndex++] = (byte) Integer.parseInt(octal, 8);
+                        i += 3;
+                        continue;
+                    }
+                }
+                // 如果有累积的字节，先解码
+                if (byteIndex > 0) {
+                    decoded.append(new String(bytes, 0, byteIndex, StandardCharsets.UTF_8));
+                    byteIndex = 0;
+                }
+                decoded.append(c);
+            }
+            
+            // 处理剩余的字节
+            if (byteIndex > 0) {
+                decoded.append(new String(bytes, 0, byteIndex, StandardCharsets.UTF_8));
+            }
+            
+            return decoded.toString();
+        } catch (Exception e) {
+            // 解码失败，返回原始路径
+            return path;
+        }
     }
     
     /**
@@ -1045,6 +1109,7 @@ public class GitSmartCommitService {
     /**
      * 回退单个文件到某个提交的状态
      * 使用 git checkout <commit> -- <file> 命令
+     * 对于已删除的文件，使用 git show <commit>:<file> 来恢复
      */
     public Map<String, Object> revertFileToCommit(String projectPath, String commitHash, String filePath) {
         Map<String, Object> result = new HashMap<>();
@@ -1056,15 +1121,70 @@ public class GitSmartCommitService {
             return result;
         }
         
+        // 首先检查文件在该提交中是否存在
+        Map<String, Object> checkResult = executeGitCommand(projectDir,
+            "git", "cat-file", "-e", commitHash + ":" + filePath);
+        
+        if (!(Boolean) checkResult.get("success")) {
+            // 文件在该提交中不存在，可能是新增的文件需要删除
+            File targetFile = new File(projectDir, filePath);
+            if (targetFile.exists()) {
+                // 使用 git rm 删除文件
+                Map<String, Object> rmResult = executeGitCommand(projectDir,
+                    "git", "rm", "-f", filePath);
+                result.put("success", rmResult.get("success"));
+                result.put("message", (Boolean) rmResult.get("success") ?
+                    "文件 " + filePath + " 已删除（该文件在目标提交中不存在）" :
+                    "删除文件失败");
+                result.put("output", rmResult.get("output"));
+                return result;
+            } else {
+                result.put("success", false);
+                result.put("message", "文件在提交 " + commitHash.substring(0, Math.min(7, commitHash.length())) + " 中不存在");
+                return result;
+            }
+        }
+        
         // 使用 git checkout <commit> -- <file> 将文件恢复到指定提交的状态
         Map<String, Object> checkoutResult = executeGitCommand(projectDir, 
             "git", "checkout", commitHash, "--", filePath);
         
-        result.put("success", checkoutResult.get("success"));
-        result.put("message", (Boolean) checkoutResult.get("success") ? 
-            "文件 " + filePath + " 已回退到提交 " + commitHash.substring(0, Math.min(7, commitHash.length())) : 
-            "回退文件失败");
-        result.put("output", checkoutResult.get("output"));
+        if ((Boolean) checkoutResult.get("success")) {
+            result.put("success", true);
+            result.put("message", "文件 " + filePath + " 已回退到提交 " + commitHash.substring(0, Math.min(7, commitHash.length())));
+        } else {
+            // 如果 checkout 失败，尝试使用 git show 来恢复文件内容
+            Map<String, Object> showResult = executeGitCommand(projectDir,
+                "git", "show", commitHash + ":" + filePath);
+            
+            if ((Boolean) showResult.get("success")) {
+                try {
+                    // 确保父目录存在
+                    File targetFile = new File(projectDir, filePath);
+                    File parentDir = targetFile.getParentFile();
+                    if (parentDir != null && !parentDir.exists()) {
+                        parentDir.mkdirs();
+                    }
+                    
+                    // 写入文件内容
+                    String content = (String) showResult.get("output");
+                    java.nio.file.Files.writeString(targetFile.toPath(), content, StandardCharsets.UTF_8);
+                    
+                    // 添加到暂存区
+                    executeGitCommand(projectDir, "git", "add", filePath);
+                    
+                    result.put("success", true);
+                    result.put("message", "文件 " + filePath + " 已恢复到提交 " + commitHash.substring(0, Math.min(7, commitHash.length())));
+                } catch (Exception e) {
+                    result.put("success", false);
+                    result.put("message", "恢复文件失败: " + e.getMessage());
+                }
+            } else {
+                result.put("success", false);
+                result.put("message", "回退文件失败");
+                result.put("output", checkoutResult.get("output"));
+            }
+        }
         
         return result;
     }
@@ -1321,6 +1441,94 @@ public class GitSmartCommitService {
         result.put("message", (Boolean) continueResult.get("success") ? 
             operation + " 操作完成" : "操作失败");
         result.put("output", output);
+        
+        return result;
+    }
+    
+    /**
+     * 获取文件的Git提交历史
+     */
+    public Map<String, Object> getFileHistory(String projectPath, String filePath) {
+        Map<String, Object> result = new HashMap<>();
+        File projectDir = new File(projectPath);
+        
+        if (filePath == null || filePath.trim().isEmpty()) {
+            result.put("success", false);
+            result.put("message", "文件路径不能为空");
+            return result;
+        }
+        
+        // git log --follow --format="%H|%h|%an|%ae|%at|%s" -- filePath
+        Map<String, Object> logResult = executeGitCommand(projectDir, 
+            "git", "-c", "core.quotepath=false", "log", "--follow", 
+            "--format=%H|%h|%an|%ae|%at|%s", "-n", "50", "--", filePath);
+        
+        List<Map<String, Object>> commits = new ArrayList<>();
+        
+        if ((Boolean) logResult.get("success")) {
+            String output = (String) logResult.get("output");
+            for (String line : output.trim().split("\n")) {
+                if (line.trim().isEmpty()) continue;
+                if (isGitWarningOrInfo(line)) continue;
+                
+                String[] parts = line.split("\\|", 6);
+                if (parts.length >= 6) {
+                    Map<String, Object> commit = new HashMap<>();
+                    commit.put("hash", parts[0]);
+                    commit.put("shortHash", parts[1]);
+                    commit.put("author", parts[2]);
+                    commit.put("email", parts[3]);
+                    try {
+                        commit.put("timestamp", Long.parseLong(parts[4]) * 1000);
+                    } catch (NumberFormatException e) {
+                        commit.put("timestamp", 0);
+                    }
+                    commit.put("message", parts[5]);
+                    commits.add(commit);
+                }
+            }
+        }
+        
+        result.put("success", true);
+        result.put("commits", commits);
+        result.put("total", commits.size());
+        result.put("filePath", filePath);
+        
+        return result;
+    }
+    
+    /**
+     * 与当前版本对比（指定提交与HEAD的差异）
+     */
+    public Map<String, Object> compareWithCurrent(String projectPath, String commitHash, String filePath) {
+        Map<String, Object> result = new HashMap<>();
+        File projectDir = new File(projectPath);
+        
+        if (commitHash == null || commitHash.trim().isEmpty()) {
+            result.put("success", false);
+            result.put("message", "提交哈希不能为空");
+            return result;
+        }
+        
+        if (filePath == null || filePath.trim().isEmpty()) {
+            result.put("success", false);
+            result.put("message", "文件路径不能为空");
+            return result;
+        }
+        
+        // git diff commitHash HEAD -- filePath
+        Map<String, Object> diffResult = executeGitCommand(projectDir, 
+            "git", "-c", "core.quotepath=false", "diff", commitHash, "HEAD", "--", filePath);
+        
+        if ((Boolean) diffResult.get("success")) {
+            String diff = (String) diffResult.get("output");
+            result.put("success", true);
+            result.put("diff", diff.isEmpty() ? "文件内容相同，无差异" : diff);
+        } else {
+            result.put("success", false);
+            result.put("message", "获取差异失败");
+            result.put("output", diffResult.get("output"));
+        }
         
         return result;
     }

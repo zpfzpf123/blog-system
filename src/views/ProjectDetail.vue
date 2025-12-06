@@ -20,7 +20,9 @@ import {
   Upload,
   Loading,
   DArrowLeft,
-  Search
+  Search,
+  Connection,
+  Monitor
 } from '@element-plus/icons-vue'
 import axios from '@/utils/axios'
 import MarkdownIt from 'markdown-it'
@@ -38,6 +40,8 @@ import GitBranchModal from '@/components/GitBranchModal.vue'
 import GitStashModal from '@/components/GitStashModal.vue'
 import GitFilesModal from '@/components/GitFilesModal.vue'
 import GitConflictModal from '@/components/GitConflictModal.vue'
+import DevEnvironmentPanel from '@/components/DevEnvironmentPanel.vue'
+import ApiDocPanel from '@/components/ApiDocPanel.vue'
 
 // 配置 Markdown-it
 const md: MarkdownIt = new MarkdownIt({
@@ -1343,6 +1347,36 @@ onUnmounted(() => {
                     <span>✓ 已加载全部 {{ gitCommits.length }} 条提交记录</span>
                   </div>
                 </div>
+              </div>
+            </el-tab-pane>
+
+            <!-- API文档管理标签 -->
+            <el-tab-pane name="apis">
+              <template #label>
+                <div class="tab-label">
+                  <el-icon><Connection /></el-icon>
+                  <span>API文档</span>
+                </div>
+              </template>
+              <div class="tab-content full-height">
+                <ApiDocPanel v-if="project" :project-id="project.id" />
+              </div>
+            </el-tab-pane>
+
+            <!-- 开发环境管理标签 -->
+            <el-tab-pane name="devenv">
+              <template #label>
+                <div class="tab-label">
+                  <el-icon><Monitor /></el-icon>
+                  <span>开发环境</span>
+                </div>
+              </template>
+              <div class="tab-content full-height">
+                <DevEnvironmentPanel 
+                  v-if="project" 
+                  :project-id="project.id" 
+                  :project-path="project.localPath"
+                />
               </div>
             </el-tab-pane>
           </el-tabs>
@@ -2788,5 +2822,9 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-
+/* 全高度内容区 */
+.tab-content.full-height {
+  height: calc(100vh - 280px);
+  overflow: hidden;
+}
 </style>

@@ -61,6 +61,7 @@ public class ProjectServiceImpl implements ProjectService {
         existingProject.setTechStack(project.getTechStack());
         existingProject.setLocalPath(project.getLocalPath());
         existingProject.setRepoUrl(project.getRepoUrl());
+        existingProject.setApiBaseUrl(project.getApiBaseUrl());
         existingProject.setReadmeContent(project.getReadmeContent());
         existingProject.setGitCommits(project.getGitCommits());
         existingProject.setIsFavorite(project.getIsFavorite());

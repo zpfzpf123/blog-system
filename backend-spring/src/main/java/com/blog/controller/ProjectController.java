@@ -98,6 +98,49 @@ public class ProjectController {
     }
     
     /**
+     * 部分更新项目（如只更新API配置）
+     * PATCH /api/projects/{id}
+     */
+    @PatchMapping("/{id}")
+    public ResponseEntity<Project> patchProject(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
+        try {
+            Project existingProject = projectService.getProjectById(id)
+                .orElseThrow(() -> new RuntimeException("项目不存在"));
+            
+            // 只更新传入的字段
+            if (updates.containsKey("apiBaseUrl")) {
+                existingProject.setApiBaseUrl((String) updates.get("apiBaseUrl"));
+            }
+            if (updates.containsKey("apiAccessToken")) {
+                existingProject.setApiAccessToken((String) updates.get("apiAccessToken"));
+            }
+            if (updates.containsKey("name")) {
+                existingProject.setName((String) updates.get("name"));
+            }
+            if (updates.containsKey("description")) {
+                existingProject.setDescription((String) updates.get("description"));
+            }
+            if (updates.containsKey("status")) {
+                existingProject.setStatus((String) updates.get("status"));
+            }
+            if (updates.containsKey("progress")) {
+                existingProject.setProgress((Integer) updates.get("progress"));
+            }
+            if (updates.containsKey("isFavorite")) {
+                existingProject.setIsFavorite((Boolean) updates.get("isFavorite"));
+            }
+            
+            Project updatedProject = projectService.updateProject(id, existingProject);
+            return ResponseEntity.ok(updatedProject);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+    
+    /**
      * 删除项目
      * DELETE /api/projects/{id}
      */
@@ -1677,18 +1720,18 @@ public class ProjectController {
     }
     
     /**
-     * 通过WebStorm打开文件
+     * 使用VS Code打开文件
      * POST /api/projects/{id}/open-file
      */
     @PostMapping("/{id}/open-file")
-    public ResponseEntity<Map<String, Object>> openFileInWebStorm(
+    public ResponseEntity<Map<String, Object>> openFileInIde(
             @PathVariable Long id,
-            @RequestBody Map<String, String> requestBody) {
+            @RequestBody Map<String, Object> requestBody) {
         Map<String, Object> result = new HashMap<>();
         
         try {
             // 获取文件名
-            String fileName = requestBody.get("fileName");
+            String fileName = (String) requestBody.get("fileName");
             if (fileName == null || fileName.trim().isEmpty()) {
                 result.put("success", false);
                 result.put("message", "文件名不能为空");
@@ -1710,7 +1753,11 @@ public class ProjectController {
             File projectDir = new File(localPath);
             File targetFile = new File(projectDir, fileName);
             
-            if (!targetFile.exists()) {
+            // 对于已删除的文件，不检查是否存在
+            boolean checkExists = requestBody.get("checkExists") == null || 
+                                  Boolean.TRUE.equals(requestBody.get("checkExists"));
+            
+            if (checkExists && !targetFile.exists()) {
                 result.put("success", false);
                 result.put("message", "文件不存在: " + fileName);
                 return ResponseEntity.badRequest().body(result);
@@ -1719,50 +1766,20 @@ public class ProjectController {
             // 获取文件的绝对路径
             String absolutePath = targetFile.getAbsolutePath();
             
-            // 尝试使用 webstorm 命令打开文件
-            // Windows下的WebStorm命令通常是 webstorm64.exe 或 webstorm.cmd
+            // 使用VS Code打开文件
+            String os = System.getProperty("os.name").toLowerCase();
             ProcessBuilder pb;
-            
-            // 尝试多种WebStorm启动方式
-            String[] commands = {
-                "webstorm64.exe",
-                "webstorm.cmd",
-                "webstorm",
-                "idea64.exe"  // 作为备选，如果用户使用IntelliJ IDEA
-            };
-            
-            boolean opened = false;
-            StringBuilder errorOutput = new StringBuilder();
-            
-            for (String command : commands) {
-                try {
-                    pb = new ProcessBuilder(command, absolutePath);
-                    pb.redirectErrorStream(true);
-                    Process process = pb.start();
-                    
-                    // 等待一小段时间检查是否成功启动
-                    Thread.sleep(500);
-                    
-                    if (process.isAlive() || process.exitValue() == 0) {
-                        opened = true;
-                        result.put("success", true);
-                        result.put("message", "文件已在WebStorm中打开");
-                        result.put("filePath", absolutePath);
-                        result.put("command", command);
-                        break;
-                    }
-                } catch (Exception e) {
-                    errorOutput.append(command).append(": ").append(e.getMessage()).append("; ");
-                    // 继续尝试下一个命令
-                }
+            if (os.contains("win")) {
+                pb = new ProcessBuilder("cmd", "/c", "code", absolutePath);
+            } else {
+                pb = new ProcessBuilder("code", absolutePath);
             }
+            pb.redirectErrorStream(true);
+            pb.start();
             
-            if (!opened) {
-                result.put("success", false);
-                result.put("message", "无法打开WebStorm，请确保WebStorm已安装并配置到系统PATH中。错误信息: " + errorOutput.toString());
-                result.put("filePath", absolutePath);
-                result.put("hint", "您可以手动在WebStorm中打开此文件");
-            }
+            result.put("success", true);
+            result.put("message", "已在VS Code中打开");
+            result.put("filePath", absolutePath);
             
             return ResponseEntity.ok(result);
             
@@ -1771,6 +1788,147 @@ public class ProjectController {
             result.put("success", false);
             result.put("message", "打开文件失败: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
+        }
+    }
+    
+    /**
+     * 在资源管理器中打开文件所在目录
+     * POST /api/projects/{id}/open-in-explorer
+     */
+    @PostMapping("/{id}/open-in-explorer")
+    public ResponseEntity<Map<String, Object>> openInExplorer(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> requestBody) {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            String filePath = requestBody.get("filePath");
+            if (filePath == null || filePath.trim().isEmpty()) {
+                result.put("success", false);
+                result.put("message", "文件路径不能为空");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            Project project = projectService.getProjectById(id)
+                .orElseThrow(() -> new RuntimeException("项目不存在"));
+            
+            String localPath = project.getLocalPath();
+            if (localPath == null || localPath.trim().isEmpty()) {
+                result.put("success", false);
+                result.put("message", "该项目没有配置本地路径");
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+            File projectDir = new File(localPath);
+            File targetFile = new File(projectDir, filePath);
+            File parentDir = targetFile.getParentFile();
+            
+            if (parentDir == null || !parentDir.exists()) {
+                parentDir = projectDir;
+            }
+            
+            // Windows: explorer /select,filepath
+            // Mac: open -R filepath
+            // Linux: xdg-open dirpath
+            String os = System.getProperty("os.name").toLowerCase();
+            
+            if (os.contains("win")) {
+                // Windows: 使用 cmd /c explorer 来执行，确保路径正确处理
+                String targetPath;
+                String[] cmd;
+                if (targetFile.exists()) {
+                    targetPath = targetFile.getAbsolutePath();
+                    // 使用 cmd /c 执行 explorer /select,path
+                    cmd = new String[]{"cmd", "/c", "explorer", "/select," + targetPath};
+                } else if (parentDir.exists()) {
+                    targetPath = parentDir.getAbsolutePath();
+                    cmd = new String[]{"cmd", "/c", "explorer", targetPath};
+                } else {
+                    targetPath = projectDir.getAbsolutePath();
+                    cmd = new String[]{"cmd", "/c", "explorer", targetPath};
+                }
+                Runtime.getRuntime().exec(cmd);
+                result.put("openedPath", targetPath);
+            } else if (os.contains("mac")) {
+                ProcessBuilder pb;
+                if (targetFile.exists()) {
+                    pb = new ProcessBuilder("open", "-R", targetFile.getAbsolutePath());
+                } else {
+                    pb = new ProcessBuilder("open", parentDir.exists() ? parentDir.getAbsolutePath() : projectDir.getAbsolutePath());
+                }
+                pb.redirectErrorStream(true);
+                pb.start();
+            } else {
+                ProcessBuilder pb = new ProcessBuilder("xdg-open", parentDir.exists() ? parentDir.getAbsolutePath() : projectDir.getAbsolutePath());
+                pb.redirectErrorStream(true);
+                pb.start();
+            }
+            
+            // 等待一小段时间确保进程启动
+            Thread.sleep(300);
+            
+            result.put("success", true);
+            result.put("message", "已在资源管理器中打开");
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.put("success", false);
+            result.put("message", "打开资源管理器失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
+        }
+    }
+    
+    /**
+     * 获取文件的Git提交历史
+     * GET /api/projects/{id}/git/file-history
+     */
+    @GetMapping("/{id}/git/file-history")
+    public ResponseEntity<Map<String, Object>> getFileHistory(
+            @PathVariable Long id,
+            @RequestParam String filePath) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            Project project = projectService.getProjectById(id)
+                .orElseThrow(() -> new RuntimeException("项目不存在"));
+            
+            String localPath = project.getLocalPath();
+            Map<String, Object> result = gitSmartCommitService.getFileHistory(localPath, filePath);
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.put("success", false);
+            response.put("message", "获取文件历史失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+    
+    /**
+     * 与当前版本对比
+     * GET /api/projects/{id}/git/compare-with-current
+     */
+    @GetMapping("/{id}/git/compare-with-current")
+    public ResponseEntity<Map<String, Object>> compareWithCurrent(
+            @PathVariable Long id,
+            @RequestParam String commitHash,
+            @RequestParam String filePath) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            Project project = projectService.getProjectById(id)
+                .orElseThrow(() -> new RuntimeException("项目不存在"));
+            
+            String localPath = project.getLocalPath();
+            Map<String, Object> result = gitSmartCommitService.compareWithCurrent(localPath, commitHash, filePath);
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.put("success", false);
+            response.put("message", "对比失败: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
     

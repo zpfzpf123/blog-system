@@ -41,6 +41,12 @@ public class Project {
     @Column(name = "repo_url", length = 500)
     private String repoUrl;
     
+    @Column(name = "api_base_url", length = 500)
+    private String apiBaseUrl; // API测试的基础URL，如 http://localhost:8080
+    
+    @Column(name = "api_access_token", length = 1000)
+    private String apiAccessToken; // API访问令牌，用于接口测试时的Authorization
+    
     @Column(name = "readme_content", columnDefinition = "LONGTEXT")
     private String readmeContent;
     
@@ -144,6 +150,22 @@ public class Project {
     
     public void setRepoUrl(String repoUrl) {
         this.repoUrl = repoUrl;
+    }
+    
+    public String getApiBaseUrl() {
+        return apiBaseUrl;
+    }
+    
+    public void setApiBaseUrl(String apiBaseUrl) {
+        this.apiBaseUrl = apiBaseUrl;
+    }
+    
+    public String getApiAccessToken() {
+        return apiAccessToken;
+    }
+    
+    public void setApiAccessToken(String apiAccessToken) {
+        this.apiAccessToken = apiAccessToken;
     }
     
     public String getReadmeContent() {

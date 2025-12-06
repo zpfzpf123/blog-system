@@ -2,7 +2,7 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from '@/utils/axios'
-import { Clock, User, Document, Refresh, Back, View, ArrowUp, ArrowDown, CopyDocument, Search, Select } from '@element-plus/icons-vue'
+import { Clock, User, Document, Refresh, Back, View, ArrowUp, ArrowDown, CopyDocument, Search, Select, FolderOpened, Switch } from '@element-plus/icons-vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -51,10 +51,22 @@ const contextMenuVisible = ref(false)
 const contextMenuPosition = ref({ x: 0, y: 0 })
 const contextMenuFile = ref<any>(null)
 
+
+
 // 冲突相关
 const showConflictPanel = ref(false)
 const conflictFiles = ref<string[]>([])
 const conflictOperation = ref('')
+
+// 文件历史相关
+const showFileHistoryDialog = ref(false)
+const fileHistoryData = ref<any[]>([])
+const fileHistoryPath = ref('')
+const fileHistoryContextMenuVisible = ref(false)
+const fileHistoryContextMenuPosition = ref({ x: 0, y: 0 })
+const fileHistoryContextCommit = ref<any>(null)
+
+
 
 // 格式化差异内容，添加语法高亮和行号
 const formatDiffContent = (content: string): string => {
@@ -136,7 +148,31 @@ const scrollToHunk = (index: number) => {
 const showContextMenu = (event: MouseEvent, file: any) => {
   event.preventDefault()
   contextMenuFile.value = file
-  contextMenuPosition.value = { x: event.clientX, y: event.clientY }
+  
+  // 计算菜单位置，确保不超出屏幕
+  const menuWidth = 200
+  const menuHeight = 350 // 预估菜单高度
+  const windowWidth = window.innerWidth
+  const windowHeight = window.innerHeight
+  
+  let x = event.clientX
+  let y = event.clientY
+  
+  // 如果菜单会超出右边界，向左显示
+  if (x + menuWidth > windowWidth) {
+    x = windowWidth - menuWidth - 10
+  }
+  
+  // 如果菜单会超出下边界，向上显示
+  if (y + menuHeight > windowHeight) {
+    y = windowHeight - menuHeight - 10
+  }
+  
+  // 确保不会超出左边界和上边界
+  x = Math.max(10, x)
+  y = Math.max(10, y)
+  
+  contextMenuPosition.value = { x, y }
   contextMenuVisible.value = true
   
   // 点击其他地方关闭菜单
@@ -154,11 +190,23 @@ const revertSingleFile = async () => {
   if (!props.projectId || !selectedCommit.value || !contextMenuFile.value) return
   
   const file = contextMenuFile.value
+  const commitHash = selectedCommit.value.hash
+  const shortHash = selectedCommit.value.shortHash
   hideContextMenu()
+  
+  // 根据文件状态显示不同的提示信息
+  let confirmMessage = ''
+  if (file.status === 'D') {
+    confirmMessage = `确定要恢复已删除的文件 "${file.path}" 到提交 ${shortHash} 的状态吗？\n\n这将重新创建该文件。`
+  } else if (file.status === 'A') {
+    confirmMessage = `确定要回退文件 "${file.path}" 吗？\n\n由于该文件在提交 ${shortHash} 中是新增的，回退后文件将被删除。`
+  } else {
+    confirmMessage = `确定要将文件 "${file.path}" 回退到提交 ${shortHash} 的状态吗？\n\n这将覆盖当前工作区中该文件的内容。`
+  }
   
   try {
     await ElMessageBox.confirm(
-      `确定要将文件 "${file.path}" 回退到提交 ${selectedCommit.value.shortHash} 的状态吗？\n\n这将覆盖当前工作区中该文件的内容。`,
+      confirmMessage,
       '确认回退文件',
       {
         confirmButtonText: '确定回退',
@@ -168,19 +216,20 @@ const revertSingleFile = async () => {
     )
     
     const response = await axios.post(`/api/projects/${props.projectId}/git/revert-file`, {
-      commitHash: selectedCommit.value.hash,
+      commitHash: commitHash,
       filePath: file.path
     })
     
     if (response.data.success) {
-      ElMessage.success(`文件 ${file.path} 已回退`)
+      ElMessage.success(response.data.message || `文件 ${file.path} 已回退`)
       emit('refresh')
     } else {
       ElMessage.error(response.data.message || '回退文件失败')
     }
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('回退文件失败')
+      console.error('回退文件失败:', error)
+      ElMessage.error(error.response?.data?.message || '回退文件失败')
     }
   }
 }
@@ -198,6 +247,257 @@ const copyFilePath = () => {
     })
   
   hideContextMenu()
+}
+
+// 复制文件名
+const copyFileName = () => {
+  if (!contextMenuFile.value) return
+  
+  const fileName = getFileName(contextMenuFile.value.path)
+  navigator.clipboard.writeText(fileName)
+    .then(() => {
+      ElMessage.success('已复制文件名')
+    })
+    .catch(() => {
+      ElMessage.error('复制失败')
+    })
+  
+  hideContextMenu()
+}
+
+// 在VS Code中打开文件
+const openFileInIDE = async () => {
+  if (!props.projectId || !contextMenuFile.value) return
+  
+  hideContextMenu()
+  
+  try {
+    const file = contextMenuFile.value
+    // 对于已删除的文件，不检查是否存在
+    const checkExists = file.status !== 'D'
+    
+    const response = await axios.post(`/api/projects/${props.projectId}/open-file`, {
+      fileName: file.path,
+      checkExists: checkExists
+    })
+    
+    if (response.data.success) {
+      ElMessage.success(response.data.message || '已在VS Code中打开')
+    } else {
+      ElMessage.error(response.data.message || '打开失败')
+    }
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.message || '打开文件失败')
+  }
+}
+
+// 在资源管理器中显示
+const openInExplorer = async () => {
+  if (!props.projectId || !contextMenuFile.value) return
+  
+  hideContextMenu()
+  
+  try {
+    const response = await axios.post(`/api/projects/${props.projectId}/open-in-explorer`, {
+      filePath: contextMenuFile.value.path
+    })
+    
+    if (response.data.success) {
+      ElMessage.success('已在资源管理器中打开')
+    } else {
+      ElMessage.error(response.data.message || '打开资源管理器失败')
+    }
+  } catch (error: any) {
+    console.error('打开资源管理器失败:', error)
+    ElMessage.error(error.response?.data?.message || '打开资源管理器失败')
+  }
+}
+
+// 查看文件历史
+const viewFileHistory = async () => {
+  if (!props.projectId || !contextMenuFile.value) return
+  
+  const filePath = contextMenuFile.value.path
+  hideContextMenu()
+  
+  try {
+    const response = await axios.get(`/api/projects/${props.projectId}/git/file-history`, {
+      params: { filePath: filePath }
+    })
+    
+    if (response.data.success) {
+      // 显示文件历史对话框
+      fileHistoryData.value = response.data.commits || []
+      fileHistoryPath.value = filePath
+      showFileHistoryDialog.value = true
+    } else {
+      ElMessage.error(response.data.message || '获取文件历史失败')
+    }
+  } catch (error: any) {
+    console.error('获取文件历史失败:', error)
+    ElMessage.error(error.response?.data?.message || '获取文件历史失败')
+  }
+}
+
+// 显示文件历史右键菜单
+const showFileHistoryContextMenu = (event: MouseEvent, commit: any) => {
+  event.preventDefault()
+  event.stopPropagation()
+  fileHistoryContextCommit.value = commit
+  
+  // 计算菜单位置
+  const menuWidth = 180
+  const menuHeight = 120
+  const windowWidth = window.innerWidth
+  const windowHeight = window.innerHeight
+  
+  let x = event.clientX
+  let y = event.clientY
+  
+  if (x + menuWidth > windowWidth) {
+    x = windowWidth - menuWidth - 10
+  }
+  if (y + menuHeight > windowHeight) {
+    y = windowHeight - menuHeight - 10
+  }
+  
+  x = Math.max(10, x)
+  y = Math.max(10, y)
+  
+  fileHistoryContextMenuPosition.value = { x, y }
+  fileHistoryContextMenuVisible.value = true
+  
+  document.addEventListener('click', hideFileHistoryContextMenu, { once: true })
+}
+
+// 隐藏文件历史右键菜单
+const hideFileHistoryContextMenu = () => {
+  fileHistoryContextMenuVisible.value = false
+  fileHistoryContextCommit.value = null
+}
+
+// 查看文件在该提交中的差异
+const viewFileHistoryDiff = async (commit: any) => {
+  if (!props.projectId || !fileHistoryPath.value) return
+  
+  hideFileHistoryContextMenu()
+  
+  try {
+    loadingDiff.value = true
+    diffFileName.value = `${fileHistoryPath.value} @ ${commit.shortHash}`
+    showDiffDialog.value = true
+    diffContent.value = ''
+    currentHunkIndex.value = -1
+    diffHunks.value = []
+    
+    const response = await axios.get(`/api/projects/${props.projectId}/git/commits/${commit.hash}/diff`, {
+      params: { filePath: fileHistoryPath.value }
+    })
+    
+    if (response.data.success) {
+      diffContent.value = response.data.diff || '无差异内容'
+      nextTick(() => {
+        parseDiffHunks()
+      })
+    } else {
+      diffContent.value = response.data.message || '获取差异失败'
+    }
+  } catch (error: any) {
+    console.error('获取文件差异失败:', error)
+    diffContent.value = '获取差异失败: ' + (error.response?.data?.message || error.message || '未知错误')
+  } finally {
+    loadingDiff.value = false
+  }
+}
+
+// 回退文件到历史版本
+const revertFileToHistoryCommit = async () => {
+  if (!props.projectId || !fileHistoryContextCommit.value || !fileHistoryPath.value) return
+  
+  const commit = fileHistoryContextCommit.value
+  const filePath = fileHistoryPath.value
+  hideFileHistoryContextMenu()
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定要将文件 "${filePath}" 回退到提交 ${commit.shortHash} 的状态吗？\n\n提交信息: ${commit.message}\n\n这将覆盖当前工作区中该文件的内容。`,
+      '确认回退文件',
+      {
+        confirmButtonText: '确定回退',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const response = await axios.post(`/api/projects/${props.projectId}/git/revert-file`, {
+      commitHash: commit.hash,
+      filePath: filePath
+    })
+    
+    if (response.data.success) {
+      ElMessage.success(response.data.message || `文件已回退到 ${commit.shortHash}`)
+      emit('refresh')
+    } else {
+      ElMessage.error(response.data.message || '回退文件失败')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('回退文件失败:', error)
+      ElMessage.error(error.response?.data?.message || '回退文件失败')
+    }
+  }
+}
+
+// 复制历史提交哈希
+const copyHistoryCommitHash = () => {
+  if (!fileHistoryContextCommit.value) return
+  
+  navigator.clipboard.writeText(fileHistoryContextCommit.value.hash)
+    .then(() => {
+      ElMessage.success('已复制提交哈希')
+    })
+    .catch(() => {
+      ElMessage.error('复制失败')
+    })
+  
+  hideFileHistoryContextMenu()
+}
+
+// 与当前版本对比
+const compareWithCurrent = async () => {
+  if (!props.projectId || !selectedCommit.value || !contextMenuFile.value) return
+  
+  const filePath = contextMenuFile.value.path
+  const commitHash = selectedCommit.value.hash
+  hideContextMenu()
+  
+  try {
+    loadingDiff.value = true
+    diffFileName.value = `${filePath} (与当前版本对比)`
+    showDiffDialog.value = true
+    diffContent.value = ''
+    
+    const response = await axios.get(`/api/projects/${props.projectId}/git/compare-with-current`, {
+      params: { 
+        commitHash: commitHash,
+        filePath: filePath 
+      }
+    })
+    
+    if (response.data.success) {
+      diffContent.value = response.data.diff || '文件内容相同，无差异'
+      nextTick(() => {
+        parseDiffHunks()
+      })
+    } else {
+      diffContent.value = response.data.message || '获取差异失败'
+    }
+  } catch (error: any) {
+    console.error('获取差异失败:', error)
+    diffContent.value = '获取差异失败: ' + (error.response?.data?.message || error.message || '未知错误')
+  } finally {
+    loadingDiff.value = false
+  }
 }
 
 // 复制提交哈希
@@ -686,19 +986,43 @@ watch(() => props.modelValue, (newVal) => {
               v-if="contextMenuVisible" 
               class="context-menu"
               :style="{ left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px' }"
+              @click.stop
             >
               <div class="context-menu-item" @click="viewFileDiff(contextMenuFile)">
                 <el-icon><View /></el-icon>
                 <span>查看差异</span>
               </div>
+              
+              <div class="context-menu-item" @click="openFileInIDE()">
+                <el-icon><Document /></el-icon>
+                <span>在VS Code中打开</span>
+              </div>
+              
+              <div class="context-menu-item" @click="openInExplorer">
+                <el-icon><FolderOpened /></el-icon>
+                <span>在资源管理器中显示</span>
+              </div>
+              <div class="context-menu-divider"></div>
+              <div class="context-menu-item" @click="viewFileHistory">
+                <el-icon><Clock /></el-icon>
+                <span>查看文件历史</span>
+              </div>
               <div class="context-menu-item" @click="revertSingleFile">
                 <el-icon><Back /></el-icon>
-                <span>回退此文件</span>
+                <span>回退此文件到此版本</span>
+              </div>
+              <div class="context-menu-item" @click="compareWithCurrent">
+                <el-icon><Switch /></el-icon>
+                <span>与当前版本对比</span>
               </div>
               <div class="context-menu-divider"></div>
               <div class="context-menu-item" @click="copyFilePath">
                 <el-icon><CopyDocument /></el-icon>
                 <span>复制文件路径</span>
+              </div>
+              <div class="context-menu-item" @click="copyFileName">
+                <el-icon><CopyDocument /></el-icon>
+                <span>复制文件名</span>
               </div>
             </div>
           </Teleport>
@@ -789,6 +1113,73 @@ watch(() => props.modelValue, (newVal) => {
       <el-button @click="showDiffDialog = false">关闭</el-button>
     </template>
   </el-dialog>
+
+  <!-- 文件历史对话框 -->
+  <el-dialog
+    v-model="showFileHistoryDialog"
+    :title="`文件历史: ${fileHistoryPath}`"
+    width="700px"
+    :close-on-click-modal="true"
+    class="file-history-dialog"
+  >
+    <div class="file-history-list">
+      <div v-if="fileHistoryData.length === 0" class="empty-history">
+        <el-icon size="48"><Clock /></el-icon>
+        <p>暂无提交历史</p>
+      </div>
+      <div 
+        v-for="commit in fileHistoryData" 
+        :key="commit.hash"
+        class="file-history-item"
+        @click="viewFileHistoryDiff(commit)"
+        @contextmenu="showFileHistoryContextMenu($event, commit)"
+      >
+        <div class="history-dot"></div>
+        <div class="history-content">
+          <div class="history-message">{{ commit.message }}</div>
+          <div class="history-meta">
+            <span class="history-hash">{{ commit.shortHash }}</span>
+            <span class="history-author">
+              <el-icon><User /></el-icon>
+              {{ commit.author }}
+            </span>
+            <span class="history-time">{{ formatRelativeTime(commit.timestamp) }}</span>
+          </div>
+        </div>
+        <el-icon class="goto-icon"><View /></el-icon>
+      </div>
+    </div>
+    <div class="file-history-hint">
+      <span>💡 点击查看文件差异，右键可回退文件到该版本</span>
+    </div>
+    <template #footer>
+      <el-button @click="showFileHistoryDialog = false">关闭</el-button>
+    </template>
+  </el-dialog>
+
+  <!-- 文件历史右键菜单 -->
+  <Teleport to="body">
+    <div 
+      v-if="fileHistoryContextMenuVisible" 
+      class="context-menu"
+      :style="{ left: fileHistoryContextMenuPosition.x + 'px', top: fileHistoryContextMenuPosition.y + 'px' }"
+      @click.stop
+    >
+      <div class="context-menu-item" @click="viewFileHistoryDiff(fileHistoryContextCommit)">
+        <el-icon><View /></el-icon>
+        <span>查看文件差异</span>
+      </div>
+      <div class="context-menu-item" @click="revertFileToHistoryCommit">
+        <el-icon><Back /></el-icon>
+        <span>回退此文件到此版本</span>
+      </div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item" @click="copyHistoryCommitHash">
+        <el-icon><CopyDocument /></el-icon>
+        <span>复制提交哈希</span>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 
@@ -1251,6 +1642,44 @@ code.info-value {
   margin: 6px 0;
 }
 
+/* 子菜单样式 */
+.context-menu-item.has-submenu {
+  position: relative;
+}
+
+.context-menu-item .submenu-arrow {
+  margin-left: auto;
+  font-size: 10px;
+  color: #909399;
+}
+
+.context-submenu {
+  position: absolute;
+  left: 100%;
+  top: -6px;
+  background: white;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 6px 0;
+  min-width: 160px;
+  z-index: 10000;
+}
+
+.context-menu-item.disabled {
+  color: #c0c4cc;
+  cursor: not-allowed;
+}
+
+.context-menu-item.disabled:hover {
+  background: transparent;
+  color: #c0c4cc;
+}
+
+.context-menu-item .el-tag {
+  margin-left: auto;
+}
+
 /* 差异块高亮当前位置 */
 :deep([data-hunk-index]) {
   scroll-margin-top: 50px;
@@ -1328,5 +1757,118 @@ code.info-value {
 
 .conflict-hint p {
   margin: 4px 0;
+}
+
+/* 文件历史对话框样式 */
+.file-history-list {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.empty-history {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: #909399;
+}
+
+.empty-history p {
+  margin-top: 12px;
+}
+
+.file-history-item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  margin-bottom: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.file-history-item:hover {
+  background: #ecf5ff;
+  border-color: #409eff;
+}
+
+.file-history-item .goto-icon {
+  color: #909399;
+  font-size: 16px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.file-history-item:hover .goto-icon {
+  opacity: 1;
+  color: #409eff;
+}
+
+.history-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #409eff;
+  margin-top: 6px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.history-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-message {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 6px;
+}
+
+.history-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.history-hash {
+  font-family: 'Consolas', monospace;
+  background: #f0f2f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.history-author {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.file-history-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.file-history-list::-webkit-scrollbar-track {
+  background: #f5f5f5;
+}
+
+.file-history-list::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 3px;
+}
+
+.file-history-hint {
+  padding: 12px;
+  text-align: center;
+  color: #909399;
+  font-size: 13px;
+  border-top: 1px solid #e8ecf1;
+  margin-top: 10px;
 }
 </style>
