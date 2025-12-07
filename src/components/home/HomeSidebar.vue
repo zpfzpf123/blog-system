@@ -139,23 +139,19 @@ const hasActiveFilters = computed(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  border-radius: 28px;
+  border-radius: var(--radius-2xl);
   overflow: hidden;
-  background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.75) 0%, 
-    rgba(252, 253, 255, 0.7) 100%);
+  background: var(--bg-glass);
   backdrop-filter: blur(24px) saturate(180%);
   border: 1.5px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 12px 40px rgba(99, 102, 241, 0.08),
-              0 4px 16px rgba(0, 0, 0, 0.04),
-              inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  animation: sidebarFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-glass);
+  animation: sidebarFadeIn 0.5s var(--ease-out);
 }
 
 @keyframes sidebarFadeIn {
   from {
     opacity: 0;
-    transform: translateX(-30px);
+    transform: translateX(-24px);
   }
   to {
     opacity: 1;
@@ -164,7 +160,7 @@ const hasActiveFilters = computed(() => {
 }
 
 .sidebar-header {
-  padding: 28px;
+  padding: var(--spacing-6);
   border-bottom: 1px solid rgba(99, 102, 241, 0.08);
   background: linear-gradient(135deg, 
     rgba(255, 255, 255, 0.5) 0%, 
@@ -188,41 +184,39 @@ const hasActiveFilters = computed(() => {
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-5);
 }
 
 .logo-box {
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  border-radius: 14px;
+  width: 46px;
+  height: 46px;
+  background: var(--gradient-primary);
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-size: 22px;
-  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.3),
-              inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--text-inverse);
+  font-size: 20px;
+  box-shadow: var(--shadow-primary);
+  transition: all var(--transition-normal);
   animation: logoFloat 3s ease-in-out infinite;
 }
 
 @keyframes logoFloat {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+  50% { transform: translateY(-3px); }
 }
 
 .logo-box:hover {
   transform: scale(1.1) rotate(5deg);
-  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4),
-              inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow: var(--shadow-primary-lg);
 }
 
 .brand-text {
-  font-size: 1.3rem;
-  font-weight: 900;
-  background: linear-gradient(135deg, #1e293b 0%, #4f46e5 100%);
+  font-size: var(--text-xl);
+  font-weight: var(--font-extrabold);
+  background: var(--gradient-primary);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -231,15 +225,14 @@ const hasActiveFilters = computed(() => {
 
 .create-btn {
   width: 100%;
-  height: 48px;
-  border-radius: 14px;
-  font-weight: 700;
-  font-size: 1rem;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  height: 46px;
+  border-radius: var(--radius-lg);
+  font-weight: var(--font-bold);
+  font-size: var(--text-sm);
+  background: var(--gradient-success);
   border: none;
-  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.25),
-              inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.25);
+  transition: all var(--transition-normal);
   position: relative;
   overflow: hidden;
 }
@@ -251,7 +244,7 @@ const hasActiveFilters = computed(() => {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  background: var(--gradient-shimmer);
   transition: left 0.5s ease;
 }
 
@@ -261,8 +254,7 @@ const hasActiveFilters = computed(() => {
 
 .create-btn:hover {
   transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 10px 28px rgba(16, 185, 129, 0.35),
-              inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow: 0 10px 28px rgba(16, 185, 129, 0.35);
 }
 
 .create-btn:active {
@@ -274,27 +266,27 @@ const hasActiveFilters = computed(() => {
 }
 
 .sidebar-content {
-  padding: 24px;
+  padding: var(--spacing-5);
 }
 
 .section {
-  margin-bottom: 32px;
+  margin-bottom: var(--spacing-8);
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: var(--spacing-4);
 }
 
 .section-title {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 0.95rem;
-  font-weight: 800;
-  background: linear-gradient(135deg, #334155 0%, #4f46e5 100%);
+  gap: var(--spacing-2);
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  background: var(--gradient-dark);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -302,26 +294,19 @@ const hasActiveFilters = computed(() => {
 
 .title-icon {
   font-size: 1.1rem;
-  color: #6366f1;
+  color: var(--primary-color);
 }
 
 .count-badge {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  color: white;
-  font-size: 0.7rem;
-  font-weight: 800;
-  padding: 4px 10px;
-  border-radius: 12px;
+  background: var(--gradient-primary);
+  color: var(--text-inverse);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  padding: var(--spacing-1) var(--spacing-3);
+  border-radius: var(--radius-lg);
   min-width: 28px;
   text-align: center;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3),
-              inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  animation: badgePulse 2s ease-in-out infinite;
-}
-
-@keyframes badgePulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+  box-shadow: var(--shadow-primary);
 }
 
 /* 分类卡片网格 */
@@ -537,12 +522,13 @@ const hasActiveFilters = computed(() => {
 }
 
 .sidebar-footer {
-  padding: 20px 28px;
+  padding: var(--spacing-5) var(--spacing-6);
   border-top: 1px solid rgba(99, 102, 241, 0.08);
   background: linear-gradient(135deg, 
     rgba(255, 255, 255, 0.5) 0%, 
     rgba(248, 250, 255, 0.3) 100%);
   position: relative;
+  animation: fadeInUp 0.3s var(--ease-out);
 }
 
 .sidebar-footer::before {
@@ -560,10 +546,70 @@ const hasActiveFilters = computed(() => {
 
 .reset-btn {
   width: 100%;
-  color: #ef4444;
+  height: 42px;
+  border-radius: var(--radius-lg);
+  font-weight: var(--font-semibold);
+  color: var(--danger-color);
+  background: var(--danger-light);
+  border: 1.5px solid transparent;
+  transition: all var(--transition-normal);
+  position: relative;
+  overflow: hidden;
+}
+
+.reset-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.reset-btn:hover::before {
+  left: 100%;
 }
 
 .reset-btn:hover {
-  background: #fee2e2;
+  background: var(--danger-light);
+  border-color: var(--danger-color);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.2);
+}
+
+.reset-btn:active {
+  transform: translateY(0);
+}
+
+/* 响应式优化 */
+@media (max-width: 1200px) {
+  .sidebar-wrapper {
+    border-radius: var(--radius-xl);
+  }
+  
+  .sidebar-header {
+    padding: var(--spacing-5);
+  }
+  
+  .sidebar-content {
+    padding: var(--spacing-4);
+  }
+  
+  .category-card {
+    padding: 12px;
+  }
+  
+  .card-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+  }
+  
+  .tag-bubble {
+    padding: 7px 14px;
+    font-size: 0.8rem;
+  }
 }
 </style>

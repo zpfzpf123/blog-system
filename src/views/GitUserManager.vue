@@ -237,61 +237,234 @@ onMounted(() => {
 
 <style scoped>
 .git-user-manager {
-  padding: 20px;
+  padding: var(--spacing-6);
   max-width: 1400px;
   margin: 0 auto;
+  min-height: calc(100vh - 100px);
+  animation: pageEnter 0.5s var(--ease-out);
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: var(--spacing-8);
+  padding: var(--spacing-6);
+  background: var(--bg-glass);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-radius: var(--radius-2xl);
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  box-shadow: var(--shadow-glass);
 }
 
 .header-left h1 {
   margin: 0;
-  font-size: 28px;
-  font-weight: 600;
-  color: #1f2937;
+  font-size: var(--text-3xl);
+  font-weight: var(--font-extrabold);
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
 }
 
 .subtitle {
-  margin: 4px 0 0 0;
-  font-size: 14px;
-  color: #6b7280;
+  margin: var(--spacing-2) 0 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-weight: var(--font-medium);
+}
+
+.page-header .el-button {
+  border-radius: var(--radius-lg);
+  font-weight: var(--font-semibold);
+  padding: var(--spacing-3) var(--spacing-6);
+  background: var(--gradient-primary);
+  border: none;
+  box-shadow: var(--shadow-primary);
+  transition: all var(--transition-normal);
+}
+
+.page-header .el-button:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-primary-lg);
 }
 
 .content-card {
-  border-radius: 12px;
+  border-radius: var(--radius-2xl);
   overflow: hidden;
+  background: var(--bg-glass);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  box-shadow: var(--shadow-glass);
+  transition: all var(--transition-normal);
+}
+
+.content-card:hover {
+  box-shadow: var(--shadow-card-hover);
 }
 
 .user-name {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-2);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
 }
 
 .token-display {
-  padding: 4px 8px;
-  background: #f3f4f6;
-  border-radius: 4px;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  color: #4b5563;
+  padding: var(--spacing-1) var(--spacing-3);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.08) 100%);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--primary-color);
+  border: 1px solid rgba(99, 102, 241, 0.15);
 }
 
 .form-tip {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  font-size: 12px;
-  color: #6b7280;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-2);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  padding: var(--spacing-2) var(--spacing-3);
+  background: var(--info-bg);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(14, 165, 233, 0.15);
 }
 
 .form-tip .el-icon {
-  color: #3b82f6;
+  color: var(--info-color);
+}
+
+/* 表格样式优化 */
+:deep(.el-table) {
+  --el-table-border-color: var(--border-light);
+  --el-table-header-bg-color: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.03) 100%);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+:deep(.el-table th) {
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+:deep(.el-table tr) {
+  transition: all var(--transition-fast);
+}
+
+:deep(.el-table tr:hover) {
+  background: rgba(99, 102, 241, 0.04);
+}
+
+/* 对话框样式优化 */
+:deep(.el-dialog) {
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+}
+
+:deep(.el-dialog__header) {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.05) 100%);
+  padding: var(--spacing-5) var(--spacing-6);
+}
+
+:deep(.el-dialog__title) {
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+}
+
+:deep(.el-dialog__body) {
+  padding: var(--spacing-6);
+}
+
+:deep(.el-dialog__footer) {
+  padding: var(--spacing-4) var(--spacing-6);
+  border-top: 1px solid var(--border-light);
+}
+
+/* 表格操作按钮样式 */
+:deep(.el-table .el-button--link) {
+  padding: var(--spacing-1) var(--spacing-2);
+  font-weight: var(--font-medium);
+  transition: all var(--transition-fast);
+}
+
+:deep(.el-table .el-button--link:hover) {
+  transform: translateY(-1px);
+}
+
+:deep(.el-table .el-button--link.el-button--primary) {
+  color: var(--primary-color);
+}
+
+:deep(.el-table .el-button--link.el-button--primary:hover) {
+  color: var(--primary-hover);
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: var(--radius-md);
+}
+
+:deep(.el-table .el-button--link.el-button--success) {
+  color: var(--success-color);
+}
+
+:deep(.el-table .el-button--link.el-button--success:hover) {
+  color: var(--success-hover);
+  background: rgba(16, 185, 129, 0.08);
+  border-radius: var(--radius-md);
+}
+
+:deep(.el-table .el-button--link.el-button--danger) {
+  color: var(--danger-color);
+}
+
+:deep(.el-table .el-button--link.el-button--danger:hover) {
+  color: var(--danger-hover);
+  background: rgba(239, 68, 68, 0.08);
+  border-radius: var(--radius-md);
+}
+
+/* 对话框底部按钮样式 */
+:deep(.el-dialog__footer .el-button) {
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-2) var(--spacing-5);
+  font-weight: var(--font-medium);
+  transition: all var(--transition-normal);
+}
+
+:deep(.el-dialog__footer .el-button--default) {
+  background: var(--bg-muted);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+}
+
+:deep(.el-dialog__footer .el-button--default:hover) {
+  background: var(--gray-200);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+:deep(.el-dialog__footer .el-button--primary) {
+  background: var(--gradient-primary);
+  border: none;
+  box-shadow: var(--shadow-primary);
+}
+
+:deep(.el-dialog__footer .el-button--primary:hover) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-primary-lg);
 }
 </style>

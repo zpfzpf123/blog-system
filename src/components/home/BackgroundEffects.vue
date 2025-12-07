@@ -1,8 +1,15 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
-// 简单的粒子系统
+// 性能优化：检测是否应该减少动画
+const shouldReduceMotion = () => {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+// 轻量级粒子系统 - 大幅减少粒子数量和更新频率
 const initParticles = () => {
+  if (shouldReduceMotion()) return // 如果用户偏好减少动画，直接跳过
+
   const canvas = document.getElementById('particle-canvas') as HTMLCanvasElement
   if (!canvas) return
 
@@ -15,7 +22,8 @@ const initParticles = () => {
   canvas.height = height
 
   const particles: Particle[] = []
-  const particleCount = window.innerWidth < 768 ? 20 : 50 // 移动端减少粒子数
+  // 大幅减少粒子数量：移动端8个，桌面端15个
+  const particleCount = window.innerWidth < 768 ? 8 : 15
 
   class Particle {
     x: number
@@ -28,10 +36,11 @@ const initParticles = () => {
     constructor() {
       this.x = Math.random() * width
       this.y = Math.random() * height
-      this.vx = (Math.random() - 0.5) * 0.5
-      this.vy = (Math.random() - 0.5) * 0.5
-      this.size = Math.random() * 3
-      this.color = `rgba(${100 + Math.random() * 100}, ${100 + Math.random() * 100}, 255, ${0.1 + Math.random() * 0.2})`
+      // 降低移动速度
+      this.vx = (Math.random() - 0.5) * 0.2
+      this.vy = (Math.random() - 0.5) * 0.2
+      this.size = Math.random() * 2 + 1
+      this.color = `rgba(${120 + Math.random() * 60}, ${120 + Math.random() * 60}, 255, ${0.08 + Math.random() * 0.12})`
     }
 
     update() {
@@ -58,29 +67,42 @@ const initParticles = () => {
   }
 
   let animationId: number
+  let lastTime = 0
+  const fps = 30 // 限制帧率为30fps以减少CPU占用
 
-  const animate = () => {
+  const animate = (currentTime: number) => {
+    animationId = requestAnimationFrame(animate)
+    
+    // 帧率限制
+    if (currentTime - lastTime < 1000 / fps) return
+    lastTime = currentTime
+
     ctx.clearRect(0, 0, width, height)
     particles.forEach((p) => {
       p.update()
       p.draw()
     })
-    animationId = requestAnimationFrame(animate)
   }
 
-  animate()
+  animationId = requestAnimationFrame(animate)
 
+  // 防抖处理resize事件
+  let resizeTimeout: number
   const handleResize = () => {
-    width = window.innerWidth
-    height = window.innerHeight
-    canvas.width = width
-    canvas.height = height
+    clearTimeout(resizeTimeout)
+    resizeTimeout = window.setTimeout(() => {
+      width = window.innerWidth
+      height = window.innerHeight
+      canvas.width = width
+      canvas.height = height
+    }, 200)
   }
 
   window.addEventListener('resize', handleResize)
 
   return () => {
     cancelAnimationFrame(animationId)
+    clearTimeout(resizeTimeout)
     window.removeEventListener('resize', handleResize)
   }
 }
@@ -88,7 +110,10 @@ const initParticles = () => {
 let cleanup: (() => void) | undefined
 
 onMounted(() => {
-  cleanup = initParticles()
+  // 延迟初始化，避免影响首屏渲染
+  setTimeout(() => {
+    cleanup = initParticles()
+  }, 500)
 })
 
 onUnmounted(() => {
@@ -100,10 +125,10 @@ onUnmounted(() => {
   <div class="background-container">
     <div class="gradient-bg"></div>
     <canvas id="particle-canvas" class="particle-canvas"></canvas>
+    <!-- 简化为2个形状，移除第三个 -->
     <div class="bg-shapes">
       <div class="shape shape-1"></div>
       <div class="shape shape-2"></div>
-      <div class="shape shape-3"></div>
     </div>
   </div>
 </template>
@@ -123,26 +148,22 @@ onUnmounted(() => {
 .gradient-bg {
   position: absolute;
   inset: 0;
+  /* 简化渐变，减少颜色停止点 */
   background: linear-gradient(
     135deg,
     #fdfbff 0%,
-    #f0f4ff 15%,
-    #e5eaff 30%,
-    #f3e8ff 45%,
-    #fdf2f8 60%,
-    #f0f9ff 75%,
-    #fefeff 90%,
+    #f0f4ff 30%,
+    rgba(243, 232, 255, 0.5) 60%,
     #ffffff 100%
   );
-  background-size: 400% 400%;
-  animation: gradientFlow 25s ease infinite;
-  opacity: 0.95;
+  /* 移除动画，使用静态渐变 */
+  opacity: 0.98;
 }
 
 .particle-canvas {
   position: absolute;
   inset: 0;
-  opacity: 0.4;
+  opacity: 0.25;
   mix-blend-mode: screen;
 }
 
@@ -156,50 +177,63 @@ onUnmounted(() => {
   position: absolute;
   border-radius: 50%;
   filter: blur(100px);
-  opacity: 0.35;
-  animation: float 25s infinite ease-in-out;
+  opacity: 0.25;
+  /* 大幅延长动画周期，减少CPU占用 */
+  animation: float 60s infinite linear;
   mix-blend-mode: multiply;
+  /* 使用 transform 优化性能 */
+  will-change: transform;
+  contain: layout style paint;
 }
 
 .shape-1 {
-  top: -15%;
-  left: -15%;
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, #c7d2fe 0%, #e0e7ff 50%, transparent 100%);
+  top: -10%;
+  left: -10%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, 
+    rgba(99, 102, 241, 0.3) 0%, 
+    rgba(139, 92, 246, 0.15) 50%,
+    transparent 100%);
   animation-delay: 0s;
 }
 
 .shape-2 {
-  top: 35%;
-  right: -15%;
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, #fbcfe8 0%, #fce7f3 50%, transparent 100%);
-  animation-delay: -8s;
+  top: 40%;
+  right: -10%;
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, 
+    rgba(236, 72, 153, 0.25) 0%, 
+    rgba(251, 146, 60, 0.12) 50%,
+    transparent 100%);
+  animation-delay: -30s;
 }
 
-.shape-3 {
-  bottom: -15%;
-  left: 15%;
-  width: 700px;
-  height: 700px;
-  background: radial-gradient(circle, #e9d5ff 0%, #f3e8ff 50%, transparent 100%);
-  animation-delay: -15s;
-}
+/* 移除 ::after 伪元素动画，减少渲染负担 */
 
-@keyframes gradientFlow {
-  0% { background-position: 0% 50%; }
-  25% { background-position: 50% 75%; }
-  50% { background-position: 100% 50%; }
-  75% { background-position: 50% 25%; }
-  100% { background-position: 0% 50%; }
-}
-
+/* 简化的浮动动画 */
 @keyframes float {
-  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
-  25% { transform: translate(40px, -60px) rotate(15deg) scale(1.05); }
-  50% { transform: translate(-30px, 30px) rotate(-10deg) scale(0.95); }
-  75% { transform: translate(20px, -40px) rotate(8deg) scale(1.02); }
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(20px, -20px); }
+}
+
+/* 减少动画（无障碍） */
+@media (prefers-reduced-motion: reduce) {
+  .shape {
+    animation: none;
+  }
+}
+
+/* 移动端进一步简化 */
+@media (max-width: 768px) {
+  .shape {
+    animation: none;
+    opacity: 0.15;
+  }
+  
+  .particle-canvas {
+    opacity: 0.15;
+  }
 }
 </style>

@@ -736,75 +736,100 @@ onMounted(() => {
 
 <style scoped>
 .project-manager {
-  padding: 20px;
-  background: #f3f6fa;
+  padding: var(--spacing-6);
+  background: var(--bg-body);
   min-height: 100vh;
 }
 
 /* 统计卡片 */
 .statistics-section {
-  margin-bottom: 24px;
+  margin-bottom: var(--spacing-6);
 }
 
 .stat-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 16px;
-  padding: 20px;
+  background: var(--gradient-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-5);
   display: flex;
   align-items: center;
-  gap: 16px;
-  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.2);
-  transition: all 0.3s;
+  gap: var(--spacing-4);
+  box-shadow: var(--shadow-primary);
+  transition: all var(--transition-normal);
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.stat-card:hover::before {
+  left: 100%;
 }
 
 .stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 30px rgba(102, 126, 234, 0.3);
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: var(--shadow-primary-lg);
 }
 
 .stat-card.stat-total {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient-primary);
 }
 
 .stat-card.stat-progress {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: var(--gradient-secondary);
 }
 
 .stat-card.stat-completed {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  background: var(--gradient-info);
 }
 
 .stat-card.stat-paused {
-  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  background: var(--gradient-success);
 }
 
 .stat-icon {
   width: 56px;
   height: 56px;
   background: rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
-  color: white;
+  font-size: 26px;
+  color: var(--text-inverse);
+  backdrop-filter: blur(10px);
+  transition: transform var(--transition-normal);
+}
+
+.stat-card:hover .stat-icon {
+  transform: scale(1.1) rotate(-5deg);
 }
 
 .stat-info {
-  color: white;
+  color: var(--text-inverse);
 }
 
 .stat-value {
-  font-size: 32px;
-  font-weight: bold;
+  font-size: var(--text-3xl);
+  font-weight: var(--font-extrabold);
   line-height: 1;
-  margin-bottom: 8px;
+  margin-bottom: var(--spacing-2);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .stat-label {
-  font-size: 14px;
+  font-size: var(--text-sm);
   opacity: 0.9;
+  font-weight: var(--font-medium);
 }
 
 /* 筛选栏 */
@@ -812,23 +837,28 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: var(--spacing-6);
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--spacing-4);
+  background: var(--bg-card);
+  padding: var(--spacing-4) var(--spacing-5);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
 }
 
 .filter-left {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--spacing-3);
 }
 
 /* 项目卡片网格 */
 .projects-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: var(--spacing-5);
   min-height: 300px;
 }
 
@@ -838,68 +868,99 @@ onMounted(() => {
   justify-content: center;
   align-items: center;
   min-height: 400px;
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+  border: 2px dashed var(--border-color);
 }
 
 .project-card {
-  background: white;
-  border-radius: 16px;
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s;
+  box-shadow: var(--shadow-card);
+  transition: all var(--transition-normal);
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--border-light);
+  position: relative;
+}
+
+.project-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--gradient-primary);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--transition-normal);
 }
 
 .project-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.15);
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
+.project-card:hover::before {
+  transform: scaleX(1);
 }
 
 .card-header {
-  padding: 20px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: var(--spacing-5);
+  border-bottom: 1px solid var(--border-light);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-muted) 100%);
 }
 
 .card-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-3);
 }
 
 .favorite-icon {
-  font-size: 20px;
-  color: #ddd;
+  font-size: 22px;
+  color: var(--gray-300);
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all var(--transition-normal);
 }
 
 .favorite-icon:hover {
-  transform: scale(1.2);
+  transform: scale(1.2) rotate(-10deg);
+  color: var(--warning-color);
 }
 
 .favorite-icon.is-favorite {
-  color: #f59e0b;
+  color: var(--warning-color);
+  filter: drop-shadow(0 2px 4px rgba(245, 158, 11, 0.4));
 }
 
 .project-name {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--text-main);
+  transition: color var(--transition-fast);
+}
+
+.project-card:hover .project-name {
+  color: var(--primary-color);
 }
 
 .card-body {
-  padding: 20px;
+  padding: var(--spacing-5);
   flex: 1;
 }
 
 .project-description {
-  color: #666;
-  font-size: 14px;
-  line-height: 1.6;
-  margin-bottom: 16px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  margin-bottom: var(--spacing-4);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -907,61 +968,93 @@ onMounted(() => {
 }
 
 .progress-section {
-  margin-bottom: 16px;
+  margin-bottom: var(--spacing-4);
 }
 
 .progress-label {
-  font-size: 13px;
-  color: #606266;
-  font-weight: 500;
-  margin-bottom: 8px;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-weight: var(--font-medium);
+  margin-bottom: var(--spacing-2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .tech-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-4);
 }
 
 .tech-tag {
-  border-radius: 6px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
 }
 
 .project-meta {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  color: #999;
+  gap: var(--spacing-1);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
 }
 
 .card-footer {
-  padding: 16px 20px;
-  border-top: 1px solid #f0f0f0;
+  padding: var(--spacing-4) var(--spacing-5);
+  border-top: 1px solid var(--border-light);
   display: flex;
-  gap: 12px;
+  gap: var(--spacing-3);
+  background: var(--bg-muted);
 }
 
 /* 响应式 */
 @media (max-width: 768px) {
+  .project-manager {
+    padding: var(--spacing-4);
+  }
+  
   .projects-grid {
     grid-template-columns: 1fr;
+    gap: var(--spacing-4);
   }
 
   .filter-section {
     flex-direction: column;
     align-items: stretch;
+    padding: var(--spacing-4);
   }
 
   .filter-left {
     flex-direction: column;
+    width: 100%;
   }
 
   .filter-left .el-input,
   .filter-left .el-select {
     width: 100% !important;
     margin-left: 0 !important;
+  }
+  
+  .stat-card {
+    padding: var(--spacing-4);
+  }
+  
+  .stat-value {
+    font-size: var(--text-2xl);
+  }
+  
+  .stat-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 22px;
   }
 }
 </style>

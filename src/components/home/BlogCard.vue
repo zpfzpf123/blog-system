@@ -130,8 +130,8 @@ const handleAction = (action: 'edit' | 'delete' | 'export' | 'copy', e: MouseEve
 <style scoped>
 .modern-card {
   position: relative;
-  background: linear-gradient(to bottom, #ffffff 0%, #fafbff 100%);
-  border-radius: 24px;
+  background: var(--gradient-card);
+  border-radius: var(--radius-2xl);
   overflow: hidden;
   transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
   cursor: pointer;
@@ -140,30 +140,28 @@ const handleAction = (action: 'edit' | 'delete' | 'export' | 'copy', e: MouseEve
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(99, 102, 241, 0.08);
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.06), 0 2px 8px rgba(0, 0, 0, 0.02);
+  box-shadow: var(--shadow-card);
 }
 
 /* 悬停效果 */
 .modern-card:hover {
   transform: translateY(-8px) scale(1.01);
-  box-shadow: 0 24px 48px rgba(99, 102, 241, 0.16), 
-              0 8px 20px rgba(139, 92, 246, 0.08),
-              0 0 0 1px rgba(99, 102, 241, 0.15);
-  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: var(--shadow-card-hover), 0 0 0 1px rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.25);
   background: linear-gradient(to bottom, #ffffff 0%, #f8f9ff 100%);
 }
 
 .card-body {
-  padding: 28px;
+  padding: var(--spacing-6);
   display: flex;
   flex-direction: column;
   height: 100%;
   z-index: 1;
   position: relative;
   background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.5) 0%, 
-    rgba(240, 242, 255, 0.3) 50%,
-    rgba(255, 255, 255, 0.5) 100%);
+    rgba(255, 255, 255, 0.6) 0%, 
+    rgba(248, 250, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0.6) 100%);
   backdrop-filter: blur(10px);
   transition: all 0.4s ease;
 }
@@ -173,25 +171,25 @@ const handleAction = (action: 'edit' | 'delete' | 'export' | 'copy', e: MouseEve
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  font-size: 0.85rem;
-  color: #94a3b8;
+  margin-bottom: var(--spacing-4);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
 }
 
 .category-badge {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 16px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.12) 100%);
-  color: #5b5fc7;
-  border-radius: 24px;
-  font-weight: 700;
-  font-size: 0.82rem;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-4);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(139, 92, 246, 0.1) 100%);
+  color: var(--primary-color);
+  border-radius: var(--radius-full);
+  font-weight: var(--font-semibold);
+  font-size: var(--text-xs);
   letter-spacing: 0.3px;
-  border: 1.5px solid rgba(99, 102, 241, 0.2);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 3px 12px rgba(99, 102, 241, 0.15), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+  border: 1.5px solid rgba(99, 102, 241, 0.15);
+  transition: all var(--transition-normal);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1);
   position: relative;
   overflow: hidden;
 }
@@ -203,7 +201,7 @@ const handleAction = (action: 'edit' | 'delete' | 'export' | 'copy', e: MouseEve
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  background: var(--gradient-shimmer);
   transition: left 0.5s ease;
 }
 
@@ -212,26 +210,25 @@ const handleAction = (action: 'edit' | 'delete' | 'export' | 'copy', e: MouseEve
 }
 
 .modern-card:hover .category-badge {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(139, 92, 246, 0.2) 100%);
-  border-color: rgba(99, 102, 241, 0.4);
-  transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.6);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.15) 100%);
+  border-color: rgba(99, 102, 241, 0.3);
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.2);
 }
 
 .date-badge {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  background: linear-gradient(135deg, rgba(236, 72, 153, 0.12) 0%, rgba(251, 146, 60, 0.1) 100%);
-  border-radius: 24px;
-  color: #db2777;
-  font-weight: 600;
-  font-size: 0.82rem;
-  letter-spacing: 0.3px;
-  border: 1.5px solid rgba(236, 72, 153, 0.18);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 3px 12px rgba(236, 72, 153, 0.12), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.1) 0%, rgba(251, 146, 60, 0.08) 100%);
+  border-radius: var(--radius-full);
+  color: var(--accent-color);
+  font-weight: var(--font-medium);
+  font-size: var(--text-xs);
+  border: 1.5px solid rgba(236, 72, 153, 0.15);
+  transition: all var(--transition-normal);
+  box-shadow: 0 2px 8px rgba(236, 72, 153, 0.08);
   position: relative;
   overflow: hidden;
 }
@@ -243,7 +240,7 @@ const handleAction = (action: 'edit' | 'delete' | 'export' | 'copy', e: MouseEve
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  background: var(--gradient-shimmer);
   transition: left 0.6s ease;
 }
 
@@ -252,54 +249,52 @@ const handleAction = (action: 'edit' | 'delete' | 'export' | 'copy', e: MouseEve
 }
 
 .modern-card:hover .date-badge {
-  background: linear-gradient(135deg, rgba(236, 72, 153, 0.18) 0%, rgba(251, 146, 60, 0.15) 100%);
-  border-color: rgba(236, 72, 153, 0.3);
-  transform: translateY(-2px) scale(1.05);
-  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.6);
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.15) 0%, rgba(251, 146, 60, 0.12) 100%);
+  border-color: rgba(236, 72, 153, 0.25);
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 4px 16px rgba(236, 72, 153, 0.15);
 }
 
 /* 核心内容 */
 .card-main {
   flex: 1;
-  margin-bottom: 20px;
+  margin-bottom: var(--spacing-5);
 }
 
 .post-title {
-  font-size: 1.45rem;
-  font-weight: 800;
-  color: #1e293b;
-  line-height: 1.4;
-  margin: 0 0 14px 0;
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--text-main);
+  line-height: var(--leading-snug);
+  margin: 0 0 var(--spacing-3) 0;
   letter-spacing: -0.02em;
   display: block;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .modern-card:hover .post-title {
-  background: linear-gradient(120deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+  background: var(--gradient-secondary);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   transform: translateX(4px);
-  text-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
 }
 
 .post-desc {
-  font-size: 0.96rem;
-  color: #64748b;
-  line-height: 1.7;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  transition: color 0.3s ease;
+  transition: color var(--transition-fast);
 }
 
 .modern-card:hover .post-desc {
-  color: #475569;
+  color: var(--text-regular);
 }
 
 /* 底部区域 */
@@ -307,10 +302,10 @@ const handleAction = (action: 'edit' | 'delete' | 'export' | 'copy', e: MouseEve
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 18px;
+  padding-top: var(--spacing-4);
   border-top: 1px solid rgba(99, 102, 241, 0.08);
-  margin-bottom: 4px;
-  min-height: 48px;
+  margin-bottom: var(--spacing-1);
+  min-height: 44px;
   position: relative;
 }
 
@@ -326,7 +321,7 @@ const handleAction = (action: 'edit' | 'delete' | 'export' | 'copy', e: MouseEve
     rgba(99, 102, 241, 0.2) 50%, 
     transparent 100%);
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity var(--transition-normal);
 }
 
 .modern-card:hover .card-footer::before {
@@ -337,24 +332,24 @@ const handleAction = (action: 'edit' | 'delete' | 'export' | 'copy', e: MouseEve
   flex: 1;
 }
 
-/* 底部标签装饰 */
+/* 底部标签 */
 .card-tags {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-2);
   flex-wrap: wrap;
 }
 
 .mini-tag {
-  font-size: 0.75rem;
-  padding: 5px 12px;
-  border-radius: 14px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(236, 72, 153, 0.1) 100%);
-  color: #a855f7;
-  border: 1px solid rgba(168, 85, 247, 0.2);
-  box-shadow: 0 2px 6px rgba(168, 85, 247, 0.12);
+  font-size: var(--text-xs);
+  padding: var(--spacing-1) var(--spacing-3);
+  border-radius: var(--radius-full);
+  font-weight: var(--font-medium);
+  letter-spacing: 0.2px;
+  transition: all var(--transition-normal);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(236, 72, 153, 0.08) 100%);
+  color: var(--secondary-color);
+  border: 1px solid rgba(168, 85, 247, 0.15);
+  box-shadow: 0 2px 4px rgba(168, 85, 247, 0.08);
   position: relative;
   overflow: hidden;
 }
@@ -366,7 +361,7 @@ const handleAction = (action: 'edit' | 'delete' | 'export' | 'copy', e: MouseEve
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  background: var(--gradient-shimmer);
   transition: left 0.4s ease;
 }
 
@@ -375,40 +370,37 @@ const handleAction = (action: 'edit' | 'delete' | 'export' | 'copy', e: MouseEve
 }
 
 .mini-tag:nth-child(2) {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.12) 0%, rgba(99, 102, 241, 0.1) 100%);
-  color: #0ea5e9;
-  border-color: rgba(14, 165, 233, 0.2);
-  box-shadow: 0 2px 6px rgba(14, 165, 233, 0.12);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(99, 102, 241, 0.08) 100%);
+  color: var(--info-color);
+  border-color: rgba(14, 165, 233, 0.15);
+  box-shadow: 0 2px 4px rgba(14, 165, 233, 0.08);
 }
 
 .mini-tag:nth-child(3) {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(34, 197, 94, 0.1) 100%);
-  color: #10b981;
-  border-color: rgba(16, 185, 129, 0.2);
-  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.12);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(34, 197, 94, 0.08) 100%);
+  color: var(--success-color);
+  border-color: rgba(16, 185, 129, 0.15);
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.08);
 }
 
 .modern-card:hover .mini-tag {
-  transform: translateY(-3px) scale(1.05);
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.25);
-  border-color: rgba(168, 85, 247, 0.3);
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 4px 10px rgba(168, 85, 247, 0.2);
 }
 
 .modern-card:hover .mini-tag:nth-child(2) {
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
-  border-color: rgba(14, 165, 233, 0.3);
+  box-shadow: 0 4px 10px rgba(14, 165, 233, 0.2);
 }
 
 .modern-card:hover .mini-tag:nth-child(3) {
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
-  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
 }
 
 /* 操作按钮组 */
 .action-group {
   opacity: 0;
   transform: translateX(10px);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all var(--transition-normal);
   margin-left: auto;
 }
 
@@ -419,119 +411,100 @@ const handleAction = (action: 'edit' | 'delete' | 'export' | 'copy', e: MouseEve
 
 .action-buttons {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-2);
 }
 
 .icon-btn {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
   background: transparent;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .icon-btn:hover {
-  transform: scale(1.1);
+  transform: scale(1.15);
+}
+
+.icon-btn:active {
+  transform: scale(1.05);
 }
 
 .icon-btn.primary:hover {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%);
-  color: #6366f1;
+  background: var(--primary-lighter);
+  color: var(--primary-color);
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
 }
 
 .icon-btn.danger:hover {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.1) 100%);
-  color: #ef4444;
+  background: var(--danger-light);
+  color: var(--danger-color);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
 }
 
 .icon-btn.info:hover {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(6, 182, 212, 0.1) 100%);
-  color: #0ea5e9;
+  background: var(--info-light);
+  color: var(--info-color);
   box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
 }
 
 .icon-btn.success:hover {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.1) 100%);
-  color: #10b981;
+  background: var(--success-light);
+  color: var(--success-color);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
 }
 
-/* 底部标签装饰 */
-.card-tags {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.mini-tag {
-  font-size: 0.75rem;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%);
-  color: #a855f7;
-  border: 1px solid rgba(168, 85, 247, 0.15);
-}
-
-.mini-tag:nth-child(2) {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%);
-  color: #0ea5e9;
-  border-color: rgba(14, 165, 233, 0.15);
-}
-
-.mini-tag:nth-child(3) {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(34, 197, 94, 0.08) 100%);
-  color: #10b981;
-  border-color: rgba(16, 185, 129, 0.15);
-}
-
-.modern-card:hover .mini-tag {
-  transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.15);
-}
-
-.modern-card:hover .mini-tag:nth-child(2) {
-  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.15);
-}
-
-.modern-card:hover .mini-tag:nth-child(3) {
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
-}
-
-/* 装饰背景线 */
+/* 装饰背景 */
 .card-bg-decoration {
   position: absolute;
   top: 0;
   right: 0;
-  width: 240px;
-  height: 240px;
+  width: 200px;
+  height: 200px;
   background: radial-gradient(circle at top right, 
-    rgba(99, 102, 241, 0.08) 0%, 
-    rgba(168, 85, 247, 0.05) 25%,
-    rgba(236, 72, 153, 0.03) 50%,
-    transparent 75%);
+    rgba(99, 102, 241, 0.06) 0%, 
+    rgba(168, 85, 247, 0.04) 30%,
+    transparent 70%);
   border-radius: 0 0 0 100%;
   pointer-events: none;
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: 0.7;
+  opacity: 0.8;
 }
 
 .modern-card:hover .card-bg-decoration {
   background: radial-gradient(circle at top right, 
-    rgba(99, 102, 241, 0.15) 0%, 
-    rgba(168, 85, 247, 0.1) 25%,
-    rgba(236, 72, 153, 0.06) 50%,
-    transparent 75%);
+    rgba(99, 102, 241, 0.12) 0%, 
+    rgba(168, 85, 247, 0.08) 30%,
+    transparent 70%);
   opacity: 1;
-  transform: scale(1.1) rotate(5deg);
+  transform: scale(1.15) rotate(5deg);
+}
+
+/* 响应式 */
+@media (max-width: 640px) {
+  .card-body {
+    padding: var(--spacing-4);
+  }
+  
+  .post-title {
+    font-size: var(--text-lg);
+  }
+  
+  .card-meta-header {
+    flex-wrap: wrap;
+    gap: var(--spacing-2);
+  }
+  
+  .category-badge,
+  .date-badge {
+    padding: var(--spacing-1) var(--spacing-3);
+    font-size: 0.7rem;
+  }
 }
 </style>

@@ -1,113 +1,255 @@
 :root {
   /* 
-   * 核心知识点：CSS变量 (CSS Custom Properties)
-   * 作用：定义一套全局的设计系统（Design System），确保整个应用的颜色、间距、字体保持一致。
-   * 修改一处，全局生效，极大提高了可维护性。
+   * 🎨 增强版设计系统 (Enhanced Design System)
+   * 统一的视觉语言，让整个应用更加协调美观
    */
 
-  /* --- 色彩系统 (Color System) --- */
-  /* 主色调：使用深邃的靛蓝色，给人专业、稳重的感觉 */
-  --primary-color: #4f46e5;
-  /* Indigo 600 */
-  --primary-hover: #4338ca;
-  /* Indigo 700 */
+  /* === 色彩系统 (Color System) === */
+  
+  /* 主色调 - 优雅的靛蓝紫渐变 */
+  --primary-color: #6366f1;
+  --primary-hover: #4f46e5;
+  --primary-active: #4338ca;
   --primary-light: #e0e7ff;
-  /* Indigo 100 */
+  --primary-lighter: #eef2ff;
+  --primary-dark: #3730a3;
+  
+  /* 次要色调 - 活力紫 */
+  --secondary-color: #8b5cf6;
+  --secondary-hover: #7c3aed;
+  --secondary-light: #ede9fe;
+  
+  /* 强调色 - 粉红 */
+  --accent-color: #ec4899;
+  --accent-hover: #db2777;
+  --accent-light: #fce7f3;
 
-  /* 辅助色 */
+  /* 语义色彩 */
   --success-color: #10b981;
-  /* Emerald 500 */
+  --success-hover: #059669;
+  --success-light: #d1fae5;
+  --success-bg: rgba(16, 185, 129, 0.1);
+  
   --warning-color: #f59e0b;
-  /* Amber 500 */
+  --warning-hover: #d97706;
+  --warning-light: #fef3c7;
+  --warning-bg: rgba(245, 158, 11, 0.1);
+  
   --danger-color: #ef4444;
-  /* Red 500 */
-  --info-color: #3b82f6;
-  /* Blue 500 */
+  --danger-hover: #dc2626;
+  --danger-light: #fee2e2;
+  --danger-bg: rgba(239, 68, 68, 0.1);
+  
+  --info-color: #0ea5e9;
+  --info-hover: #0284c7;
+  --info-light: #e0f2fe;
+  --info-bg: rgba(14, 165, 233, 0.1);
 
-  /* 中性色 (Neutral Colors) - 用于文字和背景 */
-  --text-main: #1f2937;
-  /* Gray 800 - 主要文字 */
-  --text-regular: #4b5563;
-  /* Gray 600 - 次要文字 */
-  --text-secondary: #9ca3af;
-  /* Gray 400 - 辅助文字 */
-  --text-placeholder: #d1d5db;
+  /* 中性色 (Neutral Colors) */
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
 
-  /* 背景色 */
-  --bg-body: #f3f4f6;
-  /* Gray 100 - 页面大背景 */
-  --bg-card: #ffffff;
-  /* 卡片背景 */
-  --bg-glass: rgba(255, 255, 255, 0.8);
-  /* 毛玻璃背景 */
-
-  /* 边框颜色 */
-  --border-color: #e5e7eb;
-  /* Gray 200 */
-  --border-light: #f3f4f6;
-
-  /* --- 阴影系统 (Shadow System) --- */
-  /* 使用多层阴影创造深度感，比单一阴影更自然 */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-
-  /* --- 间距系统 (Spacing System) --- */
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  --spacing-xxl: 48px;
-
-  /* --- 圆角 (Border Radius) --- */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-full: 9999px;
-
-  /* --- 动画 (Transitions) --- */
-  --transition-fast: 0.2s ease;
-  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 0.5s ease;
-
-  /* --- 兼容性变量映射 (Compatibility Mappings) --- */
-  --primary: var(--primary-color);
-  --text-primary: var(--text-main);
-  --bg-muted: var(--bg-body);
-  --bg-surface: #ffffff;
-  --border-default: var(--border-color);
-
+  /* 文字颜色 */
+  --text-main: #1e293b;
+  --text-primary: #1e293b;
+  --text-regular: #475569;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --text-tertiary: #cbd5e1;
+  --text-placeholder: #94a3b8;
+  --text-disabled: #cbd5e1;
+  --text-inverse: #ffffff;
   --text-link: var(--primary-color);
   --text-link-hover: var(--primary-hover);
 
+  /* 背景色 */
+  --bg-body: #f8fafc;
+  --bg-page: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  --bg-card: #ffffff;
+  --bg-card-hover: #fafbff;
+  --bg-muted: #f1f5f9;
+  --bg-subtle: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-glass: rgba(255, 255, 255, 0.85);
+  --bg-glass-strong: rgba(255, 255, 255, 0.95);
+  --bg-overlay: rgba(15, 23, 42, 0.5);
+  --bg-skeleton: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+
+  /* 边框颜色 */
+  --border-color: #e2e8f0;
+  --border-light: #f1f5f9;
+  --border-default: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-focus: var(--primary-color);
+
+  /* === 渐变系统 (Gradient System) === */
+  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  --gradient-secondary: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  --gradient-accent: linear-gradient(135deg, #ec4899 0%, #f97316 100%);
+  --gradient-success: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+  --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+  --gradient-info: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+  --gradient-dark: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  --gradient-light: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%);
+  --gradient-hero: linear-gradient(135deg, rgba(99,102,241,0.05) 0%, rgba(139,92,246,0.05) 50%, rgba(236,72,153,0.05) 100%);
+  --gradient-card: linear-gradient(180deg, #ffffff 0%, #fafbff 100%);
+  --gradient-shimmer: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+
+  /* === 阴影系统 (Shadow System) === */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.04);
+  --shadow-hover: 0 20px 40px -10px rgba(99, 102, 241, 0.2);
+  --shadow-focus: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  --shadow-primary: 0 8px 24px -4px rgba(99, 102, 241, 0.25);
+  --shadow-primary-lg: 0 16px 40px -8px rgba(99, 102, 241, 0.3);
+  --shadow-card: 0 4px 20px rgba(99, 102, 241, 0.06), 0 2px 8px rgba(0, 0, 0, 0.02);
+  --shadow-card-hover: 0 20px 40px rgba(99, 102, 241, 0.12), 0 8px 16px rgba(0, 0, 0, 0.04);
+  --shadow-glass: 0 8px 32px rgba(99, 102, 241, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --shadow-float: 0 12px 28px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+
+  /* 兼容性映射 */
+  --card-shadow: var(--shadow-card);
+  --card-shadow-hover: var(--shadow-card-hover);
+  --card-bg: var(--bg-card);
+  --card-border: var(--border-light);
+
+  /* === 间距系统 (Spacing System) === */
+  --spacing-0: 0;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+  --spacing-20: 80px;
+  --spacing-24: 96px;
+  
+  /* 兼容性映射 */
+  --spacing-xs: var(--spacing-1);
+  --spacing-sm: var(--spacing-2);
+  --spacing-md: var(--spacing-4);
+  --spacing-lg: var(--spacing-6);
+  --spacing-xl: var(--spacing-8);
+  --spacing-xxl: var(--spacing-12);
+
+  /* === 圆角系统 (Border Radius) === */
+  --radius-none: 0;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+  --radius-3xl: 32px;
+  --radius-full: 9999px;
+
+  /* === 字体系统 (Typography) === */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, 'Courier New', monospace;
+  
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+
+  --font-light: 300;
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-extrabold: 800;
+
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+  --leading-loose: 2;
+
+  /* === 动画系统 (Animation) === */
+  --ease-linear: linear;
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --ease-elastic: cubic-bezier(0.68, -0.6, 0.32, 1.6);
+  --ease-smooth: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 350ms;
+  --duration-slower: 500ms;
+  --duration-slowest: 700ms;
+
+  --transition-fast: 150ms var(--ease-out);
+  --transition-normal: 250ms var(--ease-in-out);
+  --transition-slow: 350ms var(--ease-in-out);
+  --transition-bounce: 500ms var(--ease-bounce);
+  --transition-spring: 400ms var(--ease-spring);
+
+  /* === 层级系统 (Z-Index) === */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-fixed: 300;
+  --z-modal-backdrop: 400;
+  --z-modal: 500;
+  --z-popover: 600;
+  --z-tooltip: 700;
+  --z-toast: 800;
+
+  /* === 断点 (Breakpoints) === */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+
+  /* === 代码高亮兼容 === */
   --code-bg: #f6f8fa;
   --code-text: var(--text-main);
   --code-border: var(--border-color);
-
-  --card-bg: var(--bg-card);
-  --card-shadow: var(--shadow-sm);
-  --card-shadow-hover: var(--shadow-md);
-  --card-border: var(--border-light);
-
+  --primary: var(--primary-color);
   --primary-bg: var(--primary-light);
   --success: var(--success-color);
-  --success-bg: #d1fae5;
-
-  --gradient-primary: linear-gradient(135deg, var(--primary-color), #818cf8);
-  --text-muted: var(--text-secondary);
-  --text-tertiary: #d1d5db;
-
   --warning: var(--warning-color);
-  --warning-bg: #fef3c7;
-
   --danger: var(--danger-color);
-  --danger-bg: #fee2e2;
-
   --info: var(--info-color);
-  --info-bg: #dbeafe;
+}
 
-  --bg-subtle: #fafafa;
+/* 暗色模式预留 */
+@media (prefers-color-scheme: dark) {
+  :root.auto-dark {
+    --text-main: #f1f5f9;
+    --text-primary: #f1f5f9;
+    --text-regular: #cbd5e1;
+    --text-secondary: #94a3b8;
+    --bg-body: #0f172a;
+    --bg-card: #1e293b;
+    --bg-muted: #334155;
+    --border-color: #334155;
+    --border-light: #1e293b;
+  }
 }
