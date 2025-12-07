@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElPagination, ElEmpty, ElSkeleton, ElInput, ElButton, ElIcon, ElTooltip } from 'element-plus'
-import { Search, DataLine, RefreshLeft, Timer, Top, Grid, List, Delete, Edit, Download, CopyDocument } from '@element-plus/icons-vue'
+import { Search, DataLine, RefreshLeft, Timer, Top, Grid, List, Delete, Edit, Download, CopyDocument, Setting } from '@element-plus/icons-vue'
 import axios from '@/utils/axios'
 import { copyEnhancedRichContent } from '@/utils/imageUtils'
 
@@ -11,6 +11,7 @@ import GlobalSearch from '@/components/home/GlobalSearch.vue'
 import BlogCard from '@/components/home/BlogCard.vue'
 import HomeSidebar from '@/components/home/HomeSidebar.vue'
 import BackgroundEffects from '@/components/home/BackgroundEffects.vue'
+import ThemeSettings from '@/components/ThemeSettings.vue'
 
 // Types
 interface Category {
@@ -52,6 +53,11 @@ const selectedTagIds = ref<number[]>([])
 
 // Refs
 const globalSearchRef = ref<InstanceType<typeof GlobalSearch> | null>(null)
+const themeSettingsRef = ref<InstanceType<typeof ThemeSettings> | null>(null)
+
+const openThemeSettings = () => {
+  themeSettingsRef.value?.open()
+}
 
 // Computed for Hero Section
 const greeting = computed(() => {
@@ -424,6 +430,12 @@ onUnmounted(() => {
                 </button>
               </el-tooltip>
               <div class="divider-v"></div>
+              <el-tooltip content="阅读主题设置" placement="top">
+                <button class="icon-btn theme-btn" @click="openThemeSettings">
+                  <el-icon><Setting /></el-icon>
+                </button>
+              </el-tooltip>
+              <div class="divider-v"></div>
               <el-tooltip content="重置筛选" placement="top">
                  <button class="icon-btn" @click="handleReset">
                   <el-icon><RefreshLeft /></el-icon>
@@ -497,6 +509,7 @@ onUnmounted(() => {
     </main>
 
     <GlobalSearch ref="globalSearchRef" />
+    <ThemeSettings ref="themeSettingsRef" />
     
     <!-- 回到顶部 -->
     <transition name="fade">
@@ -932,6 +945,14 @@ onUnmounted(() => {
   height: 20px;
   background: #e2e8f0;
   margin: 0 4px;
+}
+
+.theme-btn:hover {
+  color: #8b5cf6 !important;
+}
+
+.theme-btn:hover::before {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(168, 85, 247, 0.1) 100%) !important;
 }
 
 /* Grid */

@@ -619,10 +619,10 @@ const openFileInIDE = async (fileName: string) => {
   align-items: center;
   gap: 20px;
   padding: 16px;
-  background: #f8f9fa;
+  background: var(--el-fill-color-light, #f8f9fa);
   border-radius: 8px;
   margin-bottom: 20px;
-  border: 1px solid #e8ecf1;
+  border: 1px solid var(--el-border-color, #e8ecf1);
 }
 
 .branch-item {
@@ -634,7 +634,7 @@ const openFileInIDE = async (fileName: string) => {
 .branch-arrow {
   font-size: 20px;
   font-weight: bold;
-  color: #409eff;
+  color: var(--el-color-primary, #409eff);
 }
 
 .input-section {
@@ -644,33 +644,44 @@ const openFileInIDE = async (fileName: string) => {
   margin-bottom: 15px;
 }
 
+/* 修复输入框图标和文字重叠问题 */
+.input-section :deep(.el-input__wrapper) {
+  padding-left: 30px;
+}
+
+.input-section :deep(.el-input__prefix) {
+  position: absolute;
+  left: 10px;
+  color: var(--el-text-color-placeholder, #a8abb2);
+}
+
 .retry-section {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  background: #fff7e6;
+  background: var(--el-color-warning-light-9, #fff7e6);
   border-radius: 6px;
-  border: 1px solid #ffd666;
+  border: 1px solid var(--el-color-warning-light-5, #ffd666);
 }
 
 .label {
   font-weight: 600;
-  color: #303133;
+  color: var(--el-text-color-primary, #303133);
   white-space: nowrap;
 }
 
 .hint-text {
-  color: #909399;
+  color: var(--el-text-color-secondary, #909399);
   font-size: 14px;
 }
 
 .steps-container {
-  background: #f8f9fa;
+  background: var(--el-fill-color-light, #f8f9fa);
   padding: 30px 20px;
   border-radius: 12px;
   margin-bottom: 25px;
-  border: 1px solid #e8ecf1;
+  border: 1px solid var(--el-border-color, #e8ecf1);
 }
 
 .terminal-window {
@@ -842,21 +853,21 @@ const openFileInIDE = async (fileName: string) => {
 }
 
 .file-icon {
-  color: #f56c6c;
+  color: var(--el-color-danger, #f56c6c);
   font-size: 18px;
   flex-shrink: 0;
 }
 
 .file-name {
   flex: 1;
-  color: #303133;
+  color: var(--el-text-color-primary, #303133);
   font-size: 14px;
   font-family: 'Consolas', 'Monaco', monospace;
   word-break: break-all;
 }
 
 .open-hint {
-  color: #909399;
+  color: var(--el-text-color-secondary, #909399);
   font-size: 16px;
   opacity: 0;
   transition: opacity 0.3s;
@@ -865,20 +876,46 @@ const openFileInIDE = async (fileName: string) => {
 
 .conflict-file-item:hover .open-hint {
   opacity: 1;
-  color: #409eff;
+  color: var(--el-color-primary, #409eff);
 }
 
 .conflict-files-list::-webkit-scrollbar {
   width: 6px;
 }
 .conflict-files-list::-webkit-scrollbar-track {
-  background: #fef0f0;
+  background: var(--el-color-danger-light-9, #fef0f0);
 }
 .conflict-files-list::-webkit-scrollbar-thumb {
-  background: #f56c6c;
+  background: var(--el-color-danger, #f56c6c);
   border-radius: 3px;
 }
 .conflict-files-list::-webkit-scrollbar-thumb:hover {
-  background: #f45656;
+  background: var(--el-color-danger-dark-2, #f45656);
+}
+
+/* 暗黑模式适配 */
+:global(.dark) .branch-section,
+:global(.dark) .steps-container {
+  background: var(--el-bg-color-overlay, #1d1e1f);
+  border-color: var(--el-border-color-darker, #414243);
+}
+
+:global(.dark) .retry-section {
+  background: rgba(230, 162, 60, 0.1);
+  border-color: rgba(230, 162, 60, 0.3);
+}
+
+:global(.dark) .conflict-files-section {
+  background: rgba(245, 108, 108, 0.1);
+  border-color: var(--el-color-danger, #f56c6c);
+}
+
+:global(.dark) .conflict-file-item {
+  background: var(--el-bg-color-overlay, #1d1e1f);
+  border-color: rgba(245, 108, 108, 0.3);
+}
+
+:global(.dark) .conflict-file-item:hover {
+  background: rgba(245, 108, 108, 0.15);
 }
 </style>

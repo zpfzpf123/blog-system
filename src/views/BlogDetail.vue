@@ -6,7 +6,7 @@
       </el-card>
     </div>
 
-    <div v-else-if="blogPost" class="blog-layout">
+    <div v-else-if="blogPost" class="blog-layout" :class="[`content-style-${themeStore.contentStyle}`, `toc-style-${themeStore.tocStyle}`]">
       <div class="blog-main">
         <el-card class="blog-card">
           <div class="blog-header">
@@ -44,7 +44,10 @@
           </div>
 
           <div class="blog-content">
-            <div class="markdown-body" v-html="renderedHtml"></div>
+            <div 
+              class="markdown-body" 
+              v-html="renderedHtml"
+            ></div>
           </div>
 
           <div class="blog-footer">
@@ -116,7 +119,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick, watch, onUnmounted } from 'vue'
+import { ref, onMounted, nextTick, watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElCard, ElTag, ElButton, ElSkeleton, ElEmpty, ElMessage } from 'element-plus'
 import {
@@ -136,8 +139,10 @@ import MarkdownIt from 'markdown-it'
 import markdownItAnchor from 'markdown-it-anchor'
 import markdownItToc from 'markdown-it-table-of-contents'
 import hljs from 'highlight.js'
-import 'highlight.js/styles/github.css'
-import 'github-markdown-css/github-markdown-light.css'
+import { useThemeStore } from '@/stores/theme'
+
+import 'github-markdown-css/github-markdown.css'
+
 import { processImageUrlsInMarkdown, copyEnhancedRichContent } from '@/utils/imageUtils'
 
 // 类型定义
@@ -169,23 +174,164 @@ const isFullscreen = ref(false)
 const renderedHtml = ref('')
 const tocItems = ref<Array<{ id: string; text: string; level: number }>>([])
 const activeTocId = ref('')
+const currentCodeThemeLink = ref<HTMLLinkElement | null>(null)
 
 const route = useRoute()
+const themeStore = useThemeStore()
+
+// 动态加载代码高亮主题
+const loadCodeTheme = (themeName: string) => {
+  console.log('loadCodeTheme called with:', themeName)
+
+  // 移除旧的主题样式
+  if (currentCodeThemeLink.value) {
+    console.log('Removing old theme link')
+    currentCodeThemeLink.value.remove()
+    currentCodeThemeLink.value = null
+  }
+
+  // 移除之前可能存在的主题 link
+  const oldLinks = document.querySelectorAll('link[data-hljs-theme]')
+  console.log('Found old links:', oldLinks.length)
+  oldLinks.forEach((link) => link.remove())
+
+  // 移除旧的覆盖样式
+  const oldOverride = document.getElementById('hljs-theme-override')
+  if (oldOverride) oldOverride.remove()
+
+  // 创建新的 link 标签从 CDN 加载
+  const link = document.createElement('link')
+  link.rel = 'stylesheet'
+  link.setAttribute('data-hljs-theme', themeName)
+  link.href = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/${themeName}.min.css`
+
+  link.onload = () => {
+    console.log('Theme CSS loaded successfully:', themeName)
+    // 主题加载后，添加覆盖样式确保背景色生效
+    applyThemeOverride(themeName)
+  }
+
+  // 立即应用覆盖样式（不等待 CSS 加载完成）
+  applyThemeOverride(themeName)
+  link.onerror = (e) => {
+    console.error('Failed to load theme CSS:', themeName, e)
+  }
+
+  document.head.appendChild(link)
+  currentCodeThemeLink.value = link
+  console.log('New theme link added:', link.href)
+}
+
+// 主题背景色映射
+const themeBackgrounds: Record<string, { bg: string; color: string }> = {
+  github: { bg: '#f6f8fa', color: '#24292e' },
+  'github-dark': { bg: '#0d1117', color: '#c9d1d9' },
+  'atom-one-light': { bg: '#fafafa', color: '#383a42' },
+  'atom-one-dark': { bg: '#282c34', color: '#abb2bf' },
+  vs: { bg: '#ffffff', color: '#000000' },
+  vs2015: { bg: '#1e1e1e', color: '#dcdcdc' },
+  monokai: { bg: '#272822', color: '#f8f8f2' },
+  'monokai-sublime': { bg: '#23241f', color: '#f8f8f2' },
+  nord: { bg: '#2e3440', color: '#d8dee9' },
+  'tokyo-night-dark': { bg: '#1a1b26', color: '#a9b1d6' },
+  'tokyo-night-light': { bg: '#d5d6db', color: '#343b58' },
+  'night-owl': { bg: '#011627', color: '#d6deeb' },
+  obsidian: { bg: '#282b2e', color: '#e0e2e4' },
+  'stackoverflow-light': { bg: '#f6f6f6', color: '#2f3337' },
+  'stackoverflow-dark': { bg: '#1c1b1b', color: '#f6f6f6' },
+  xcode: { bg: '#ffffff', color: '#000000' },
+  idea: { bg: '#ffffff', color: '#000000' },
+  androidstudio: { bg: '#282b2e', color: '#a9b7c6' },
+  agate: { bg: '#333333', color: '#ffffff' },
+  rainbow: { bg: '#474949', color: '#d1d9e1' },
+  'gradient-dark': { bg: '#1a1a2e', color: '#eeeeee' },
+  'shades-of-purple': { bg: '#2d2b55', color: '#e3dfff' },
+  'panda-syntax-dark': { bg: '#292a2b', color: '#e6e6e6' },
+  'panda-syntax-light': { bg: '#e6e6e6', color: '#292a2b' },
+  'rose-pine': { bg: '#191724', color: '#e0def4' },
+  'rose-pine-moon': { bg: '#232136', color: '#e0def4' },
+  'rose-pine-dawn': { bg: '#faf4ed', color: '#575279' },
+  'arduino-light': { bg: '#ffffff', color: '#434f54' },
+  'a11y-light': { bg: '#fefefe', color: '#545454' },
+  'a11y-dark': { bg: '#2b2b2b', color: '#f8f8f2' },
+  'color-brewer': { bg: '#fff', color: '#000' },
+  googlecode: { bg: '#fff', color: '#000' },
+  lightfair: { bg: '#f8f8f8', color: '#444' },
+  'qtcreator-light': { bg: '#ffffff', color: '#000000' },
+  'qtcreator-dark': { bg: '#000000', color: '#aaaaaa' },
+  'an-old-hope': { bg: '#1c1d21', color: '#c0c5ce' },
+  arta: { bg: '#222', color: '#aaa' },
+  'codepen-embed': { bg: '#222', color: '#fff' },
+  dark: { bg: '#444', color: '#ddd' },
+  devibeans: { bg: '#1a1a1a', color: '#abb2bf' },
+  far: { bg: '#000080', color: '#0ff' },
+  felipec: { bg: '#272822', color: '#f8f8f2' },
+  hybrid: { bg: '#1d1f21', color: '#c5c8c6' },
+  'ir-black': { bg: '#000', color: '#f6f3e8' },
+  'kimbie-dark': { bg: '#221a0f', color: '#d3af86' },
+  lioshi: { bg: '#303030', color: '#c5c8c6' },
+  'nnfx-dark': { bg: '#333', color: '#fff' },
+  'paraiso-dark': { bg: '#2f1e2e', color: '#a39e9b' },
+  srcery: { bg: '#1c1b19', color: '#fce8c3' },
+  sunburst: { bg: '#000', color: '#f8f8f8' },
+  'tomorrow-night-blue': { bg: '#002451', color: '#fff' },
+  'tomorrow-night-bright': { bg: '#000', color: '#eaeaea' },
+  xt256: { bg: '#000', color: '#eaeaea' },
+}
+
+// 应用主题覆盖样式
+const applyThemeOverride = (themeName: string) => {
+  // 移除旧的覆盖样式
+  const oldOverride = document.getElementById('hljs-theme-override')
+  if (oldOverride) oldOverride.remove()
+
+  const colors = themeBackgrounds[themeName] || themeBackgrounds['github']
+  console.log('Applying theme override:', themeName, colors)
+
+  // 创建覆盖样式
+  const style = document.createElement('style')
+  style.id = 'hljs-theme-override'
+  style.textContent = `
+    .markdown-body pre code.hljs,
+    .markdown-body pre code,
+    .markdown-body .hljs {
+      background: ${colors.bg} !important;
+      color: ${colors.color} !important;
+    }
+  `
+  document.head.appendChild(style)
+}
+
+// 监听主题变化
+watch(
+  () => themeStore.codeTheme,
+  (newTheme) => {
+    console.log('Theme changed to:', newTheme)
+    loadCodeTheme(newTheme)
+  },
+  { immediate: true }
+)
+
+
+
 
 // 初始化 markdown-it
-const md = new MarkdownIt({
+const md: MarkdownIt = new MarkdownIt({
   html: true,
   linkify: true,
   typographer: true,
-  highlight: function (str, lang) {
+  highlight: function (str: string, lang: string): string {
     if (lang && hljs.getLanguage(lang)) {
       try {
-        return '<pre class="hljs"><code>' +
+        // hljs 类放在 code 上，让主题样式生效
+        return '<pre><code class="hljs language-' + lang + '">' +
                hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
                '</code></pre>'
-      } catch (__) {}
+      } catch (_) {
+        // ignore
+      }
     }
-    return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>'
+    return '<pre><code class="hljs">' + MarkdownIt().utils.escapeHtml(str) + '</code></pre>'
   }
 })
 
@@ -294,12 +440,9 @@ const enhanceCodeBlocks = () => {
   const container = document.querySelector('.markdown-body')
   if (!container) return
   
-  let codeBlocks = container.querySelectorAll('pre.hljs')
-  if (codeBlocks.length === 0) {
-    codeBlocks = container.querySelectorAll('pre')
-  }
+  const codeBlocks = container.querySelectorAll('pre')
   
-  codeBlocks.forEach((pre, index) => {
+  codeBlocks.forEach((pre) => {
     // 避免重复添加
     if (pre.querySelector('.code-toolbar')) return
     
@@ -556,6 +699,10 @@ onMounted(() => {
 onUnmounted(() => {
   document.body.style.overflow = ''
   window.removeEventListener('scroll', updateActiveToc)
+  // 清理动态加载的主题样式
+  if (currentCodeThemeLink.value) {
+    currentCodeThemeLink.value.remove()
+  }
 })
 
 // ========= 全文搜索高亮与定位 =========
@@ -672,7 +819,6 @@ watch(
 <style scoped>
 /* 基础布局 */
 .blog-detail-container {
-  max-width: 1400px;
   margin: 0 auto;
   padding: 20px;
   min-height: 100vh;
@@ -682,7 +828,6 @@ watch(
   display: flex;
   gap: 24px;
   /* align-items: flex-start;  <-- 已移除，使侧边栏高度自动撑开 */
-  max-width: 1400px;
   margin: 0 auto;
   position: relative;
 }
@@ -705,9 +850,9 @@ watch(
 /* 目录卡片 */
 .toc-card {
   border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  border: none;
-  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
   backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
@@ -716,7 +861,7 @@ watch(
 
 .toc-card :deep(.el-card__header) {
   padding: 15px 20px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-default);
   flex-shrink: 0; /* 防止头部被压缩 */
 }
 
@@ -733,11 +878,11 @@ watch(
   gap: 8px;
   font-size: 1.1rem;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--text-primary);
 }
 
 .toc-header .el-icon {
-  color: #667eea;
+  color: var(--primary);
 }
 
 .toc-content {
@@ -767,42 +912,52 @@ watch(
 .toc-item {
   padding: 8px 12px;
   border-radius: 8px;
-  color: #666;
+  color: var(--text-regular);
   font-size: 0.95rem;
   transition: all 0.3s ease;
   cursor: pointer;
   display: flex;
   align-items: center;
   border-left: 3px solid transparent;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
+  line-height: 1.6;
 }
 
 .toc-item:hover {
-  background-color: #f5f7fa;
-  color: #409eff;
+  background-color: var(--bg-muted);
+  color: var(--primary);
+  transform: translateX(2px);
+  border-left-color: var(--primary);
 }
 
 .toc-item.toc-active {
-  background-color: #f0f4ff;
-  color: #667eea;
+  background-color: var(--primary-bg);
+  color: var(--primary);
   font-weight: 600;
-  border-left-color: #667eea;
+  border-left-color: var(--primary);
 }
 
 .toc-level-1 {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 1rem;
+  color: var(--text-main);
+  margin-top: 8px;
+  margin-bottom: 4px;
 }
 
 .toc-level-2 {
   padding-left: 24px;
   font-size: 0.92rem;
+  color: var(--text-regular);
+  font-weight: 500;
 }
 
 .toc-level-3 {
   padding-left: 36px;
   font-size: 0.88rem;
-  color: #909399;
+  color: var(--text-regular);
+  font-weight: 400;
+  opacity: 0.85;
 }
 
 .toc-text {
@@ -818,7 +973,7 @@ watch(
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
-  color: #909399;
+  color: var(--text-muted);
   font-size: 0.9rem;
 }
 
@@ -843,30 +998,31 @@ watch(
 .blog-card {
   margin-bottom: 20px;
   border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--card-shadow);
   overflow: hidden;
   transition: all 0.3s ease;
-  border: none;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
 }
 
 .blog-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--card-shadow-hover);
 }
 
 /* 博客头部 */
 .blog-header {
   padding: 30px 30px 20px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .blog-title {
   margin: 0 0 20px 0;
   font-size: 2.2rem;
-  color: #2c3e50;
+  color: var(--text-primary);
   font-weight: 700;
   line-height: 1.3;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient-primary);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -885,21 +1041,21 @@ watch(
   align-items: center;
   gap: 6px;
   font-size: 0.9rem;
-  color: #666;
+  color: var(--text-secondary);
   padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--bg-muted);
   border-radius: 20px;
   backdrop-filter: blur(5px);
-  border: 1px solid #eee;
+  border: 1px solid var(--border-default);
 }
 
 .meta-item .el-icon {
-  color: #409eff;
+  color: var(--primary);
   font-size: 1rem;
 }
 
 .meta-item.reading-time {
-  color: #67c23a;
+  color: var(--success);
   font-weight: 600;
 }
 
@@ -926,21 +1082,25 @@ watch(
 .blog-content {
   padding: 30px;
   line-height: 1.8;
-  color: #2c3e50;
+  color: var(--text-primary);
   font-size: 1.05rem;
 }
 
 .markdown-body {
   font-family: 'Segoe UI', 'PingFang SC', 'Hiragino Sans', Arial, sans-serif;
+  color: var(--text-primary);
+  background: transparent !important;
 }
+
+
 
 /* 标题样式 */
 .markdown-body :deep(h1) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient-primary);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  border-bottom: 2px solid #667eea;
+  border-bottom: 2px solid var(--primary);
   padding-bottom: 12px;
   margin-top: 24px;
   margin-bottom: 16px;
@@ -948,8 +1108,8 @@ watch(
 }
 
 .markdown-body :deep(h2) {
-  color: #2c3e50;
-  border-bottom: 1px solid #eee;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-default);
   padding-bottom: 10px;
   margin-top: 20px;
   margin-bottom: 14px;
@@ -957,7 +1117,7 @@ watch(
 }
 
 .markdown-body :deep(h3) {
-  color: #2c3e50;
+  color: var(--text-primary);
   margin-top: 18px;
   margin-bottom: 12px;
   scroll-margin-top: 20px;
@@ -965,101 +1125,101 @@ watch(
 
 /* 引用样式 */
 .markdown-body :deep(blockquote) {
-  border-left: 4px solid #667eea;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+  border-left: 4px solid var(--primary);
+  background: var(--primary-bg);
   border-radius: 0 8px 8px 0;
   padding: 15px 20px;
   margin: 20px 0;
+  color: var(--text-secondary);
 }
 
 /* 链接样式 */
 .markdown-body :deep(a) {
-  color: #667eea;
+  color: var(--text-link);
   text-decoration: none;
   border-bottom: 1px solid transparent;
   transition: all 0.3s ease;
 }
 
 .markdown-body :deep(a:hover) {
-  border-bottom-color: #667eea;
+  color: var(--text-link-hover);
+  border-bottom-color: var(--text-link-hover);
 }
 
 /* 表格样式 */
 .markdown-body :deep(table) {
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
   width: 100%;
   margin: 20px 0;
+  border-collapse: collapse;
 }
 
 .markdown-body :deep(th) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient-primary);
   color: white;
   padding: 12px;
 }
 
 .markdown-body :deep(td) {
   padding: 10px 12px;
+  border: 1px solid var(--border-default);
 }
 
 .markdown-body :deep(tr:nth-child(even)) {
-  background-color: #f8fafc;
+  background-color: var(--bg-muted);
 }
 
 .markdown-body :deep(tr:hover) {
-  background-color: #f1f5f9;
+  background-color: var(--bg-subtle);
 }
 
 /* 图片样式 */
 .markdown-body :deep(img) {
   border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
   transition: all 0.3s ease;
   max-width: 100%;
 }
 
 .markdown-body :deep(img:hover) {
   transform: scale(1.02);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-lg);
 }
 
-/* 代码块样式 */
+/* 代码块样式 - 让 highlight.js 主题生效 */
 .markdown-body :deep(pre) {
   border-radius: 8px;
   margin: 16px 0;
   position: relative;
-  background: #f6f8fa !important;
   padding: 0 !important;
   overflow: hidden;
   transition: max-height 0.3s ease;
 }
 
-.markdown-body :deep(pre code) {
+.markdown-body :deep(pre code.hljs) {
+  font-family: 'Monaco', 'Courier New', monospace;
+  display: block;
+  padding: 16px !important;
+  padding-top: 48px !important; /* 为工具栏留出空间 */
+  overflow-x: auto;
+  max-height: none;
+  transition: max-height 0.3s ease;
+  border-radius: 8px;
+}
+
+.markdown-body :deep(pre code:not(.hljs)) {
   font-family: 'Monaco', 'Courier New', monospace;
   display: block;
   padding: 16px;
   overflow-x: auto;
-  max-height: none;
-  transition: max-height 0.3s ease;
 }
 
 /* 代码块收起状态 */
 .markdown-body :deep(pre.code-collapsed code) {
-  max-height: 100px;
+  max-height: 150px;
   overflow: hidden;
-  position: relative;
-}
-
-.markdown-body :deep(pre.code-collapsed code::after) {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 60px;
-  background: linear-gradient(to bottom, transparent, #f6f8fa);
-  pointer-events: none;
 }
 
 /* 代码工具栏 */
@@ -1068,14 +1228,14 @@ watch(
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  background: #e8eaed;
-  border-bottom: 1px solid #d0d4d9;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .markdown-body :deep(.code-lang) {
   font-size: 12px;
   font-weight: 600;
-  color: #667eea;
+  color: var(--primary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -1089,9 +1249,9 @@ watch(
   padding: 4px 12px;
   font-size: 12px;
   font-weight: 500;
-  color: #606266;
-  background: white;
-  border: 1px solid #d0d4d9;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1101,15 +1261,15 @@ watch(
 }
 
 .markdown-body :deep(.code-btn:hover) {
-  color: #409eff;
-  border-color: #409eff;
-  background: #ecf5ff;
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-bg);
 }
 
 .markdown-body :deep(.code-btn.copied) {
-  color: #67c23a;
-  border-color: #67c23a;
-  background: #f0f9ff;
+  color: var(--success);
+  border-color: var(--success);
+  background: var(--success-bg);
 }
 
 .markdown-body :deep(.code-btn span) {
@@ -1119,10 +1279,10 @@ watch(
 /* 行内代码 */
 .markdown-body :deep(code:not(pre code)) {
   font-family: 'Monaco', 'Courier New', monospace;
-  background: #f0f2f5;
+  background: var(--code-bg);
   padding: 2px 6px;
   border-radius: 3px;
-  color: #e83e8c;
+  color: var(--code-text);
   font-size: 0.9em;
 }
 
@@ -1132,8 +1292,8 @@ watch(
   justify-content: space-between;
   align-items: center;
   padding: 20px 30px;
-  border-top: 1px solid #f0f0f0;
-  background: #fafbfc;
+  border-top: 1px solid var(--border-default);
+  background: var(--bg-muted);
 }
 
 .footer-actions {
@@ -1149,11 +1309,11 @@ watch(
 
 .footer-actions .el-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-md);
 }
 
 .footer-info {
-  color: #999;
+  color: var(--text-muted);
   font-size: 0.9rem;
   font-style: italic;
 }
@@ -1231,8 +1391,8 @@ watch(
 
 /* 全文搜索高亮样式 */
 .blog-content :deep(mark.search-hit) {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--warning-bg);
+  color: var(--warning);
   padding: 2px 4px;
   border-radius: 3px;
   font-weight: 600;
@@ -1248,4 +1408,418 @@ watch(
     box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.5);
   }
 }
+
+/* 段落和列表样式 */
+.markdown-body :deep(p),
+.markdown-body :deep(li) {
+  color: var(--text-primary);
+}
+
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  color: var(--text-primary);
+}
+
+.markdown-body :deep(hr) {
+  border-color: var(--border-default);
+}
+
+/* 强调文本 */
+.markdown-body :deep(strong) {
+  color: var(--text-primary);
+}
+
+.markdown-body :deep(em) {
+  color: var(--text-secondary);
+}
+
+/* ========== 内容风格 - 优雅风格 ========== */
+.content-style-elegant .blog-content {
+  font-family: 'Georgia', 'Noto Serif SC', serif;
+  line-height: 2;
+}
+
+.content-style-elegant .markdown-body :deep(h1),
+.content-style-elegant .markdown-body :deep(h2),
+.content-style-elegant .markdown-body :deep(h3) {
+  font-family: 'Georgia', 'Noto Serif SC', serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.content-style-elegant .markdown-body :deep(blockquote) {
+  border-left-color: #764ba2;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+  font-style: italic;
+}
+
+.content-style-elegant .markdown-body :deep(a) {
+  color: #764ba2;
+}
+
+/* ========== 内容风格 - 科技风格 ========== */
+.content-style-tech .blog-content {
+  font-family: 'Inter', 'SF Pro Display', -apple-system, sans-serif;
+}
+
+.content-style-tech .markdown-body :deep(h1),
+.content-style-tech .markdown-body :deep(h2),
+.content-style-tech .markdown-body :deep(h3) {
+  background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.content-style-tech .markdown-body :deep(blockquote) {
+  border-left-color: #3a7bd5;
+  background: linear-gradient(135deg, rgba(0, 210, 255, 0.08) 0%, rgba(58, 123, 213, 0.08) 100%);
+}
+
+.content-style-tech .markdown-body :deep(a) {
+  color: #3a7bd5;
+}
+
+.content-style-tech .markdown-body :deep(code:not(pre code)) {
+  background: linear-gradient(135deg, rgba(0, 210, 255, 0.15) 0%, rgba(58, 123, 213, 0.15) 100%);
+  color: #3a7bd5;
+}
+
+/* ========== 内容风格 - 极简风格 ========== */
+.content-style-minimal .blog-content {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 2;
+}
+
+.content-style-minimal .markdown-body :deep(h1),
+.content-style-minimal .markdown-body :deep(h2),
+.content-style-minimal .markdown-body :deep(h3) {
+  background: none;
+  -webkit-text-fill-color: #1a1a1a;
+  color: #1a1a1a;
+  border-bottom: none;
+  font-weight: 600;
+}
+
+.content-style-minimal .markdown-body :deep(h1) {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+}
+
+.content-style-minimal .markdown-body :deep(h2) {
+  font-size: 1.4rem;
+}
+
+.content-style-minimal .markdown-body :deep(blockquote) {
+  border-left: 2px solid #e0e0e0;
+  background: transparent;
+  padding-left: 20px;
+  color: #666;
+}
+
+.content-style-minimal .markdown-body :deep(a) {
+  color: #1a1a1a;
+  text-decoration: underline;
+}
+
+.content-style-minimal .blog-card {
+  box-shadow: none;
+  border: 1px solid #eee;
+}
+
+/* ========== 内容风格 - 暖色风格 ========== */
+.content-style-warm .blog-card {
+  background: #faf8f5;
+}
+
+.content-style-warm .blog-content {
+  font-family: 'Merriweather', 'Noto Serif SC', Georgia, serif;
+  line-height: 1.9;
+  color: #3d3d3d;
+}
+
+.content-style-warm .markdown-body :deep(h1),
+.content-style-warm .markdown-body :deep(h2),
+.content-style-warm .markdown-body :deep(h3) {
+  background: linear-gradient(135deg, #d4a574 0%, #c17f59 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.content-style-warm .markdown-body :deep(blockquote) {
+  border-left-color: #d4a574;
+  background: rgba(212, 165, 116, 0.1);
+}
+
+.content-style-warm .markdown-body :deep(a) {
+  color: #c17f59;
+}
+
+.content-style-warm .blog-footer {
+  background: #f5f0ea;
+}
+
+/* ========== 内容风格 - Notion 风格 ========== */
+.content-style-notion .blog-card {
+  background: #ffffff;
+  box-shadow: none;
+  border: none;
+}
+
+.content-style-notion .blog-content {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+  line-height: 1.7;
+}
+
+.content-style-notion .markdown-body :deep(h1),
+.content-style-notion .markdown-body :deep(h2),
+.content-style-notion .markdown-body :deep(h3) {
+  background: none;
+  -webkit-text-fill-color: #37352f;
+  color: #37352f;
+  border-bottom: none;
+  font-weight: 700;
+}
+
+.content-style-notion .markdown-body :deep(h1) {
+  font-size: 2.5rem;
+  margin-top: 2rem;
+}
+
+.content-style-notion .markdown-body :deep(h2) {
+  font-size: 1.875rem;
+  margin-top: 1.5rem;
+}
+
+.content-style-notion .markdown-body :deep(blockquote) {
+  border-left: 3px solid #000;
+  background: transparent;
+  padding: 0 0 0 14px;
+  margin: 4px 0;
+  color: #37352f;
+}
+
+.content-style-notion .markdown-body :deep(a) {
+  color: #37352f;
+  text-decoration: underline;
+  text-decoration-color: rgba(55, 53, 47, 0.4);
+}
+
+.content-style-notion .markdown-body :deep(code:not(pre code)) {
+  background: rgba(135, 131, 120, 0.15);
+  color: #eb5757;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-size: 85%;
+}
+
+.content-style-notion .blog-header {
+  border-bottom: none;
+}
+
+/* ========== 内容风格 - 掘金风格 ========== */
+.content-style-juejin .blog-card {
+  background: #ffffff;
+}
+
+.content-style-juejin .blog-content {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+  line-height: 1.75;
+}
+
+.content-style-juejin .markdown-body :deep(h1),
+.content-style-juejin .markdown-body :deep(h2),
+.content-style-juejin .markdown-body :deep(h3) {
+  background: none;
+  -webkit-text-fill-color: #1d2129;
+  color: #1d2129;
+  font-weight: 700;
+}
+
+.content-style-juejin .markdown-body :deep(h1) {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.content-style-juejin .markdown-body :deep(h2) {
+  border-bottom: 1px solid #e4e6eb;
+  padding-bottom: 12px;
+}
+
+.content-style-juejin .markdown-body :deep(blockquote) {
+  border-left: 4px solid #1e80ff;
+  background: #f7f8fa;
+  padding: 16px;
+  margin: 16px 0;
+  color: #515767;
+  border-radius: 0 4px 4px 0;
+}
+
+.content-style-juejin .markdown-body :deep(a) {
+  color: #1e80ff;
+  text-decoration: none;
+}
+
+.content-style-juejin .markdown-body :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.content-style-juejin .markdown-body :deep(code:not(pre code)) {
+  background: rgba(30, 128, 255, 0.1);
+  color: #1e80ff;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.content-style-juejin .blog-title {
+  background: none;
+  -webkit-text-fill-color: #1d2129;
+  color: #1d2129;
+}
+
+/* ========== 目录风格 - 紧凑风格 ========== */
+.toc-style-compact .toc-item {
+  padding: 5px 10px;
+  font-size: 0.85rem;
+  margin-bottom: 2px;
+}
+
+.toc-style-compact .toc-level-1 {
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+
+.toc-style-compact .toc-level-2 {
+  padding-left: 18px;
+  font-size: 0.82rem;
+}
+
+.toc-style-compact .toc-level-3 {
+  padding-left: 28px;
+  font-size: 0.78rem;
+}
+
+/* ========== 目录风格 - 卡片风格 ========== */
+.toc-style-card .toc-item {
+  background: var(--bg-muted);
+  border-radius: 10px;
+  margin-bottom: 6px;
+  border-left: none;
+  padding: 10px 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.toc-style-card .toc-item:hover {
+  background: var(--primary-bg);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.toc-style-card .toc-item.toc-active {
+  background: var(--primary);
+  color: white;
+}
+
+.toc-style-card .toc-level-2 {
+  margin-left: 12px;
+}
+
+.toc-style-card .toc-level-3 {
+  margin-left: 24px;
+}
+
+/* ========== 目录风格 - 线条风格 ========== */
+.toc-style-line .toc-list {
+  border-left: 2px solid var(--border-default);
+  padding-left: 0;
+  margin-left: 8px;
+}
+
+.toc-style-line .toc-item {
+  position: relative;
+  border-left: none;
+  padding-left: 20px;
+  margin-left: -2px;
+}
+
+.toc-style-line .toc-item::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 50%;
+  width: 12px;
+  height: 2px;
+  background: var(--border-default);
+}
+
+.toc-style-line .toc-item:hover::before,
+.toc-style-line .toc-item.toc-active::before {
+  background: var(--primary);
+}
+
+.toc-style-line .toc-level-2 {
+  padding-left: 32px;
+}
+
+.toc-style-line .toc-level-3 {
+  padding-left: 44px;
+}
+
+/* ========== 目录风格 - 圆点风格 ========== */
+.toc-style-dot .toc-item {
+  border-left: none;
+  padding-left: 24px;
+  position: relative;
+}
+
+.toc-style-dot .toc-item::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-default);
+  transition: all 0.3s ease;
+}
+
+.toc-style-dot .toc-item:hover::before,
+.toc-style-dot .toc-item.toc-active::before {
+  background: var(--primary);
+  transform: translateY(-50%) scale(1.3);
+}
+
+.toc-style-dot .toc-level-1::before {
+  width: 8px;
+  height: 8px;
+}
+
+.toc-style-dot .toc-level-2 {
+  padding-left: 36px;
+}
+
+.toc-style-dot .toc-level-2::before {
+  left: 20px;
+  width: 5px;
+  height: 5px;
+}
+
+.toc-style-dot .toc-level-3 {
+  padding-left: 48px;
+}
+
+.toc-style-dot .toc-level-3::before {
+  left: 32px;
+  width: 4px;
+  height: 4px;
+}
 </style>
+
+
+
+

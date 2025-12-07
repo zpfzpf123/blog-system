@@ -125,6 +125,9 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+:deep(.el-dialog){
+  margin:5vh auto 50px !important;
+}
 .layout-container {
   min-height: 100vh;
   display: flex;

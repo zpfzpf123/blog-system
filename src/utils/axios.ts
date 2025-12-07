@@ -26,7 +26,11 @@ api.interceptors.request.use(
     console.log('Request:', config.method?.toUpperCase(), config.url)
     
     // 为Git相关操作设置更长的超时时间（5分钟）
-    if (config.url?.includes('/git-')) {
+    // 包括: /git-*, /smart-commit, /continue-commit, /abort-commit
+    if (config.url?.includes('/git-') || 
+        config.url?.includes('/smart-commit') || 
+        config.url?.includes('/continue-commit') ||
+        config.url?.includes('/abort-commit')) {
       config.timeout = 300000 // Git操作需要更长时间（5分钟）
       console.log('🔧 Git操作检测到，超时时间设置为5分钟')
     }

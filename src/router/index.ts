@@ -9,11 +9,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/Home.vue'
 import BlogDetail from '../views/BlogDetail.vue'
-import Admin from '../views/Admin.vue'
-import PostManager from '../views/PostManager.vue'
 import PostCreate from '../views/PostCreate.vue'
 import PostEdit from '../views/PostEdit.vue'
-import Categories from '../views/Categories.vue'
 import AIChat from '../views/AIChat.vue'
 import GitUserManager from '../views/GitUserManager.vue'
 import projectManager from '../views/ProjectManager.vue'
@@ -38,16 +35,6 @@ const router = createRouter({
       props: true,
     },
     {
-      path: '/admin',
-      name: 'Admin',
-      component: Admin,
-    },
-    {
-      path: '/admin/posts',
-      name: 'PostManager',
-      component: PostManager,
-    },
-    {
       path: '/admin/posts/create',
       name: 'PostCreate',
       component: PostCreate,
@@ -57,11 +44,6 @@ const router = createRouter({
       name: 'PostEdit',
       component: PostEdit,
       props: true,
-    },
-    {
-      path: '/categories',
-      name: 'Categories',
-      component: Categories,
     },
     {
       path: '/ai-chat',

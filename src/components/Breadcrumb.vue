@@ -35,31 +35,11 @@ const breadcrumbItems = computed(() => {
     case 'BlogDetail':
       items.push({ name: '博客详情', path: undefined, icon: Document })
       break
-    case 'Admin':
-      items.push({ name: '管理后台', path: '/admin', icon: Setting })
-      break
-    case 'PostManager':
-      items.push(
-        { name: '管理后台', path: '/admin', icon: Setting },
-        { name: '文章管理', path: '/admin/posts', icon: Document },
-      )
-      break
     case 'PostCreate':
-      items.push(
-        { name: '管理后台', path: '/admin', icon: Setting },
-        { name: '文章管理', path: '/admin/posts', icon: Document },
-        { name: '创建文章', path: undefined, icon: Plus },
-      )
+      items.push({ name: '创建文章', path: undefined, icon: Plus })
       break
     case 'PostEdit':
-      items.push(
-        { name: '管理后台', path: '/admin', icon: Setting },
-        { name: '文章管理', path: '/admin/posts', icon: Document },
-        { name: '编辑文章', path: undefined, icon: Edit },
-      )
-      break
-    case 'Categories':
-      items.push({ name: '博客分类', path: undefined, icon: Folder })
+      items.push({ name: '编辑文章', path: undefined, icon: Edit })
       break
   }
 

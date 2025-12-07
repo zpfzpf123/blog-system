@@ -7,29 +7,43 @@
 
   /* --- 色彩系统 (Color System) --- */
   /* 主色调：使用深邃的靛蓝色，给人专业、稳重的感觉 */
-  --primary-color: #4f46e5; /* Indigo 600 */
-  --primary-hover: #4338ca; /* Indigo 700 */
-  --primary-light: #e0e7ff; /* Indigo 100 */
+  --primary-color: #4f46e5;
+  /* Indigo 600 */
+  --primary-hover: #4338ca;
+  /* Indigo 700 */
+  --primary-light: #e0e7ff;
+  /* Indigo 100 */
 
   /* 辅助色 */
-  --success-color: #10b981; /* Emerald 500 */
-  --warning-color: #f59e0b; /* Amber 500 */
-  --danger-color: #ef4444; /* Red 500 */
-  --info-color: #3b82f6;    /* Blue 500 */
+  --success-color: #10b981;
+  /* Emerald 500 */
+  --warning-color: #f59e0b;
+  /* Amber 500 */
+  --danger-color: #ef4444;
+  /* Red 500 */
+  --info-color: #3b82f6;
+  /* Blue 500 */
 
   /* 中性色 (Neutral Colors) - 用于文字和背景 */
-  --text-main: #1f2937;     /* Gray 800 - 主要文字 */
-  --text-regular: #4b5563;  /* Gray 600 - 次要文字 */
-  --text-secondary: #9ca3af;/* Gray 400 - 辅助文字 */
+  --text-main: #1f2937;
+  /* Gray 800 - 主要文字 */
+  --text-regular: #4b5563;
+  /* Gray 600 - 次要文字 */
+  --text-secondary: #9ca3af;
+  /* Gray 400 - 辅助文字 */
   --text-placeholder: #d1d5db;
 
   /* 背景色 */
-  --bg-body: #f3f4f6;       /* Gray 100 - 页面大背景 */
-  --bg-card: #ffffff;       /* 卡片背景 */
-  --bg-glass: rgba(255, 255, 255, 0.8); /* 毛玻璃背景 */
+  --bg-body: #f3f4f6;
+  /* Gray 100 - 页面大背景 */
+  --bg-card: #ffffff;
+  /* 卡片背景 */
+  --bg-glass: rgba(255, 255, 255, 0.8);
+  /* 毛玻璃背景 */
 
   /* 边框颜色 */
-  --border-color: #e5e7eb;  /* Gray 200 */
+  --border-color: #e5e7eb;
+  /* Gray 200 */
   --border-light: #f3f4f6;
 
   /* --- 阴影系统 (Shadow System) --- */
@@ -58,11 +72,42 @@
   --transition-fast: 0.2s ease;
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.5s ease;
-}
 
-/* 深色模式适配 (预留) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* 这里可以定义深色模式的变量覆盖 */
-  }
+  /* --- 兼容性变量映射 (Compatibility Mappings) --- */
+  --primary: var(--primary-color);
+  --text-primary: var(--text-main);
+  --bg-muted: var(--bg-body);
+  --bg-surface: #ffffff;
+  --border-default: var(--border-color);
+
+  --text-link: var(--primary-color);
+  --text-link-hover: var(--primary-hover);
+
+  --code-bg: #f6f8fa;
+  --code-text: var(--text-main);
+  --code-border: var(--border-color);
+
+  --card-bg: var(--bg-card);
+  --card-shadow: var(--shadow-sm);
+  --card-shadow-hover: var(--shadow-md);
+  --card-border: var(--border-light);
+
+  --primary-bg: var(--primary-light);
+  --success: var(--success-color);
+  --success-bg: #d1fae5;
+
+  --gradient-primary: linear-gradient(135deg, var(--primary-color), #818cf8);
+  --text-muted: var(--text-secondary);
+  --text-tertiary: #d1d5db;
+
+  --warning: var(--warning-color);
+  --warning-bg: #fef3c7;
+
+  --danger: var(--danger-color);
+  --danger-bg: #fee2e2;
+
+  --info: var(--info-color);
+  --info-bg: #dbeafe;
+
+  --bg-subtle: #fafafa;
 }

@@ -1,232 +1,248 @@
 <template>
-  <div class="animation-demo-container">
+  <div class="animation-lab">
+    <!-- 页面标题 -->
+    <header class="lab-header">
+      <h1>CSS 动画实验室</h1>
+      <p>精选 {{ animations.length }} 个实用动画效果</p>
+    </header>
 
-    <!-- 分类导航 + 操作区 -->
-    <div class="category-bar">
-      <div class="category-nav">
-        <button 
-          v-for="cat in categories" 
-          :key="cat"
-          :class="['category-btn', { active: currentCategory === cat }]"
-          @click="currentCategory = cat"
-        >
-          {{ cat === 'all' ? '全部动画' : cat }}
-        </button>
-      </div>
+    <!-- 分类筛选 -->
+    <nav class="category-nav">
+      <button
+        v-for="cat in allCategories"
+        :key="cat.key"
+        :class="['cat-btn', { active: activeCategory === cat.key }]"
+        @click="activeCategory = cat.key"
+      >
+        <span class="cat-icon">{{ cat.icon }}</span>
+        <span class="cat-name">{{ cat.label }}</span>
+        <span class="cat-count" v-if="cat.key !== 'all'">{{ getCategoryCount(cat.key) }}</span>
+      </button>
+    </nav>
 
-      <div class="toolbar">
-        <div class="stats-chip" v-if="!loading">
-          <span class="chip-icon">📊</span>
-          <span class="chip-text">已收录 <strong class="chip-number">{{ filteredAnimations.length }}</strong> 个动画</span>
-        </div>
-        <button class="primary-btn" @click="openCreateDialog">
-          <span class="btn-icon">＋</span>
-          <span>新增动画</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- 动画列表 -->
-    <div class="animations-grid" v-if="!loading">
-      <div v-for="anim in filteredAnimations" :key="anim.id" class="animation-card">
-        <!-- 演示区域 -->
-        <div class="preview-area">
+    <!-- 动画卡片 -->
+    <div class="animation-grid" v-if="!loading">
+      <div
+        v-for="item in displayedAnimations"
+        :key="item.id"
+        class="anim-card"
+        :class="{ playing: playingId === item.id }"
+      >
+        <!-- 预览区 - 根据分类使用不同容器 -->
+        <div class="preview-area" @click="togglePlay(item.id)">
           
-          <!-- 1. 文字特效 & 打字机 -->
-          <div v-if="anim.category === '文字特效' || anim.title.includes('打字机')" class="demo-container">
-            <h3 class="demo-text" :class="extractClassName(anim.cssCode)">
-              Hello World
-            </h3>
-          </div>
+          <!-- 加载动画 -->
+          <template v-if="item.category === '加载动画'">
+            <div class="demo-loader" :class="[getAnimClass(item), { active: playingId === item.id }]">
+              <template v-if="item.title.includes('圆点') || item.title.includes('脉冲')">
+                <span></span><span></span><span></span>
+              </template>
+              <template v-else-if="item.title.includes('波浪')">
+                <span></span><span></span><span></span><span></span><span></span>
+              </template>
+              <template v-else-if="item.title.includes('进度')">
+                <!-- 进度条容器 -->
+              </template>
+            </div>
+          </template>
 
-          <!-- 2. 交互特效 (按钮) -->
-          <div v-else-if="anim.category === '交互特效' || anim.title.includes('按钮')" class="demo-container">
-            <button class="demo-btn" :class="extractClassName(anim.cssCode)">
-              Hover Me
+          <!-- 按钮特效 -->
+          <template v-else-if="item.category === '按钮特效'">
+            <button class="demo-button" :class="[getAnimClass(item), { active: playingId === item.id }]">
+              点击体验
+            </button>
+          </template>
+
+          <!-- 文字动画 -->
+          <template v-else-if="item.category === '文字动画'">
+            <div class="demo-text" :class="[getAnimClass(item), { active: playingId === item.id }]">
+              <template v-if="item.title.includes('弹跳') || item.title.includes('波浪')">
+                <span>H</span><span>e</span><span>l</span><span>l</span><span>o</span>
+              </template>
+              <template v-else>
+                Hello World
+              </template>
+            </div>
+          </template>
+
+          <!-- 悬停效果 -->
+          <template v-else-if="item.category === '悬停效果'">
+            <div class="demo-hover-box" :class="[getAnimClass(item), { active: playingId === item.id }]">
+              <span>悬停我</span>
+            </div>
+          </template>
+
+          <!-- 图形变换 -->
+          <template v-else-if="item.category === '图形变换'">
+            <div class="demo-shape" :class="[getAnimClass(item), { active: playingId === item.id }]"></div>
+          </template>
+
+          <!-- 入场动画 -->
+          <template v-else-if="item.category === '入场动画'">
+            <div 
+              class="demo-enter-box" 
+              :class="[getAnimClass(item), { active: playingId === item.id }]"
+              :key="playingId === item.id ? 'playing' : 'idle'"
+            >
+              <span>✨</span>
+            </div>
+          </template>
+
+          <!-- 强调效果 -->
+          <template v-else-if="item.category === '强调效果'">
+            <div class="demo-emphasis" :class="[getAnimClass(item), { active: playingId === item.id }]">
+              <span>🔔</span>
+            </div>
+          </template>
+
+          <!-- 背景特效 -->
+          <template v-else-if="item.category === '背景特效'">
+            <div class="demo-background" :class="[getAnimClass(item), { active: playingId === item.id }]"></div>
+          </template>
+
+          <!-- 退出动画 -->
+          <template v-else-if="item.category === '退出动画'">
+            <div 
+              class="demo-exit-box" 
+              :class="[getAnimClass(item), { active: playingId === item.id }]"
+              :key="playingId === item.id ? 'playing' : 'idle'"
+            >
+              <span>👋</span>
+            </div>
+          </template>
+
+          <!-- 边框动画 -->
+          <template v-else-if="item.category === '边框动画'">
+            <div class="demo-border" :class="[getAnimClass(item), { active: playingId === item.id }]"></div>
+          </template>
+
+          <!-- 阴影效果 -->
+          <template v-else-if="item.category === '阴影效果'">
+            <div class="demo-shadow" :class="[getAnimClass(item), { active: playingId === item.id }]"></div>
+          </template>
+
+          <!-- 3D特效 -->
+          <template v-else-if="item.category === '3D特效'">
+            <div class="demo-3d" :class="[getAnimClass(item), { active: playingId === item.id }]"></div>
+          </template>
+
+          <!-- 滤镜特效 -->
+          <template v-else-if="item.category === '滤镜特效'">
+            <div class="demo-filter" :class="[getAnimClass(item), { active: playingId === item.id }]">
+              <span>🎭</span>
+            </div>
+          </template>
+
+          <!-- 变形特效 -->
+          <template v-else-if="item.category === '变形特效'">
+            <div class="demo-transform" :class="[getAnimClass(item), { active: playingId === item.id }]"></div>
+          </template>
+
+          <!-- 默认 -->
+          <template v-else>
+            <div class="demo-default" :class="[getAnimClass(item), { active: playingId === item.id }]"></div>
+          </template>
+
+          <div class="play-indicator">
+            <span v-if="playingId === item.id">⏸ 暂停</span>
+            <span v-else>▶ 播放</span>
+          </div>
+        </div>
+
+        <!-- 卡片信息 -->
+        <div class="card-info">
+          <div class="info-header">
+            <h3>{{ item.title }}</h3>
+            <span class="category-tag">{{ item.category }}</span>
+          </div>
+          <p class="description">{{ item.description }}</p>
+          <div class="card-actions">
+            <button class="action-btn primary" @click.stop="showCodeModal(item)">
+              <span>📋</span> 复制代码
+            </button>
+            <button class="action-btn danger" @click.stop="deleteAnim(item.id)">
+              <span>🗑️</span>
             </button>
           </div>
-
-          <!-- 3. 加载动画 -->
-          <div v-else-if="anim.category === '加载动画'" class="demo-container">
-             <div v-if="anim.title.includes('圆点') || anim.title.toLowerCase().includes('dots')" class="dots-container">
-               <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-             </div>
-             <div v-else-if="anim.title.includes('条形') || anim.title.includes('波浪') || anim.title.toLowerCase().includes('bar') || anim.title.toLowerCase().includes('wave')" class="bars-container" :class="extractClassName(anim.cssCode)">
-               <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
-             </div>
-             <div v-else :class="extractClassName(anim.cssCode)"></div>
-          </div>
-
-          <!-- 4. 强调动画 (铃铛/心形) -->
-          <div v-else-if="anim.category === '强调动画'" class="demo-container">
-            <div class="demo-icon-wrapper" :class="extractClassName(anim.cssCode)">
-              <span class="demo-emoji">{{ (anim.title.includes('心') || anim.title.toLowerCase().includes('heart')) ? '❤️' : '🔔' }}</span>
-            </div>
-          </div>
-
-          <!-- 5. 进入/退出动画 (头像/圆形) -->
-          <div v-else-if="anim.category === '进入动画' || anim.category === '退出动画'" class="demo-container">
-            <div class="demo-avatar" :class="extractClassName(anim.cssCode)">
-              <span class="demo-emoji">👤</span>
-            </div>
-          </div>
-
-          <!-- 6. 炫酷特效 (卡片) -->
-          <div v-else-if="anim.category === '炫酷特效'" class="demo-container">
-            <div class="demo-card-special" :class="extractClassName(anim.cssCode)">
-              <span>Special Effect</span>
-            </div>
-          </div>
-
-          <!-- 7. 默认兜底 (方块) -->
-          <div v-else class="demo-box" :class="extractClassName(anim.cssCode)">
-            <span class="demo-icon">🎨</span>
-          </div>
-
-          <div class="demo-label">{{ anim.title }}</div>
         </div>
+      </div>
 
-        <!-- 信息区域 -->
-        <div class="info-area">
-          <p class="anim-desc">{{ anim.description }}</p>
-          
-          <!-- 代码区域 -->
-          <div class="code-section">
-            <div class="code-header" @click="toggleCode(anim.id)">
-              <span class="code-label">CSS 代码</span>
-              <span class="expand-icon">{{ expandedIds.includes(anim.id) ? '▼' : '▶' }}</span>
-            </div>
-            
-            <div v-if="expandedIds.includes(anim.id)" class="code-content">
-              <pre><code>{{ anim.cssCode }}</code></pre>
-              <button class="copy-btn" @click="copyCode(anim.cssCode, $event)">
-                <span class="btn-icon">📋</span> 复制
-              </button>
-            </div>
-          </div>
-
-          <div class="card-actions">
-            <button class="text-btn" @click="openEditDialog(anim)">编辑</button>
-            <button class="text-btn danger" @click="deleteAnimation(anim.id)">删除</button>
-          </div>
+      <!-- 添加卡片 -->
+      <div class="anim-card add-card" @click="openAddModal">
+        <div class="add-inner">
+          <span class="add-icon">+</span>
+          <span>添加新动画</span>
         </div>
       </div>
     </div>
 
-    <!-- 加载状态 -->
-    <div v-else class="loading-state">
-      <div class="loading-spinner"></div>
-      <p>正在加载动画库...</p>
+    <!-- 加载中 -->
+    <div v-if="loading" class="loading-box">
+      <div class="spinner"></div>
+      <p>加载中...</p>
     </div>
 
-    <!-- 空状态 -->
-    <div v-if="!loading && filteredAnimations.length === 0" class="empty-state">
-      <span class="empty-icon">📭</span>
-      <p>该分类下暂无动画</p>
-    </div>
+    <!-- 代码弹窗 -->
+    <Teleport to="body">
+      <div v-if="codeModal.show" class="modal-mask" @click.self="codeModal.show = false">
+        <div class="code-dialog">
+          <div class="dialog-header">
+            <h3>{{ codeModal.title }}</h3>
+            <button class="close-btn" @click="codeModal.show = false">×</button>
+          </div>
+          <div class="dialog-body">
+            <pre><code>{{ codeModal.code }}</code></pre>
+          </div>
+          <div class="dialog-footer">
+            <button class="copy-btn" @click="copyCode">
+              {{ copySuccess ? '✓ 已复制到剪贴板' : '复制代码' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
-    <!-- 新增 / 编辑动画弹窗 -->
-    <div v-if="showDialog" class="modal-overlay">
-      <div class="modal">
-        <h2 class="modal-title">{{ isEditMode ? '编辑动画' : '新增动画' }}</h2>
-        <div class="modal-body">
-          <div class="modal-left">
-            <div class="form-row">
-              <label>标题</label>
-              <input v-model="form.title" type="text" placeholder="请输入动画标题" />
+    <!-- 添加弹窗 -->
+    <Teleport to="body">
+      <div v-if="addModal.show" class="modal-mask" @click.self="addModal.show = false">
+        <div class="form-dialog">
+          <div class="dialog-header">
+            <h3>添加新动画</h3>
+            <button class="close-btn" @click="addModal.show = false">×</button>
+          </div>
+          <div class="dialog-body">
+            <div class="form-field">
+              <label>动画名称</label>
+              <input v-model="addModal.form.title" placeholder="输入动画名称" />
             </div>
-            <div class="form-row">
+            <div class="form-field">
               <label>分类</label>
-              <select v-model="form.category">
-                <option value="" disabled>请选择动画分类</option>
-                <option v-for="cat in categoryOptions" :key="cat" :value="cat">
-                  {{ cat }}
-                </option>
+              <select v-model="addModal.form.category">
+                <option value="">选择分类</option>
+                <option v-for="c in categoryList" :key="c" :value="c">{{ c }}</option>
               </select>
             </div>
-            <div class="form-row">
+            <div class="form-field">
               <label>描述</label>
-              <textarea v-model="form.description" rows="2" placeholder="简单描述动画用途" />
+              <input v-model="addModal.form.description" placeholder="简短描述" />
             </div>
-            <div class="form-row">
-              <label>CSS 代码</label>
-              <textarea v-model="form.cssCode" rows="8" placeholder="粘贴完整的 @keyframes 和类定义" />
-            </div>
-          </div>
-
-          <div class="modal-right" v-if="form.cssCode.trim()">
-            <div class="preview-section">
-              <div class="preview-header">预览</div>
-              <div class="preview-content">
-                <div class="preview-box-wrapper">
-                  
-                  <!-- 1. 文字特效 & 打字机 -->
-                  <div v-if="form.category === '文字特效' || form.title.includes('打字机')" class="demo-container">
-                    <h3 class="demo-text" :class="extractClassName(form.cssCode)">
-                      Hello World
-                    </h3>
-                  </div>
-
-                  <!-- 2. 交互特效 (按钮) -->
-                  <div v-else-if="form.category === '交互特效' || form.title.includes('按钮')" class="demo-container">
-                    <button class="demo-btn" :class="extractClassName(form.cssCode)">
-                      Hover Me
-                    </button>
-                  </div>
-
-                  <!-- 3. 加载动画 -->
-                  <div v-else-if="form.category === '加载动画'" class="demo-container">
-                     <div v-if="form.title.includes('圆点') || form.title.toLowerCase().includes('dots')" class="dots-container">
-                       <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-                     </div>
-                     <div v-else-if="form.title.includes('条形') || form.title.includes('波浪') || form.title.toLowerCase().includes('bar') || form.title.toLowerCase().includes('wave')" class="bars-container" :class="extractClassName(form.cssCode)">
-                       <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
-                     </div>
-                     <div v-else :class="extractClassName(form.cssCode)"></div>
-                  </div>
-
-                  <!-- 4. 强调动画 (铃铛/心形) -->
-                  <div v-else-if="form.category === '强调动画'" class="demo-container">
-                    <div class="demo-icon-wrapper" :class="extractClassName(form.cssCode)">
-                      <span class="demo-emoji">{{ (form.title.includes('心') || form.title.toLowerCase().includes('heart')) ? '❤️' : '🔔' }}</span>
-                    </div>
-                  </div>
-
-                  <!-- 5. 进入/退出动画 (头像/圆形) -->
-                  <div v-else-if="form.category === '进入动画' || form.category === '退出动画'" class="demo-container">
-                    <div class="demo-avatar" :class="extractClassName(form.cssCode)">
-                      <span class="demo-emoji">👤</span>
-                    </div>
-                  </div>
-
-                  <!-- 6. 炫酷特效 (卡片) -->
-                  <div v-else-if="form.category === '炫酷特效'" class="demo-container">
-                    <div class="demo-card-special" :class="extractClassName(form.cssCode)">
-                      <span>Special Effect</span>
-                    </div>
-                  </div>
-
-                  <!-- 7. 默认兜底 (方块) -->
-                  <div v-else class="demo-box preview-box" :class="extractClassName(form.cssCode)">
-                    <span class="demo-icon">🎨</span>
-                  </div>
-
-                </div>
-              </div>
+            <div class="form-field">
+              <label>CSS代码</label>
+              <textarea v-model="addModal.form.cssCode" rows="10" placeholder="粘贴CSS代码"></textarea>
             </div>
           </div>
-        </div>
-        <div class="modal-actions">
-          <button class="secondary-btn" @click="closeDialog">取消</button>
-          <button class="primary-btn" @click="submitForm">保存</button>
+          <div class="dialog-footer">
+            <button class="cancel-btn" @click="addModal.show = false">取消</button>
+            <button class="save-btn" @click="saveAnimation">保存</button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 
 interface Animation {
   id: number
@@ -236,804 +252,747 @@ interface Animation {
   description: string
 }
 
+const API = 'http://localhost:4567/api/animations'
+const CAT_API = 'http://localhost:4567/api/animation-categories'
+
 const animations = ref<Animation[]>([])
-const animationCategories = ref<{ id: number; name: string }[]>([])
+const categories = ref<{ id: number; name: string }[]>([])
 const loading = ref(true)
-const currentCategory = ref('all')
-const expandedIds = ref<number[]>([])
-const showDialog = ref(false)
-const isEditMode = ref(false)
-const form = ref({
-  id: null as number | null,
-  title: '',
-  category: '',
-  cssCode: '',
-  description: '',
+const activeCategory = ref('all')
+const playingId = ref<number | null>(null)
+const copySuccess = ref(false)
+
+const codeModal = ref({ show: false, title: '', code: '' })
+const addModal = ref({
+  show: false,
+  form: { title: '', category: '', description: '', cssCode: '' }
 })
 
-const apiBase = 'http://localhost:4567/api/animations'
-const categoryApiBase = 'http://localhost:4567/api/animation-categories'
-
-// 获取所有动画
-const fetchAnimations = async () => {
-  try {
-    const response = await fetch(apiBase)
-    if (response.ok) {
-      animations.value = await response.json()
-    }
-  } catch (error) {
-    console.error('Failed to fetch animations:', error)
-  } finally {
-    loading.value = false
-  }
+const categoryIcons: Record<string, string> = {
+  '悬停效果': '👆',
+  '加载动画': '⏳',
+  '按钮特效': '🔘',
+  '文字动画': '✍️',
+  '图形变换': '⬡',
+  '入场动画': '🎬',
+  '退出动画': '🚪',
+  '强调效果': '⚡',
+  '背景特效': '🌈',
+  '边框动画': '🔲',
+  '阴影效果': '🌑',
+  '3D特效': '🎲',
+  '滤镜特效': '🎭',
+  '变形特效': '🔀'
 }
 
-// 获取所有动画分类
-const fetchAnimationCategories = async () => {
-  try {
-    const response = await fetch(categoryApiBase)
-    if (response.ok) {
-      animationCategories.value = await response.json()
-    }
-  } catch (error) {
-    console.error('Failed to fetch animation categories:', error)
-  }
-}
-
-// 提取分类（来自动画分类表）
-const categories = computed(() => {
-  const cats = animationCategories.value.map(c => c.name)
-  return ['all', ...cats]
+const allCategories = computed(() => {
+  const cats = categories.value.map(c => ({
+    key: c.name,
+    label: c.name,
+    icon: categoryIcons[c.name] || '✨'
+  }))
+  return [{ key: 'all', label: '全部', icon: '🎨' }, ...cats]
 })
 
-// 下拉选项同样使用动画分类表
-const categoryOptions = computed(() => animationCategories.value.map(c => c.name))
+const categoryList = computed(() => categories.value.map(c => c.name))
 
-// 筛选动画
-const filteredAnimations = computed(() => {
-  if (currentCategory.value === 'all') return animations.value
-  return animations.value.filter(a => a.category === currentCategory.value)
+const displayedAnimations = computed(() => {
+  if (activeCategory.value === 'all') return animations.value
+  return animations.value.filter(a => a.category === activeCategory.value)
 })
 
-// 表单相关逻辑
-const resetForm = () => {
-  form.value = {
-    id: null,
-    title: '',
-    category: '',
-    cssCode: '',
-    description: '',
-  }
+function getCategoryCount(cat: string) {
+  return animations.value.filter(a => a.category === cat).length
 }
 
-const openCreateDialog = () => {
-  resetForm()
-  isEditMode.value = false
-  if (animationCategories.value.length > 0) {
-    form.value.category = animationCategories.value[0].name
-  }
-  showDialog.value = true
-}
-
-const openEditDialog = (anim: Animation) => {
-  form.value = {
-    id: anim.id,
-    title: anim.title,
-    category: anim.category,
-    cssCode: anim.cssCode,
-    description: anim.description,
-  }
-  isEditMode.value = true
-  showDialog.value = true
-}
-
-const closeDialog = () => {
-  showDialog.value = false
-}
-
-const submitForm = async () => {
-  if (!form.value.title.trim() || !form.value.category.trim() || !form.value.cssCode.trim()) {
-    alert('标题、分类和 CSS 代码为必填项')
-    return
-  }
-
-  const payload = {
-    title: form.value.title.trim(),
-    category: form.value.category.trim(),
-    cssCode: form.value.cssCode,
-    description: form.value.description,
-  }
-
-  try {
-    if (isEditMode.value && form.value.id != null) {
-      const response = await fetch(`${apiBase}/${form.value.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (response.ok) {
-        const updated = await response.json()
-        const index = animations.value.findIndex(a => a.id === updated.id)
-        if (index !== -1) {
-          animations.value[index] = updated
-        }
-      }
-    } else {
-      const response = await fetch(apiBase, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (response.ok) {
-        const created = await response.json()
-        animations.value.push(created)
-      }
-    }
-
-    showDialog.value = false
-  } catch (error) {
-    console.error('保存动画失败:', error)
-  }
-}
-
-const deleteAnimation = async (id: number) => {
-  if (!confirm('确定要删除这个动画吗？')) return
-
-  try {
-    const response = await fetch(`${apiBase}/${id}`, {
-      method: 'DELETE',
-    })
-    if (response.ok) {
-      animations.value = animations.value.filter(a => a.id !== id)
-    }
-  } catch (error) {
-    console.error('删除动画失败:', error)
-  }
-}
-
-// 解析 CSS 样式，注入到演示元素
-// 注意：为了演示方便，这里我们解析 keyframes 并注入到 style 标签中
-// 实际上在 Vue 中动态注入 Keyframes 比较麻烦，这里我们采用一种简单策略：
-// 仅仅将 animation 属性应用到 style，但 keyframes 需要全局注入或者 scoped 注入。
-// 这里的简单做法是：直接把 cssCode 放到 style 标签里插入 head (仅演示用)
-const injectStyles = () => {
-  const styleId = 'dynamic-animations-style'
-  let styleEl = document.getElementById(styleId)
-  if (!styleEl) {
-    styleEl = document.createElement('style')
-    styleEl.id = styleId
-    document.head.appendChild(styleEl)
-  }
-  
-  let cssContent = ''
-  animations.value.forEach(anim => {
-    // 直接使用数据库中的CSS代码，不做额外处理
-    cssContent += anim.cssCode + '\n'
-  })
-  styleEl.textContent = cssContent
-}
-
-// 为表单中的 CSS 提供单独的预览样式注入
-const injectPreviewStyle = () => {
-  const styleId = 'dynamic-animation-preview-style'
-  let styleEl = document.getElementById(styleId)
-  if (!styleEl) {
-    styleEl = document.createElement('style')
-    styleEl.id = styleId
-    document.head.appendChild(styleEl)
-  }
-
-  styleEl.textContent = form.value.cssCode || ''
-}
-
-// 提取动画类名
-const getAnimationStyles = (cssCode: string) => {
-  // 这是一个简化的提取逻辑，假设 cssCode 中包含 .classname { ... }
-  // 我们尝试从代码中提取类名，或者直接应用 animation 属性
-  // 为了演示效果，我们假设后端返回的 CSS 代码包含了 .classname 的定义
-  // 而我们在 demo-box 上应用这个 classname
-  
-  // 正则匹配 .class-name
-  const match = cssCode.match(/\.([\w-]+)\s*\{/)
-  if (match) {
-    // 返回一个对象，这就相当于 :style="{}"，但我们需要 :class
-    // 既然这样，我们还是直接在 template 里用 :class 比较麻烦，
-    // 不如直接解析 animation 属性？
-    // 或者，最稳妥的方式是：我们把 cssCode 里的 keyframes 和 class 都注入到页面 head
-    // 然后这里返回 class 名。
-    return { animation: 'none' } // 占位，实际通过 class 控制
-  }
-  return {}
-}
-
-// 监听数据变化注入样式
-import { watch } from 'vue'
-watch(animations, () => {
-  injectStyles()
-}, { deep: true })
-
-// 监听表单 CSS 变化，实时更新预览样式
-watch(
-  () => form.value.cssCode,
-  () => {
-    injectPreviewStyle()
-  }
-)
-
-// 但上面的 getAnimationStyles 绑定 style 不太对，应该绑定 class。
-// 修正：我们直接用 DOM 操作或者 class 绑定。
-// 简单起见，我们在 onMounted 之后，给每个 demo-box 添加对应的 class
-// 更好的方法：
-// 在 template 中： :class="extractClassName(anim.cssCode)"
-
-const extractClassName = (cssCode: string) => {
-  const match = cssCode.match(/\.([\w-]+)\s*\{/)
+function getAnimClass(item: Animation) {
+  const match = item.cssCode.match(/\.([\w-]+)\s*\{/)
   return match ? match[1] : ''
 }
 
-// 复制代码
-const copyCode = async (code: string, event: Event) => {
-  const btn = event.target as HTMLButtonElement
-  const originalText = btn.innerHTML
-  
+function togglePlay(id: number) {
+  playingId.value = playingId.value === id ? null : id
+}
+
+function showCodeModal(item: Animation) {
+  codeModal.value = { show: true, title: item.title, code: item.cssCode }
+  copySuccess.value = false
+}
+
+async function copyCode() {
   try {
-    await navigator.clipboard.writeText(code)
-    btn.innerHTML = '<span class="btn-icon">✅</span> 已复制'
-    setTimeout(() => {
-      btn.innerHTML = originalText
-    }, 2000)
-  } catch (err) {
-    console.error('复制失败', err)
-    btn.innerHTML = '❌ 失败'
+    await navigator.clipboard.writeText(codeModal.value.code)
+    copySuccess.value = true
+    setTimeout(() => (copySuccess.value = false), 2000)
+  } catch {
+    alert('复制失败')
   }
 }
 
-const toggleCode = (id: number) => {
-  const index = expandedIds.value.indexOf(id)
-  if (index === -1) {
-    expandedIds.value.push(id)
-  } else {
-    expandedIds.value.splice(index, 1)
+function openAddModal() {
+  addModal.value = {
+    show: true,
+    form: { title: '', category: '', description: '', cssCode: '' }
   }
 }
 
-onMounted(() => {
-  fetchAnimations()
-  fetchAnimationCategories()
+async function saveAnimation() {
+  const { title, category, cssCode } = addModal.value.form
+  if (!title || !category || !cssCode) {
+    alert('请填写完整')
+    return
+  }
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(addModal.value.form)
+    })
+    if (res.ok) {
+      animations.value.push(await res.json())
+      addModal.value.show = false
+    }
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+async function deleteAnim(id: number) {
+  if (!confirm('确定删除？')) return
+  try {
+    await fetch(`${API}/${id}`, { method: 'DELETE' })
+    animations.value = animations.value.filter(a => a.id !== id)
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+function injectStyles() {
+  let el = document.getElementById('dynamic-css') as HTMLStyleElement
+  if (!el) {
+    el = document.createElement('style')
+    el.id = 'dynamic-css'
+    document.head.appendChild(el)
+  }
+  el.textContent = animations.value.map(a => a.cssCode).join('\n')
+}
+
+watch(animations, injectStyles, { deep: true })
+
+onMounted(async () => {
+  try {
+    const [aRes, cRes] = await Promise.all([fetch(API), fetch(CAT_API)])
+    if (aRes.ok) animations.value = await aRes.json()
+    if (cRes.ok) categories.value = await cRes.json()
+  } finally {
+    loading.value = false
+  }
 })
 </script>
 
 <style scoped>
-.animation-demo-container {
-  padding: 20px;
-  height: 100%;
-  overflow-y: auto;
-  background: #f8f9fa;
+.animation-lab {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0c0c1d 0%, #1a1a3e 100%);
+  padding: 40px 32px;
+  color: #fff;
 }
 
-.page-subtitle {
-  color: #6c757d;
-  font-size: 1.1rem;
+/* 头部 */
+.lab-header {
+  text-align: center;
+  margin-bottom: 40px;
 }
 
-.category-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
+.lab-header h1 {
+  font-size: 2.8rem;
+  font-weight: 800;
+  background: linear-gradient(120deg, #a855f7, #ec4899, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0 0 8px;
 }
 
+.lab-header p {
+  color: #64748b;
+  font-size: 1rem;
+}
+
+/* 分类导航 */
 .category-nav {
   display: flex;
-  justify-content: flex-start;
-  gap: 15px;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 40px;
   flex-wrap: wrap;
 }
 
-.category-btn {
-  padding: 8px 20px;
-  border: none;
-  border-radius: 20px;
-  background: white;
-  color: #6c757d;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-}
-
-.category-btn.active, .category-btn:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
-}
-
-.animations-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 25px;
-  padding: 10px;
-}
-
-.toolbar {
+.cat-btn {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 16px;
-}
-
-.stats-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: white;
-  border: 1px solid rgba(99, 102, 241, 0.2);
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(99, 102, 241, 0.05);
-  color: #475569;
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
-  user-select: none;
-}
-
-.stats-chip:hover {
-  border-color: rgba(99, 102, 241, 0.4);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 12px rgba(99, 102, 241, 0.1);
-}
-
-.chip-icon {
-  font-size: 1.1rem;
-}
-
-.chip-number {
-  color: #6366f1;
-  font-weight: 800;
-  font-size: 1.1rem;
-  margin: 0 2px;
-}
-
-.primary-btn,
-.secondary-btn {
-  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: none;
-  cursor: pointer;
+  padding: 10px 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50px;
+  color: #94a3b8;
   font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  cursor: pointer;
+  transition: all 0.25s;
 }
 
-.primary-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.cat-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
-.primary-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+.cat-btn.active {
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
 }
 
-.secondary-btn {
-  background: #f1f3f5;
-  color: #495057;
+.cat-icon {
+  font-size: 1.1rem;
 }
 
-.secondary-btn:hover {
-  background: #e9ecef;
+.cat-count {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.75rem;
 }
 
-.animation-card {
-  background: white;
-  border-radius: 16px;
+/* 动画网格 */
+.animation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.anim-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-  transition: transform 0.3s ease;
-  border: 1px solid rgba(0,0,0,0.05);
+  transition: all 0.3s;
 }
 
-.animation-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+.anim-card:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
+.anim-card.playing {
+  border-color: #06b6d4;
+  box-shadow: 0 0 30px rgba(6, 182, 212, 0.2);
+}
+
+/* 预览区 */
 .preview-area {
-  height: 180px;
-  background: #f1f3f5;
+  height: 200px;
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.08) 0%, transparent 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.play-indicator {
+  position: absolute;
+  bottom: 12px;
+  font-size: 0.75rem;
+  color: #64748b;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.preview-area:hover .play-indicator {
+  opacity: 1;
+}
+
+/* ========== 各类演示容器 ========== */
+
+/* 加载动画容器 */
+.demo-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.demo-loader span {
+  width: 12px;
+  height: 12px;
+  background: #8b5cf6;
+  border-radius: 50%;
+}
+
+/* 按钮容器 */
+.demo-button {
+  padding: 14px 32px;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* 文字容器 */
+.demo-text {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.demo-text span {
+  display: inline-block;
+}
+
+/* 悬停容器 */
+.demo-hover-box {
+  width: 120px;
+  height: 120px;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* 图形容器 */
+.demo-shape {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+  border-radius: 16px;
+}
+
+/* 入场动画容器 */
+.demo-enter-box {
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  opacity: 0;
+}
+
+.demo-enter-box.active {
+  opacity: 1;
+}
+
+/* 强调效果容器 */
+.demo-emphasis {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #f59e0b, #ec4899);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+}
+
+/* 背景特效容器 */
+.demo-background {
+  width: 160px;
+  height: 100px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+}
+
+/* 退出动画容器 */
+.demo-exit-box {
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+}
+
+.demo-exit-box.active {
+  opacity: 0;
+}
+
+/* 边框动画容器 */
+.demo-border {
+  width: 100px;
+  height: 100px;
+  background: transparent;
+  border: 4px solid #8b5cf6;
+  border-radius: 16px;
+}
+
+/* 阴影效果容器 */
+.demo-shadow {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(139, 92, 246, 0.4);
+}
+
+/* 3D特效容器 */
+.demo-3d {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #06b6d4, #8b5cf6);
+  border-radius: 16px;
+}
+
+/* 滤镜特效容器 */
+.demo-filter {
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(135deg, #f59e0b, #8b5cf6);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+}
+
+/* 变形特效容器 */
+.demo-transform {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #ec4899, #06b6d4);
+  border-radius: 16px;
+}
+
+/* 默认容器 */
+.demo-default {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  border-radius: 16px;
+}
+
+/* 卡片信息 */
+.card-info {
+  padding: 20px;
+}
+
+.info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.info-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.category-tag {
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+  border-radius: 20px;
+}
+
+.description {
+  color: #64748b;
+  font-size: 0.85rem;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.card-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn.primary {
+  flex: 1;
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+}
+
+.action-btn.primary:hover {
+  background: rgba(139, 92, 246, 0.25);
+}
+
+.action-btn.danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+}
+
+.action-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* 添加卡片 */
+.add-card {
+  border-style: dashed;
+  cursor: pointer;
+  min-height: 300px;
+}
+
+.add-card:hover {
+  border-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.add-inner {
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  position: relative;
-  border-bottom: 1px solid #e9ecef;
-}
-
-.demo-box {
-  width: 80px;
-  height: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 新增演示组件样式 */
-.demo-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-}
-
-.demo-text {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: #4b5563;
-  margin: 0;
-}
-
-.demo-btn {
-  padding: 10px 24px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.demo-loading-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 铃铛图标容器 */
-.demo-icon-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 头像容器 */
-.demo-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 炫酷卡片 */
-.demo-card-special {
-  width: 140px;
-  height: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.demo-label {
-  margin-top: 15px;
-  font-weight: 600;
-  color: #495057;
-}
-
-.info-area {
-  padding: 20px;
-}
-
-.anim-desc {
-  color: #6c757d;
-  font-size: 0.9rem;
-  margin-bottom: 15px;
-  line-height: 1.5;
-}
-
-.code-section {
-  background: #282c34;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.code-header {
-  padding: 8px 12px;
-  background: rgba(255,255,255,0.1);
-  color: #abb2bf;
-  font-size: 0.8rem;
-  display: flex;
-  justify-content: space-between;
-  cursor: pointer;
-  user-select: none;
-}
-
-.code-header:hover {
-  background: rgba(255,255,255,0.15);
-}
-
-.code-content {
-  padding: 12px;
-  position: relative;
-}
-
-pre {
-  margin: 0;
-  white-space: pre-wrap;
-  color: #abb2bf;
-  font-family: 'Fira Code', monospace;
-  font-size: 0.85rem;
-}
-
-.copy-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  padding: 4px 8px;
-  background: rgba(255,255,255,0.1);
-  border: none;
-  border-radius: 4px;
-  color: white;
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.copy-btn:hover {
-  background: rgba(255,255,255,0.2);
-}
-
-.card-actions {
-  margin-top: 12px;
-  display: flex;
-  justify-content: flex-end;
   gap: 12px;
+  color: #64748b;
+  padding: 40px;
 }
 
-.text-btn {
-  background: transparent;
-  border: none;
-  color: #4b5563;
-  font-size: 0.85rem;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.text-btn:hover {
-  background: #f1f3f5;
-}
-
-.text-btn.danger {
-  color: #e11d48;
-}
-
-.text-btn.danger:hover {
-  background: #fee2e2;
-}
-
-.loading-state, .empty-state {
-  text-align: center;
-  padding: 50px;
-  color: #6c757d;
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid #e9ecef;
-  border-top-color: #667eea;
+.add-icon {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  border: 2px dashed #4b5563;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 20px;
+  transition: all 0.2s;
+}
+
+.add-card:hover .add-icon {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+}
+
+/* 加载状态 */
+.loading-box {
+  text-align: center;
+  padding: 80px;
+  color: #64748b;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(139, 92, 246, 0.2);
+  border-top-color: #8b5cf6;
+  border-radius: 50%;
+  margin: 0 auto 16px;
+  animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-.modal-overlay {
+/* 弹窗 */
+.modal-mask {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: 9999;
+  padding: 20px;
 }
 
-.modal {
+.code-dialog,
+.form-dialog {
+  background: #1e1e3f;
+  border-radius: 20px;
   width: 100%;
   max-width: 640px;
-  background: #fff;
-  border-radius: 18px;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
-  padding: 20px 22px 18px;
-}
-
-.modal-title {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: #111827;
-  margin-bottom: 14px;
-}
-
-.modal-body {
-  display: flex;
-  gap: 16px;
-  max-height: 60vh;
-  overflow: hidden;
-}
-
-.modal-left {
-  flex: 1.2;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding-right: 4px;
-  overflow-y: auto;
 }
 
-.modal-right {
-  flex: 1;
+.dialog-header {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  padding-left: 4px;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.form-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.dialog-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
 }
 
-.form-row label {
+.close-btn {
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: 50%;
+  color: #94a3b8;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.dialog-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.dialog-body pre {
+  margin: 0;
+  padding: 20px;
+  background: #0f0f2a;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.dialog-body code {
+  font-family: 'Fira Code', 'Consolas', monospace;
   font-size: 0.85rem;
-  color: #6b7280;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+  line-height: 1.6;
 }
 
-.form-row input,
-.form-row textarea,
-.form-row select {
-  border-radius: 10px;
-  border: 1px solid #e5e7eb;
-  padding: 8px 10px;
-  font-size: 0.9rem;
-  font-family: inherit;
-  resize: vertical;
-}
-
-.form-row input:focus,
-.form-row textarea:focus {
-  outline: none;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2);
-}
-
-.modal-actions {
-  margin-top: 14px;
+.dialog-footer {
+  padding: 16px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 12px;
 }
 
-.preview-section {
-  width: 100%;
-  background: #f3f4f6;
-  border-radius: 14px;
-  border: 1px dashed #e5e7eb;
-  padding: 10px 12px 14px;
+.copy-btn,
+.save-btn {
+  padding: 12px 28px;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.preview-header {
-  font-size: 0.85rem;
-  color: #6b7280;
+.copy-btn:hover,
+.save-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4);
+}
+
+.cancel-btn {
+  padding: 12px 28px;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: 10px;
+  color: #94a3b8;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 表单 */
+.form-field {
+  margin-bottom: 20px;
+}
+
+.form-field label {
+  display: block;
   margin-bottom: 8px;
+  font-size: 0.9rem;
+  color: #94a3b8;
 }
 
-.preview-content {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.preview-box-wrapper {
+.form-field input,
+.form-field select,
+.form-field textarea {
   width: 100%;
-  display: flex;
-  justify-content: center;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.95rem;
+  font-family: inherit;
+  box-sizing: border-box;
 }
 
-.preview-box {
-  width: 120px;
-  height: 120px;
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  outline: none;
+  border-color: #8b5cf6;
 }
 
+.form-field textarea {
+  resize: vertical;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.85rem;
+}
+
+/* 响应式 */
 @media (max-width: 768px) {
-  .animations-grid {
+  .animation-lab {
+    padding: 24px 16px;
+  }
+
+  .lab-header h1 {
+    font-size: 2rem;
+  }
+
+  .animation-grid {
     grid-template-columns: 1fr;
   }
 
-  .modal {
-    max-width: 100%;
+  .category-nav {
+    gap: 8px;
   }
 
-  .modal-body {
-    flex-direction: column;
-    max-height: 70vh;
-    overflow-y: auto;
+  .cat-btn {
+    padding: 8px 14px;
+    font-size: 0.85rem;
   }
-
-  .modal-right {
-    padding-left: 0;
-  }
-}
-</style>
-
-<!-- 非 Scoped 样式，用于定义默认外观，允许被动态注入的 CSS 覆盖 -->
-<style>
-.demo-box {
-  background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 99%, #FECFEF 100%);
-  border-radius: 12px;
-  font-size: 2rem;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-}
-
-.demo-btn {
-  background: #6366f1;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 1rem;
-  box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);
-}
-
-.demo-icon-wrapper {
-  width: 64px;
-  height: 64px;
-  background: #fef3c7;
-  border-radius: 50%;
-  font-size: 2rem;
-  color: #d97706;
-  box-shadow: 0 4px 6px rgba(217, 119, 6, 0.2);
-}
-
-.demo-avatar {
-  width: 64px;
-  height: 64px;
-  background: #e0e7ff;
-  border-radius: 50%;
-  font-size: 2rem;
-  border: 2px solid #6366f1;
-  color: #6366f1;
-  box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2);
-}
-
-.demo-card-special {
-  background: linear-gradient(135deg, #8b5cf6, #ec4899);
-  border-radius: 12px;
-  color: white;
-  font-weight: bold;
-  box-shadow: 0 10px 20px rgba(139, 92, 246, 0.3);
-  text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
-.bars-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  height: 40px;
-}
-
-.bar {
-  width: 6px;
-  height: 100%;
-  background-color: #6366f1;
-  border-radius: 4px;
 }
 </style>
