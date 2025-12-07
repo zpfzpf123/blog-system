@@ -9,7 +9,7 @@
 -->
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
-import { HomeFilled, Setting, ChatDotRound, Link, ArrowUpBold, MagicStick, FolderOpened, Key } from '@element-plus/icons-vue'
+import { HomeFilled, Setting, ChatDotRound, Link, ArrowUpBold, MagicStick, FolderOpened, Key, Tools } from '@element-plus/icons-vue'
 import { ElIcon } from 'element-plus'
 import { ref, onMounted, onUnmounted } from 'vue'
 
@@ -75,6 +75,10 @@ onUnmounted(() => {
           <RouterLink to="/git-users">
             <el-icon class="nav-icon animated-nav-icon"><Key /></el-icon>
             <span>Git用户</span>
+          </RouterLink>
+          <RouterLink to="/dev-tools">
+            <el-icon class="nav-icon animated-nav-icon"><Tools /></el-icon>
+            <span>工具箱</span>
           </RouterLink>
         </nav>
       </div>
@@ -242,6 +246,16 @@ header::after {
 .main-nav a:nth-child(6) .nav-icon {
   color: #ec4899;
   filter: drop-shadow(0 2px 4px rgba(236, 72, 153, 0.4));
+}
+
+.main-nav a:nth-child(7) .nav-icon {
+  color: #14b8a6;
+  filter: drop-shadow(0 2px 4px rgba(20, 184, 166, 0.4));
+}
+
+.main-nav a:nth-child(8) .nav-icon {
+  color: #f59e0b;
+  filter: drop-shadow(0 2px 4px rgba(245, 158, 11, 0.4));
 }
 .animated-nav-icon {
   animation: iconPulse 3s infinite ease-in-out;

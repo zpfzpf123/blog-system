@@ -32,6 +32,9 @@
         <li class="menu-item">
           <router-link to="/ai-chat" @click="closeMenu">AI问答</router-link>
         </li>
+        <li class="menu-item">
+          <router-link to="/dev-tools" @click="closeMenu">🛠️ 工具箱</router-link>
+        </li>
       </ul>
     </nav>
   </div>

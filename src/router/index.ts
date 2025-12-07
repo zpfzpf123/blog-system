@@ -21,6 +21,7 @@ import ProjectDetail from '../views/ProjectDetail.vue'
 import CommitDetail from '../views/CommitDetail.vue'
 import cssAnimations from '../views/CssAnimationDemo.vue'
 import WebsiteCollection from '../views/WebsiteCollection.vue'
+import DevTools from '../views/DevTools.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -99,6 +100,11 @@ const router = createRouter({
       path: '/css-animations',
       name: 'cssAnimations',
       component: cssAnimations,
+    },
+    {
+      path: '/dev-tools',
+      name: 'DevTools',
+      component: DevTools,
     },
   ],
 })
