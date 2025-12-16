@@ -166,53 +166,62 @@ const isInCodeBlock = (element: Element, container: Element): boolean => {
   return false
 }
 
-// 生成目录 - 增加延迟和重试机制
+// 目录加载状态
+const tocLoading = ref(false)
+
+// 生成目录 - 异步非阻塞方式
 const generateToc = (retryCount = 0) => {
-  nextTick(() => {
-    setTimeout(() => {
-      const container = readmeContentRef.value
-      if (!container) {
-        if (retryCount < 3) {
-          setTimeout(() => generateToc(retryCount + 1), 200)
-        }
-        return
+  // 使用 requestIdleCallback 或 setTimeout 让出主线程
+  const scheduleTask = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 10))
+  
+  scheduleTask(() => {
+    const container = readmeContentRef.value
+    if (!container) {
+      if (retryCount < 3) {
+        setTimeout(() => generateToc(retryCount + 1), 200)
       }
-      
-      // 清空旧目录
+      return
+    }
+    
+    const markdownBody = container.querySelector('.markdown-body')
+    if (!markdownBody) {
+      if (retryCount < 3) {
+        setTimeout(() => generateToc(retryCount + 1), 200)
+      }
+      return
+    }
+    
+    const headers = markdownBody.querySelectorAll('h1, h2, h3, h4, h5, h6')
+    if (headers.length === 0) {
       tocItems.value = []
+      return
+    }
+    
+    tocLoading.value = true
+    
+    // 收集目录项（不阻塞）
+    const newTocItems: Array<{id: string, text: string, level: number}> = []
+    let validIndex = 0
+    
+    headers.forEach((header) => {
+      if (isInCodeBlock(header, markdownBody)) return
       
-      // 直接在 markdown-body 元素中查找标题
-      const markdownBody = container.querySelector('.markdown-body')
-      if (!markdownBody) {
-        if (retryCount < 3) {
-          setTimeout(() => generateToc(retryCount + 1), 200)
-        }
-        return
+      if (!header.id) {
+        header.id = `heading-${validIndex}`
       }
       
-      const headers = markdownBody.querySelectorAll('h1, h2, h3, h4, h5, h6')
-      
-      if (headers.length === 0) return
-      
-      let validIndex = 0
-      headers.forEach((header) => {
-        // 如果在代码块内，跳过这个标题
-        if (isInCodeBlock(header, markdownBody)) return
-        
-        // 确保有ID
-        if (!header.id) {
-          header.id = `heading-${validIndex}`
-        }
-        
-        tocItems.value.push({
-          id: header.id,
-          text: header.textContent || '',
-          level: parseInt(header.tagName.substring(1))
-        })
-        
-        validIndex++
+      newTocItems.push({
+        id: header.id,
+        text: header.textContent || '',
+        level: parseInt(header.tagName.substring(1))
       })
-    }, 100)
+      
+      validIndex++
+    })
+    
+    // 一次性更新，减少响应式触发次数
+    tocItems.value = newTocItems
+    tocLoading.value = false
   })
 }
 
@@ -1094,18 +1103,26 @@ onUnmounted(() => {
                     <div class="toc-header">
                       <el-icon><List /></el-icon>
                       <span>目录</span>
+                      <el-icon v-if="tocLoading" class="toc-loading"><Loading /></el-icon>
                     </div>
                     <div class="toc-list">
-                      <div 
-                        v-if="tocItems.length > 0"
-                        v-for="item in tocItems" 
-                        :key="item.id"
-                        class="toc-item"
-                        :class="`toc-level-${item.level}`"
-                        @click="scrollToHeading(item.id)"
-                      >
-                        {{ item.text }}
+                      <!-- 加载中状态 -->
+                      <div v-if="tocLoading" class="toc-loading-state">
+                        <div class="toc-skeleton" v-for="i in 5" :key="i"></div>
                       </div>
+                      <!-- 目录内容 -->
+                      <template v-else-if="tocItems.length > 0">
+                        <div 
+                          v-for="item in tocItems" 
+                          :key="item.id"
+                          class="toc-item"
+                          :class="`toc-level-${item.level}`"
+                          @click="scrollToHeading(item.id)"
+                        >
+                          {{ item.text }}
+                        </div>
+                      </template>
+                      <!-- 空状态 -->
                       <div v-else class="toc-empty">
                         <el-icon><Document /></el-icon>
                         <span>文档暂无目录</span>
@@ -1951,6 +1968,40 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   background: white;
+}
+
+.toc-header .toc-loading {
+  margin-left: auto;
+  animation: spin 1s linear infinite;
+  color: #667eea;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.toc-loading-state {
+  padding: 10px 20px;
+}
+
+.toc-skeleton {
+  height: 20px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.toc-skeleton:nth-child(2) { width: 85%; margin-left: 15px; }
+.toc-skeleton:nth-child(3) { width: 70%; margin-left: 30px; }
+.toc-skeleton:nth-child(4) { width: 80%; margin-left: 15px; }
+.toc-skeleton:nth-child(5) { width: 60%; margin-left: 30px; }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 .toc-list {

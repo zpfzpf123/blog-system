@@ -1,0 +1,13 @@
+
+W()); NO(0)}}',ranslateYansform:ty:1;tropacit0px)}100%{lateY(2m:trans0;transforopacity:{0%{es countUpamds}@keyfrrwar fos ease-out:countUp 2);animation36,0.5a(0,255,10 0 20px rgb-shadow:0ff88;textce;color:#0ily:monospafam;font-ze:48pxnt-si{fo, '.box字滚动计数效果'动', '数动画', '数字滚
+('大屏', NOW()),
+0ff} 10px #00f 0box-shadow:050%);(-50%,-m:translateansfor50%;trrder-radius:#00f0ff;bobackground:eight:8px;idth:8px;h0%;w0%;left:5lute;top:5son:abtio"";posier{content:box::aft(360deg)}}.rotateansform: radar{to{treyframesfinite}@klinear inadar 2s ation:rnimnt 20%);anspare4) 10%,tra0.240,255,%,rgba(0,t 0transpareneg,from 0ddient(onic-graground:cack%;bs:50-radiuer:0;bordset;inn:absolutepositiot:"";enntx::before{coa1628}.bockground:#0relative;ba3);position:0.255, rgba(0,200,x solid0%;border:2pdius:5er-raord0px;bht:15x;heigwidth:150p'.box{，适用于监控大屏', 描动画描', '雷达扫动画', '雷达扫)),
+
+('大屏 NOW(ty:1}}',.2);opaciform:scale(1transy:0.6}50%{e(1);opacit:scalrmnsfotrahe{0%,100%{breat@keyframes ff} 20px #00f0w:0 0%;box-shador-radius:50f;bordeund:#00f0f40px;backgrox;height:0pwidth:4t:"";fter{contenox::ater}.bntent:censtify-coms:center;julign-iteay:flex;aite;displut infinn-oe-ie 2s eastion:breath);animat 70%paren0ff 0%,transle,#00f(circial-gradientground:radbacks:50%;adiur-rborde:80px;80px;height'.box{width:于状态指示', ，适用吸光晕效果的呼 '呼吸光晕', '柔和
+
+('大屏动画',W()),0%}}', NOleft:15o{e{tames shinnite}@keyfrne 2s infishi);animation:parent,0.2),trans(255,255,255nt,rgbarenspa90deg,traadient(r-grlineand:grouback0%;10ight:heh:50%;0%;widtft:-10;top:0;leion:absolute;posit:""e{contentfor}.box::beor:#00ff88colize:32px;t-s;foncentercontent:justify-ems:center;-itx;alignsplay:fle;diow:hidden;overfln:relativepositio:8px;rder-radius);bo0.3255,ba(0,200,x solid rg;border:1p#0d3050)40,35deg,#0a25nt(1ar-gradieround:linex;backgt:100px;heigh80px{width:1', '.bo画，适用于数字卡片'从左到右的扫光动果', 画', '扫光效屏动()),
+
+('大g)}}', NOWe(360densform:rotatte{to{trarotayframes }@ke6pxius:rder-radbo8;nd:#0a162kgrouset:2px;bacolute;inition:abs";postent:"after{con}.box::-1ndex:e;z-iinfinitr  3s linearotaten:animatiof7,#00f0ff);,#a855,#00ff88#00f0fft(from 0deg,-gradienround:conicackginset:-2px;bute;bsol";position:at:"enefore{cont:bden}.box:hidw:verflopx;os:8der-radiu1628;borground:#0alative;backtion:re120px;posi0px;height:th:20 '.box{wid用于大屏卡片',边框效果，适', '科技感流光, '流光边框屏动画''大S
+( VALUEreated_at)_code, ciption, cssescrtitle, dory, ns (categimatioancss_INSERT INTO 
+S utf8mb4;
+SET NAME

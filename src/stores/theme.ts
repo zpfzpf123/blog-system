@@ -110,8 +110,8 @@ export const tocStyles = [
 
 export const useThemeStore = defineStore('theme', () => {
   // 从 localStorage 读取保存的设置
-  const savedCodeTheme = localStorage.getItem('blog-code-theme') || 'atom-one-dark'
-  const savedContentStyle = localStorage.getItem('blog-content-style') || 'juejin'
+  const savedCodeTheme = localStorage.getItem('blog-code-theme') || 'atom-one-light'
+  const savedContentStyle = localStorage.getItem('blog-content-style') || 'notion'
   const savedTocStyle = localStorage.getItem('blog-toc-style') || 'compact'
 
   const codeTheme = ref(savedCodeTheme)
@@ -144,8 +144,8 @@ export const useThemeStore = defineStore('theme', () => {
   }
 
   const resetToDefault = () => {
-    codeTheme.value = 'atom-one-dark'
-    contentStyle.value = 'juejin'
+    codeTheme.value = 'atom-one-light'
+    contentStyle.value = 'notion'
     tocStyle.value = 'compact'
   }
 

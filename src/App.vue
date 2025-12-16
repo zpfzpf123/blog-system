@@ -9,7 +9,7 @@
 -->
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
-import { HomeFilled, Setting, ChatDotRound, Link, ArrowUpBold, MagicStick, FolderOpened, Key, Tools } from '@element-plus/icons-vue'
+import { HomeFilled, Setting, ChatDotRound, Link, ArrowUpBold, MagicStick, FolderOpened, Key, Tools, Document } from '@element-plus/icons-vue'
 import { ElIcon } from 'element-plus'
 import { ref, onMounted, onUnmounted } from 'vue'
 
@@ -63,10 +63,6 @@ onUnmounted(() => {
             <el-icon class="nav-icon"><HomeFilled /></el-icon>
             <span class="nav-text">首页</span>
           </RouterLink>
-          <RouterLink to="/admin" class="nav-item">
-            <el-icon class="nav-icon"><Setting /></el-icon>
-            <span class="nav-text">管理</span>
-          </RouterLink>
           <RouterLink to="/websites" class="nav-item">
             <el-icon class="nav-icon"><Link /></el-icon>
             <span class="nav-text">网站</span>
@@ -90,6 +86,10 @@ onUnmounted(() => {
           <RouterLink to="/dev-tools" class="nav-item">
             <el-icon class="nav-icon"><Tools /></el-icon>
             <span class="nav-text">工具</span>
+          </RouterLink>
+          <RouterLink to="/page-templates" class="nav-item">
+            <el-icon class="nav-icon"><Document /></el-icon>
+            <span class="nav-text">模板</span>
           </RouterLink>
         </nav>
         
@@ -299,13 +299,13 @@ onUnmounted(() => {
 
 /* 为不同导航项设置图标颜色 */
 .nav-item:nth-child(1) .nav-icon { color: var(--primary-color); }
-.nav-item:nth-child(2) .nav-icon { color: #8b5cf6; }
-.nav-item:nth-child(3) .nav-icon { color: #06b6d4; }
-.nav-item:nth-child(4) .nav-icon { color: #10b981; }
-.nav-item:nth-child(5) .nav-icon { color: #f97316; }
-.nav-item:nth-child(6) .nav-icon { color: #ec4899; }
-.nav-item:nth-child(7) .nav-icon { color: #14b8a6; }
-.nav-item:nth-child(8) .nav-icon { color: #eab308; }
+.nav-item:nth-child(2) .nav-icon { color: #06b6d4; }
+.nav-item:nth-child(3) .nav-icon { color: #10b981; }
+.nav-item:nth-child(4) .nav-icon { color: #f97316; }
+.nav-item:nth-child(5) .nav-icon { color: #ec4899; }
+.nav-item:nth-child(6) .nav-icon { color: #14b8a6; }
+.nav-item:nth-child(7) .nav-icon { color: #eab308; }
+.nav-item:nth-child(8) .nav-icon { color: #8b5cf6; }
 
 .nav-item.router-link-exact-active .nav-icon,
 .nav-item:hover .nav-icon {

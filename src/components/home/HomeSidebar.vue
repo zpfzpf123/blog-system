@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Plus, Folder, CollectionTag, RefreshRight, UserFilled } from '@element-plus/icons-vue'
-import { ElButton, ElScrollbar, ElTag, ElAvatar, ElTooltip } from 'element-plus'
+import { Plus, Folder, CollectionTag, RefreshRight, UserFilled, Edit, Delete, MoreFilled } from '@element-plus/icons-vue'
+import { ElButton, ElScrollbar, ElTag, ElAvatar, ElTooltip, ElDropdown, ElDropdownMenu, ElDropdownItem } from 'element-plus'
 
 interface Category {
   id: number
@@ -25,6 +25,12 @@ const emit = defineEmits<{
   (e: 'update:selectedTagIds', value: number[]): void
   (e: 'create'): void
   (e: 'reset'): void
+  (e: 'addCategory'): void
+  (e: 'editCategory', category: Category): void
+  (e: 'deleteCategory', category: Category): void
+  (e: 'addTag'): void
+  (e: 'editTag', tag: Tag): void
+  (e: 'deleteTag', tag: Tag): void
 }>()
 
 const toggleCategory = (id: number) => {
@@ -44,6 +50,22 @@ const toggleTag = (id: number) => {
 const hasActiveFilters = computed(() => {
   return props.selectedCategoryIds.length > 0 || props.selectedTagIds.length > 0
 })
+
+const handleCategoryAction = (action: string, category: Category) => {
+  if (action === 'edit') {
+    emit('editCategory', category)
+  } else if (action === 'delete') {
+    emit('deleteCategory', category)
+  }
+}
+
+const handleTagAction = (action: string, tag: Tag) => {
+  if (action === 'edit') {
+    emit('editTag', tag)
+  } else if (action === 'delete') {
+    emit('deleteTag', tag)
+  }
+}
 </script>
 
 <template>
@@ -71,7 +93,19 @@ const hasActiveFilters = computed(() => {
               <el-icon class="title-icon"><Folder /></el-icon>
               <span>分类导航</span>
             </div>
-            <div class="count-badge">{{ categories.length }}</div>
+            <div class="header-actions">
+              <div class="count-badge">{{ categories.length }}</div>
+              <el-tooltip content="添加分类" placement="top">
+                <el-button 
+                  size="small" 
+                  circle 
+                  class="add-btn"
+                  @click="emit('addCategory')"
+                >
+                  <el-icon><Plus /></el-icon>
+                </el-button>
+              </el-tooltip>
+            </div>
           </div>
           <div class="category-grid">
             <div
@@ -87,8 +121,32 @@ const hasActiveFilters = computed(() => {
               </div>
               <div class="card-content">
                 <span class="card-name">{{ cat.name }}</span>
-                <div class="card-indicator" v-if="selectedCategoryIds.includes(cat.id)">
-                  <el-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M406.656 706.944 195.84 496.256a32 32 0 1 0-45.248 45.248l256 256 512-512a32 32 0 0 0-45.248-45.248L406.592 706.944z"></path></svg></el-icon>
+                <div class="card-actions">
+                  <el-dropdown trigger="click" @command="(cmd) => handleCategoryAction(cmd, cat)">
+                    <el-button 
+                      size="small" 
+                      circle 
+                      class="action-btn"
+                      @click.stop
+                    >
+                      <el-icon><MoreFilled /></el-icon>
+                    </el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="edit">
+                          <el-icon><Edit /></el-icon>
+                          编辑
+                        </el-dropdown-item>
+                        <el-dropdown-item command="delete" divided>
+                          <el-icon><Delete /></el-icon>
+                          删除
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                  <div class="card-indicator" v-if="selectedCategoryIds.includes(cat.id)">
+                    <el-icon><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><path fill="currentColor" d="M406.656 706.944 195.84 496.256a32 32 0 1 0-45.248 45.248l256 256 512-512a32 32 0 0 0-45.248-45.248L406.592 706.944z"></path></svg></el-icon>
+                  </div>
                 </div>
               </div>
             </div>
@@ -102,7 +160,19 @@ const hasActiveFilters = computed(() => {
               <el-icon class="title-icon"><CollectionTag /></el-icon>
               <span>热门标签</span>
             </div>
-            <div class="count-badge">{{ tags.length }}</div>
+            <div class="header-actions">
+              <div class="count-badge">{{ tags.length }}</div>
+              <el-tooltip content="添加标签" placement="top">
+                <el-button 
+                  size="small" 
+                  circle 
+                  class="add-btn"
+                  @click="emit('addTag')"
+                >
+                  <el-icon><Plus /></el-icon>
+                </el-button>
+              </el-tooltip>
+            </div>
           </div>
           <div class="tag-cloud-new">
             <div
@@ -114,10 +184,31 @@ const hasActiveFilters = computed(() => {
                 animationDelay: `${index * 0.05}s`,
                 '--tag-hue': (index * 40) % 360
               }"
-              @click="toggleTag(tag.id)"
             >
-              <span class="tag-text">{{ tag.name }}</span>
-              <span class="tag-check" v-if="selectedTagIds.includes(tag.id)">✓</span>
+              <span class="tag-text" @click="toggleTag(tag.id)">{{ tag.name }}</span>
+              <span class="tag-check" v-if="selectedTagIds.includes(tag.id)" @click="toggleTag(tag.id)">✓</span>
+              <el-dropdown trigger="click" @command="(cmd) => handleTagAction(cmd, tag)" class="tag-dropdown">
+                <el-button 
+                  size="small" 
+                  circle 
+                  class="tag-action-btn"
+                  @click.stop
+                >
+                  <el-icon><MoreFilled /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="edit">
+                      <el-icon><Edit /></el-icon>
+                      编辑
+                    </el-dropdown-item>
+                    <el-dropdown-item command="delete" divided>
+                      <el-icon><Delete /></el-icon>
+                      删除
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </div>
           </div>
         </div>
@@ -297,6 +388,12 @@ const hasActiveFilters = computed(() => {
   color: var(--primary-color);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
 .count-badge {
   background: var(--gradient-primary);
   color: var(--text-inverse);
@@ -307,6 +404,21 @@ const hasActiveFilters = computed(() => {
   min-width: 28px;
   text-align: center;
   box-shadow: var(--shadow-primary);
+}
+
+.add-btn {
+  width: 28px;
+  height: 28px;
+  background: var(--gradient-success) !important;
+  border: none !important;
+  color: white !important;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25) !important;
+  transition: all var(--transition-normal) !important;
+}
+
+.add-btn:hover {
+  transform: scale(1.1) rotate(90deg) !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35) !important;
 }
 
 /* 分类卡片网格 */
@@ -327,36 +439,8 @@ const hasActiveFilters = computed(() => {
   border: 2px solid transparent;
   border-radius: 14px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  animation: slideIn 0.4s ease-out backwards;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   position: relative;
-  overflow: hidden;
-}
-
-.category-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.1), transparent);
-  transition: left 0.5s ease;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.category-card:hover::before {
-  left: 100%;
 }
 
 .category-card:hover {
@@ -364,9 +448,7 @@ const hasActiveFilters = computed(() => {
     rgba(255, 255, 255, 0.95) 0%, 
     rgba(252, 253, 255, 0.9) 100%);
   border-color: #6366f1;
-  transform: translateX(8px) scale(1.02);
-  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.2),
-              inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
 }
 
 .category-card.active {
@@ -388,20 +470,11 @@ const hasActiveFilters = computed(() => {
   color: white;
   font-size: 1.2rem;
   flex-shrink: 0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3),
-              inset 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-
-.category-card:hover .card-icon {
-  transform: rotate(12deg) scale(1.15);
-  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4),
-              inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
 .category-card.active .card-icon {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  transform: scale(1.05);
 }
 
 .card-content {
@@ -409,6 +482,7 @@ const hasActiveFilters = computed(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: var(--spacing-2);
 }
 
 .card-name {
@@ -416,6 +490,7 @@ const hasActiveFilters = computed(() => {
   font-weight: 600;
   color: #475569;
   transition: color 0.3s ease;
+  flex: 1;
 }
 
 .category-card:hover .card-name {
@@ -424,6 +499,33 @@ const hasActiveFilters = computed(() => {
 
 .category-card.active .card-name {
   color: #6366f1;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.action-btn {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  padding: 0 !important;
+  background: rgba(99, 102, 241, 0.1) !important;
+  border: none !important;
+  color: var(--primary-color) !important;
+  visibility: hidden;
+  transition: background var(--transition-fast), color var(--transition-fast) !important;
+}
+
+.category-card:hover .action-btn {
+  visibility: visible;
+}
+
+.action-btn:hover {
+  background: var(--primary-color) !important;
+  color: white !important;
 }
 
 .card-indicator {
@@ -461,43 +563,22 @@ const hasActiveFilters = computed(() => {
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  animation: bubbleIn 0.4s ease-out backwards;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   box-shadow: 0 3px 10px hsla(var(--tag-hue), 70%, 50%, 0.15);
   overflow: hidden;
-}
-
-.tag-bubble::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-  transition: left 0.5s ease;
-}
-
-@keyframes bubbleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.tag-bubble:hover::before {
-  left: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .tag-bubble:hover {
-  transform: translateY(-4px) scale(1.08);
-  box-shadow: 0 8px 20px hsla(var(--tag-hue), 70%, 50%, 0.3);
-  background: hsl(var(--tag-hue), 70%, 88%);
+  box-shadow: 0 6px 16px hsla(var(--tag-hue), 70%, 50%, 0.25);
+  background: hsl(var(--tag-hue), 70%, 90%);
   border-color: hsl(var(--tag-hue), 70%, 75%);
+}
+
+.tag-bubble:hover .tag-action-btn {
+  visibility: visible;
 }
 
 .tag-bubble.active {
@@ -508,17 +589,45 @@ const hasActiveFilters = computed(() => {
   border-color: hsl(var(--tag-hue), 70%, 45%);
   box-shadow: 0 6px 16px hsla(var(--tag-hue), 70%, 50%, 0.45),
               inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  transform: scale(1.05);
 }
 
 .tag-text {
   display: inline-block;
+  cursor: pointer;
+  z-index: 1;
+  position: relative;
 }
 
 .tag-check {
-  margin-left: 6px;
+  margin-left: 0;
   font-weight: 700;
   animation: checkPop 0.3s ease-out;
+  cursor: pointer;
+  z-index: 1;
+  position: relative;
+}
+
+.tag-dropdown {
+  display: inline-flex;
+  z-index: 2;
+  position: relative;
+}
+
+.tag-action-btn {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  padding: 0 !important;
+  background: rgba(0, 0, 0, 0.1) !important;
+  border: none !important;
+  color: currentColor !important;
+  visibility: hidden;
+  transition: background var(--transition-fast) !important;
+  margin-left: 4px;
+}
+
+.tag-action-btn:hover {
+  background: rgba(0, 0, 0, 0.2) !important;
 }
 
 .sidebar-footer {

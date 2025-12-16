@@ -48,9 +48,9 @@ const maxRetries = ref(3)
 // 步骤定义
 const steps = [
   { title: '环境检查', icon: Document, description: '检查工作区状态' },
+  { title: '暂存变更', icon: Check, description: 'git add .' },
   { title: '同步远程', icon: Download, description: '拉取最新代码' },
-  { title: '冲突检测', icon: Connection, description: '检测合并冲突' },
-  { title: '本地提交', icon: Check, description: '提交到本地仓库' },
+  { title: '本地提交', icon: Document, description: '提交到本地仓库' },
   { title: '推送代码', icon: Upload, description: '推送到远程仓库' }
 ]
 
@@ -61,7 +61,7 @@ const stepStatus = ref('process')
 const logs = ref<string[]>([])
 const logsContainerRef = ref<HTMLElement | null>(null)
 
-// 添加日志
+// 添加日志（支持延迟）
 const addLog = (message: string, type: 'info' | 'success' | 'warning' | 'error' | 'cmd' = 'info') => {
   const timestamp = new Date().toLocaleTimeString()
   let prefix = ''
@@ -74,6 +74,21 @@ const addLog = (message: string, type: 'info' | 'success' | 'warning' | 'error' 
       logsContainerRef.value.scrollTop = logsContainerRef.value.scrollHeight
     }
   }, 10)
+}
+
+// 延迟函数
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+// 逐步添加日志（带动画效果）
+const addLogWithDelay = async (message: string, type: 'info' | 'success' | 'warning' | 'error' | 'cmd' = 'info', delayMs: number = 300) => {
+  await delay(delayMs)
+  addLog(message, type)
+}
+
+// 更新步骤（带延迟）
+const updateStepWithDelay = async (step: number, delayMs: number = 500) => {
+  await delay(delayMs)
+  activeStep.value = step
 }
 
 // 关闭弹窗
@@ -134,7 +149,7 @@ watch(() => props.modelValue, (newVal) => {
   }
 })
 
-// 开始智能提交（新流程）
+// 开始智能提交（新流程 - 逐步显示进度）
 const startSmartCommit = async () => {
   if (!commitMessage.value.trim()) {
     addLog('请输入提交信息', 'error')
@@ -155,8 +170,8 @@ const startSmartCommit = async () => {
   conflictFiles.value = []
   
   addLog('开始智能提交流程...', 'info')
-  addLog(`提交信息: ${commitMessage.value}`, 'info')
-  addLog(`最大重试次数: ${maxRetries.value}`, 'info')
+  await addLogWithDelay(`提交信息: ${commitMessage.value}`, 'info', 200)
+  await addLogWithDelay(`最大重试次数: ${maxRetries.value}`, 'info', 200)
 
   try {
     const response = await axios.post(`/api/projects/${props.projectId}/smart-commit`, {
@@ -168,91 +183,108 @@ const startSmartCommit = async () => {
 
     const data = response.data
 
-    // 步骤1: 环境检查
+    // 步骤1: 环境检查 (索引0 -> 完成后进入索引1)
     if (data.step1_status) {
-      addLog('git status', 'cmd')
+      await addLogWithDelay('git status', 'cmd', 400)
       const status = data.step1_status
-      addLog(`当前分支: ${status.currentBranch}`, 'info')
-      addLog(`检测到 ${status.totalChanges} 个文件变更`, 'info')
-      activeStep.value = 1
+      await addLogWithDelay(`当前分支: ${status.currentBranch}`, 'info', 300)
+      await addLogWithDelay(`检测到 ${status.totalChanges} 个文件变更`, 'info', 300)
+      await updateStepWithDelay(1, 400)
     }
 
     // 如果没有变更
     if (data.noChanges) {
-      addLog('工作区干净，没有需要提交的更改', 'warning')
+      await addLogWithDelay('工作区干净，没有需要提交的更改', 'warning', 300)
       stepStatus.value = 'finish'
       isProcessing.value = false
       return
     }
 
-    // 步骤2: 暂存文件
+    // 步骤2: 暂存变更 (索引1 -> 完成后进入索引2)
     if (data.step2_stage) {
-      addLog('git add .', 'cmd')
-      addLog(data.step2_stage.message, 'success')
-      activeStep.value = 2
+      await addLogWithDelay('git add .', 'cmd', 400)
+      await addLogWithDelay(data.step2_stage.message || '文件已暂存', 'success', 300)
+      await updateStepWithDelay(2, 400)
     }
 
-    // 步骤3: 拉取远程
+    // 步骤3: 同步远程 (索引2 -> 完成后进入索引3)
     if (data.step3_pull) {
-      addLog('git fetch', 'cmd')
-      addLog('获取远程最新状态完成', 'success')
-      addLog('git pull --rebase', 'cmd')
-      addLog(data.step3_pull.message, 'success')
-      activeStep.value = 3
+      await addLogWithDelay('git fetch', 'cmd', 400)
+      await addLogWithDelay('获取远程最新状态完成', 'success', 300)
+      await addLogWithDelay('git pull --rebase', 'cmd', 400)
+      await addLogWithDelay(data.step3_pull.message || '同步完成', 'success', 300)
+      await updateStepWithDelay(3, 400)
     }
 
-    // 检查是否有冲突
+    // 检查是否有冲突（冲突发生在同步远程阶段）
     if (data.hasConflict) {
       stepStatus.value = 'error'
-      addLog('检测到代码冲突！', 'error')
+      await addLogWithDelay('检测到代码冲突！', 'error', 300)
       
       conflictFiles.value = data.conflictFiles || []
-      addLog(`发现 ${data.conflictCount} 个冲突文件:`, 'warning')
-      conflictFiles.value.forEach(file => {
-        addLog(`  - ${file}`, 'error')
-      })
+      await addLogWithDelay(`发现 ${data.conflictCount || conflictFiles.value.length} 个冲突文件:`, 'warning', 300)
+      for (const file of conflictFiles.value) {
+        await addLogWithDelay(`  - ${file}`, 'error', 150)
+      }
       
-      addLog('请解决冲突后，点击"继续提交"按钮', 'warning')
+      await addLogWithDelay('请解决冲突后，点击"继续提交"按钮', 'warning', 300)
       hasConflictPending.value = true
       isProcessing.value = false
       return
     }
 
-    // 步骤4: 本地提交
+    // 步骤4: 本地提交 (索引3 -> 完成后进入索引4)
     if (data.step4_commit) {
-      addLog(`git commit -m "${commitMessage.value}"`, 'cmd')
-      addLog(data.step4_commit.message, 'success')
+      await addLogWithDelay(`git commit -m "${commitMessage.value}"`, 'cmd', 400)
+      await addLogWithDelay(data.step4_commit.message || '提交成功', 'success', 300)
       if (data.step4_commit.commitHash) {
-        addLog(`提交哈希: ${data.step4_commit.commitHash}`, 'info')
+        await addLogWithDelay(`提交哈希: ${data.step4_commit.commitHash}`, 'info', 200)
       }
-      activeStep.value = 4
+      await updateStepWithDelay(4, 400)
     }
 
-    // 步骤5: 推送
+    // 步骤5: 推送代码 (索引4 -> 完成)
     if (data.step5_push) {
       const pushCmd = selectedRemoteBranch.value 
         ? `git push ${selectedRemoteBranch.value.split('/')[0]} ${selectedLocalBranch.value}`
         : 'git push'
-      addLog(pushCmd, 'cmd')
+      await addLogWithDelay(pushCmd, 'cmd', 400)
       
       // 显示重试日志
       if (data.step5_push.retryLogs && data.step5_push.retryLogs.length > 0) {
-        data.step5_push.retryLogs.forEach((log: string) => {
-          addLog(log, 'warning')
-        })
+        for (const log of data.step5_push.retryLogs) {
+          await addLogWithDelay(log, 'warning', 200)
+        }
       }
       
-      addLog(data.step5_push.message, 'success')
-      if (data.retryCount > 0) {
-        addLog(`共重试 ${data.retryCount} 次`, 'info')
+      // 检查推送阶段是否有冲突（自动 pull 时发现的冲突）
+      if (data.step5_push.hasConflict) {
+        stepStatus.value = 'error'
+        activeStep.value = 4
+        await addLogWithDelay('推送时自动拉取检测到代码冲突！', 'error', 300)
+        
+        conflictFiles.value = data.step5_push.conflictFiles || []
+        await addLogWithDelay(`发现 ${data.step5_push.conflictCount || conflictFiles.value.length} 个冲突文件:`, 'warning', 300)
+        for (const file of conflictFiles.value) {
+          await addLogWithDelay(`  - ${file}`, 'error', 150)
+        }
+        
+        await addLogWithDelay('请解决冲突后，点击"继续提交"按钮', 'warning', 300)
+        hasConflictPending.value = true
+        isProcessing.value = false
+        return
       }
-      activeStep.value = 5
+      
+      await addLogWithDelay(data.step5_push.message || '推送成功', 'success', 300)
+      if (data.step5_push.retryCount > 0) {
+        await addLogWithDelay(`共重试 ${data.step5_push.retryCount} 次`, 'info', 200)
+      }
     }
 
     // 检查最终结果
     if (data.success) {
       stepStatus.value = 'success'
-      addLog('✅ 智能提交全流程执行完毕', 'success')
+      await addLogWithDelay('✅ 智能提交全流程执行完毕', 'success', 400)
       
       ElMessage.success('提交成功！')
       emit('success')
@@ -267,9 +299,9 @@ const startSmartCommit = async () => {
       stepStatus.value = 'error'
       
       if (data.needPull) {
-        addLog('远程有新提交，请重新执行智能提交', 'error')
+        await addLogWithDelay('远程有新提交，请重新执行智能提交', 'error', 300)
       } else {
-        addLog(data.message || '提交失败', 'error')
+        await addLogWithDelay(data.message || '提交失败', 'error', 300)
       }
       
       ElMessage.error(data.message || '提交失败')
@@ -288,7 +320,7 @@ const startSmartCommit = async () => {
   }
 }
 
-// 继续提交（解决冲突后）
+// 继续提交（解决冲突后 - 逐步显示进度）
 const continueCommit = async () => {
   if (!props.projectId) {
     addLog('项目ID不存在', 'error')
@@ -310,33 +342,35 @@ const continueCommit = async () => {
     const data = response.data
 
     if (data.hasConflict) {
-      addLog('仍有未解决的冲突！', 'error')
+      await addLogWithDelay('仍有未解决的冲突！', 'error', 300)
       conflictFiles.value = data.conflictFiles || []
-      conflictFiles.value.forEach(file => {
-        addLog(`  - ${file}`, 'error')
-      })
-      addLog('请继续解决冲突', 'warning')
+      for (const file of conflictFiles.value) {
+        await addLogWithDelay(`  - ${file}`, 'error', 150)
+      }
+      await addLogWithDelay('请继续解决冲突', 'warning', 300)
       isProcessing.value = false
       return
     }
 
     if (data.success) {
-      addLog('git add .', 'cmd')
-      addLog('已暂存解决后的文件', 'success')
-      addLog('git rebase --continue', 'cmd')
-      addLog('rebase继续成功', 'success')
+      await addLogWithDelay('git add .', 'cmd', 400)
+      await addLogWithDelay('已暂存解决后的文件', 'success', 300)
+      await updateStepWithDelay(3, 400)
+      
+      await addLogWithDelay('git rebase --continue', 'cmd', 400)
+      await addLogWithDelay('rebase继续成功', 'success', 300)
       
       if (data.commitResult) {
-        addLog(`git commit -m "${commitMessage.value}"`, 'cmd')
-        addLog('提交成功', 'success')
+        await addLogWithDelay(`git commit -m "${commitMessage.value}"`, 'cmd', 400)
+        await addLogWithDelay('提交成功', 'success', 300)
+        await updateStepWithDelay(4, 400)
       }
       
-      addLog('git push', 'cmd')
-      addLog('推送成功！', 'success')
+      await addLogWithDelay('git push', 'cmd', 400)
+      await addLogWithDelay('推送成功！', 'success', 300)
       
-      activeStep.value = 5
       stepStatus.value = 'success'
-      addLog('✅ 智能提交全流程执行完毕', 'success')
+      await addLogWithDelay('✅ 智能提交全流程执行完毕', 'success', 400)
       
       hasConflictPending.value = false
       emit('success')
@@ -347,7 +381,7 @@ const continueCommit = async () => {
         visible.value = false
       }, 3000)
     } else {
-      addLog(data.message || '继续提交失败', 'error')
+      await addLogWithDelay(data.message || '继续提交失败', 'error', 300)
       ElMessage.error(data.message || '继续提交失败')
     }
 

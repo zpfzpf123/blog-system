@@ -19,6 +19,8 @@ import CommitDetail from '../views/CommitDetail.vue'
 import cssAnimations from '../views/CssAnimationDemo.vue'
 import WebsiteCollection from '../views/WebsiteCollection.vue'
 import DevTools from '../views/DevTools.vue'
+import PageTemplates from '../views/PageTemplates.vue'
+import TemplatePreview from '../views/TemplatePreview.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -87,6 +89,17 @@ const router = createRouter({
       path: '/dev-tools',
       name: 'DevTools',
       component: DevTools,
+    },
+    {
+      path: '/page-templates',
+      name: 'PageTemplates',
+      component: PageTemplates,
+    },
+    {
+      path: '/template-preview/:id',
+      name: 'TemplatePreview',
+      component: TemplatePreview,
+      props: true,
     },
   ],
 })

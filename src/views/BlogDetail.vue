@@ -1,5 +1,5 @@
 <template>
-  <div class="blog-detail-container">
+  <div class="blog-detail-container" :class="{ 'fullscreen-mode': isFullscreen }">
     <div v-if="loading" class="loading-container">
       <el-card class="loading-card">
         <el-skeleton :rows="10" animated />
@@ -2095,6 +2095,104 @@ watch(
   left: 32px;
   width: 4px;
   height: 4px;
+}
+
+/* ========== 全屏阅读模式 ========== */
+.fullscreen-mode {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  background: var(--bg-page);
+  padding: 0 !important;
+  overflow: hidden;
+  animation: fullscreenFadeIn 0.3s ease-out;
+}
+
+@keyframes fullscreenFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fullscreen-mode .blog-layout {
+  height: 100vh;
+  max-width: 100%;
+  padding: 0;
+  gap: 0;
+  margin: 0;
+}
+
+.fullscreen-mode .blog-main {
+  flex: 1;
+  height: 100vh;
+  overflow-y: auto;
+  padding: var(--spacing-6);
+}
+
+.fullscreen-mode .blog-card {
+  max-width: 900px;
+  margin: 0 auto;
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-lg);
+}
+
+.fullscreen-mode .blog-sidebar {
+  display: block !important;
+  width: 280px;
+  height: 100vh;
+  border-left: 1px solid rgba(99, 102, 241, 0.1);
+  background: var(--bg-glass);
+  backdrop-filter: blur(24px);
+}
+
+.fullscreen-mode .sidebar-sticky {
+  position: relative;
+  top: 0;
+  height: 100%;
+  padding: var(--spacing-4);
+}
+
+.fullscreen-mode .toc-card {
+  height: 100%;
+  max-height: 100%;
+  border-radius: var(--radius-xl);
+}
+
+.fullscreen-mode .toc-card :deep(.el-card__body) {
+  max-height: calc(100vh - 100px);
+}
+
+/* 全屏模式下隐藏页面其他元素 */
+.fullscreen-mode .loading-container,
+.fullscreen-mode .empty-container {
+  display: none;
+}
+
+/* 全屏模式响应式 */
+@media (max-width: 1024px) {
+  .fullscreen-mode .blog-sidebar {
+    display: none !important;
+  }
+  
+  .fullscreen-mode .blog-main {
+    padding: var(--spacing-4);
+  }
+}
+
+@media (max-width: 768px) {
+  .fullscreen-mode .blog-main {
+    padding: var(--spacing-3);
+  }
+  
+  .fullscreen-mode .blog-card {
+    border-radius: var(--radius-lg);
+  }
 }
 </style>
 

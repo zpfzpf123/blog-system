@@ -12,6 +12,7 @@ import BlogCard from '@/components/home/BlogCard.vue'
 import HomeSidebar from '@/components/home/HomeSidebar.vue'
 import BackgroundEffects from '@/components/home/BackgroundEffects.vue'
 import ThemeSettings from '@/components/ThemeSettings.vue'
+import CategoryTagManager from '@/components/home/CategoryTagManager.vue'
 
 // Types
 interface Category {
@@ -54,9 +55,15 @@ const selectedTagIds = ref<number[]>([])
 // Refs
 const globalSearchRef = ref<InstanceType<typeof GlobalSearch> | null>(null)
 const themeSettingsRef = ref<InstanceType<typeof ThemeSettings> | null>(null)
+const categoryTagManagerRef = ref<InstanceType<typeof CategoryTagManager> | null>(null)
+const showCategoryTagManager = ref(false)
 
 const openThemeSettings = () => {
   themeSettingsRef.value?.open()
+}
+
+const openCategoryTagManager = () => {
+  showCategoryTagManager.value = true
 }
 
 // Computed for Hero Section
@@ -246,6 +253,143 @@ const openGlobalSearch = () => {
   globalSearchRef.value?.open()
 }
 
+// 分类和标签管理
+const handleAddCategory = async () => {
+  const newName = await ElMessageBox.prompt('请输入分类名称', '添加分类', {
+    confirmButtonText: '添加',
+    cancelButtonText: '取消',
+    inputPattern: /\S+/,
+    inputErrorMessage: '分类名称不能为空'
+  }).catch(() => null)
+  
+  if (newName && newName.value.trim()) {
+    try {
+      await axios.post('/api/categories', { name: newName.value.trim() })
+      ElMessage.success('分类添加成功')
+      fetchCategories()
+    } catch (error: any) {
+      ElMessage.error(error.response?.data?.message || '添加失败')
+    }
+  }
+}
+
+const handleEditCategory = async (category: Category) => {
+  const newName = await ElMessageBox.prompt('请输入新的分类名称', '编辑分类', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    inputValue: category.name,
+    inputPattern: /\S+/,
+    inputErrorMessage: '分类名称不能为空'
+  }).catch(() => null)
+  
+  if (newName && newName.value.trim()) {
+    try {
+      await axios.put(`/api/categories/${category.id}`, { name: newName.value.trim() })
+      ElMessage.success('分类更新成功')
+      fetchCategories()
+    } catch (error: any) {
+      ElMessage.error(error.response?.data?.message || '更新失败')
+    }
+  }
+}
+
+const handleDeleteCategory = async (category: Category) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除分类"${category.name}"吗？该分类下的文章将变为未分类状态。`,
+      '删除确认',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await axios.delete(`/api/categories/${category.id}`)
+    ElMessage.success('删除成功')
+    fetchCategories()
+    // 如果当前筛选中包含被删除的分类，移除它
+    if (selectedCategoryIds.value.includes(category.id)) {
+      selectedCategoryIds.value = selectedCategoryIds.value.filter(id => id !== category.id)
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.message || '删除失败')
+    }
+  }
+}
+
+const handleAddTag = async () => {
+  const newName = await ElMessageBox.prompt('请输入标签名称', '添加标签', {
+    confirmButtonText: '添加',
+    cancelButtonText: '取消',
+    inputPattern: /\S+/,
+    inputErrorMessage: '标签名称不能为空'
+  }).catch(() => null)
+  
+  if (newName && newName.value.trim()) {
+    try {
+      await axios.post('/api/tags', { name: newName.value.trim() })
+      ElMessage.success('标签添加成功')
+      fetchTags()
+    } catch (error: any) {
+      ElMessage.error(error.response?.data?.message || '添加失败')
+    }
+  }
+}
+
+const handleEditTag = async (tag: Tag) => {
+  const newName = await ElMessageBox.prompt('请输入新的标签名称', '编辑标签', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    inputValue: tag.name,
+    inputPattern: /\S+/,
+    inputErrorMessage: '标签名称不能为空'
+  }).catch(() => null)
+  
+  if (newName && newName.value.trim()) {
+    try {
+      await axios.put(`/api/tags/${tag.id}`, { name: newName.value.trim() })
+      ElMessage.success('标签更新成功')
+      fetchTags()
+    } catch (error: any) {
+      ElMessage.error(error.response?.data?.message || '更新失败')
+    }
+  }
+}
+
+const handleDeleteTag = async (tag: Tag) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除标签"${tag.name}"吗？`,
+      '删除确认',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await axios.delete(`/api/tags/${tag.id}`)
+    ElMessage.success('删除成功')
+    fetchTags()
+    // 如果当前筛选中包含被删除的标签，移除它
+    if (selectedTagIds.value.includes(tag.id)) {
+      selectedTagIds.value = selectedTagIds.value.filter(id => id !== tag.id)
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.message || '删除失败')
+    }
+  }
+}
+
+const handleManagerRefresh = () => {
+  fetchCategories()
+  fetchTags()
+  fetchBlogPosts(currentPage.value)
+}
+
 // Watchers
 let searchTimer: NodeJS.Timeout
 watch(searchKeyword, () => {
@@ -359,6 +503,12 @@ onUnmounted(() => {
         :tags="tags"
         @create="goToCreateBlog"
         @reset="handleReset"
+        @addCategory="handleAddCategory"
+        @editCategory="handleEditCategory"
+        @deleteCategory="handleDeleteCategory"
+        @addTag="handleAddTag"
+        @editTag="handleEditTag"
+        @deleteTag="handleDeleteTag"
       />
     </aside>
 
@@ -510,6 +660,11 @@ onUnmounted(() => {
 
     <GlobalSearch ref="globalSearchRef" />
     <ThemeSettings ref="themeSettingsRef" />
+    <CategoryTagManager 
+      v-model="showCategoryTagManager" 
+      ref="categoryTagManagerRef"
+      @refresh="handleManagerRefresh"
+    />
     
     <!-- 回到顶部 -->
     <transition name="fade">

@@ -325,7 +325,7 @@ public class GitSmartCommitService {
     }
     
     /**
-     * 推送到远程仓库（支持自动重试）
+     * 推送到远程仓库（支持自动重试，遇到远程有新提交时自动 pull --rebase 后重试）
      */
     public Map<String, Object> pushToRemote(String projectPath, String localBranch, 
                                            String remoteBranch, int maxRetries) {
@@ -339,9 +339,9 @@ public class GitSmartCommitService {
         
         while (!pushSuccess && retryCount <= maxRetries) {
             if (retryCount > 0) {
-                retryLogs.add("第 " + retryCount + " 次重试推送...");
+                retryLogs.add("第 " + retryCount + " 次重试...");
                 try {
-                    Thread.sleep(2000); // 重试间隔2秒
+                    Thread.sleep(1000); // 重试间隔1秒
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
@@ -375,15 +375,50 @@ public class GitSmartCommitService {
             if ((Boolean) pushResult.get("success")) {
                 pushSuccess = true;
             } else {
-                retryCount++;
-                
-                // 检查是否需要先pull
+                // 检查是否因为远程有新提交导致推送失败
                 if (lastOutput.contains("rejected") || lastOutput.contains("non-fast-forward")) {
-                    result.put("success", false);
-                    result.put("needPull", true);
-                    result.put("message", "远程有新提交，需要先拉取");
-                    result.put("output", lastOutput);
-                    return result;
+                    retryCount++;
+                    
+                    if (retryCount > maxRetries) {
+                        // 超过最大重试次数，返回失败
+                        result.put("success", false);
+                        result.put("needPull", true);
+                        result.put("message", "远程有新提交，自动同步 " + maxRetries + " 次后仍失败，请稍后重试");
+                        result.put("output", lastOutput);
+                        result.put("retryCount", retryCount - 1);
+                        result.put("retryLogs", retryLogs);
+                        return result;
+                    }
+                    
+                    // 自动执行 pull --rebase
+                    retryLogs.add("检测到远程有新提交，自动拉取中...");
+                    Map<String, Object> pullResult = pullWithRebase(projectPath);
+                    
+                    // 检查 pull 是否有冲突
+                    if (pullResult.containsKey("hasConflict") && (Boolean) pullResult.get("hasConflict")) {
+                        result.put("success", false);
+                        result.put("hasConflict", true);
+                        result.put("conflictFiles", pullResult.get("conflictFiles"));
+                        result.put("conflictCount", pullResult.get("conflictCount"));
+                        result.put("message", "自动拉取时检测到代码冲突，请解决后继续");
+                        result.put("retryCount", retryCount);
+                        result.put("retryLogs", retryLogs);
+                        return result;
+                    }
+                    
+                    if (!(Boolean) pullResult.get("success")) {
+                        result.put("success", false);
+                        result.put("message", "自动拉取失败: " + pullResult.get("message"));
+                        result.put("retryCount", retryCount);
+                        result.put("retryLogs", retryLogs);
+                        return result;
+                    }
+                    
+                    retryLogs.add("拉取成功，重新推送...");
+                    // 继续循环重试 push
+                } else {
+                    // 其他错误，直接返回失败
+                    retryCount++;
                 }
             }
         }
