@@ -22,7 +22,10 @@ import {
   DArrowLeft,
   Search,
   Connection,
-  Monitor
+  Monitor,
+  Edit,
+  Delete,
+  MoreFilled
 } from '@element-plus/icons-vue'
 import axios from '@/utils/axios'
 import MarkdownIt from 'markdown-it'
@@ -118,12 +121,12 @@ const showGitFilesModal = ref(false) // Git文件变更弹窗
 const showGitConflictModal = ref(false) // Git冲突管理弹窗
 const gitStatusPanelRef = ref<InstanceType<typeof GitStatusPanel> | null>(null) // Git状态面板引用
 const initialLoading = ref(true) // 初始加载状态
-let autoRefreshTimer: NodeJS.Timeout | null = null // 自动刷新定时器
+let autoRefreshTimer: ReturnType<typeof setInterval> | null = null // 自动刷新定时器
 
 // README编辑相关
 const isEditingReadme = ref(false) // 是否处于编辑模式
 const readmeEditContent = ref('') // 编辑中的内容
-let autoSaveTimer: NodeJS.Timeout | null = null // 自动保存定时器
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null // 自动保存定时器
 const readmeContentDivRef = ref<HTMLElement | null>(null) // README内容区域引用
 const editorTextareaRef = ref<any>(null) // 编辑器 textarea 引用
 const previewPaneRef = ref<HTMLElement | null>(null) // 预览区域引用
@@ -139,6 +142,14 @@ const filterAuthor = ref('') // 筛选作者
 const filterDateRange = ref<[string, string] | null>(null) // 日期范围（YYYY-MM-DD字符串）
 const filterFilePath = ref('') // 文件路径筛选
 const showSearchPanel = ref(false) // 是否显示搜索面板
+
+// 导航菜单项
+const navItems = [
+  { id: 'readme', label: '项目文档', icon: Document },
+  { id: 'commits', label: '提交历史', icon: Clock },
+  { id: 'apis', label: 'API文档', icon: Connection },
+  { id: 'devenv', label: '开发环境', icon: Monitor },
+]
 
 // 获取所有作者列表（用于下拉选择）
 const authorList = computed(() => {
@@ -494,12 +505,11 @@ const fetchProjectDetail = async () => {
       }
     }
     
-    // 初始加载完成
-    setTimeout(() => {
-      initialLoading.value = false
-    }, 500)
+    // 初始加载完成 - 立即设置，不再延迟
+    initialLoading.value = false
   } catch (error) {
     console.error('获取项目详情失败:', error)
+    initialLoading.value = false // 错误时也要关闭加载状态
     ElMessage({
       message: '获取项目详情失败',
       type: 'error',
@@ -533,10 +543,10 @@ const getStatusType = (status: string) => {
 }
 
 const getProgressColor = (progress: number) => {
-  if (progress >= 80) return '#67c23a'
-  if (progress >= 50) return '#409eff'
-  if (progress >= 30) return '#e6a23c'
-  return '#f56c6c'
+  if (progress >= 80) return '#10b981'
+  if (progress >= 50) return '#6366f1'
+  if (progress >= 30) return '#f59e0b'
+  return '#ef4444'
 }
 
 // 获取当前激活标签页的滚动容器
@@ -576,7 +586,8 @@ const scrollToTop = () => {
 }
 
 // 标签切换时重置滚动位置和按钮状态
-const handleTabChange = () => {
+const handleTabChange = (tabId: string) => {
+  activeTab.value = tabId
   showBackTop.value = false
   
   // 切换到提交历史时
@@ -962,1046 +973,596 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="project-detail">
-    <!-- 骨架屏加载状态 -->
-    <div v-if="initialLoading" class="skeleton-container">
-      <div class="skeleton-header">
-        <div class="skeleton-circle"></div>
-        <div class="skeleton-content">
-          <div class="skeleton-title"></div>
-          <div class="skeleton-stats">
-            <div class="skeleton-stat"></div>
-            <div class="skeleton-stat"></div>
-            <div class="skeleton-stat"></div>
-          </div>
-        </div>
-      </div>
-      <div class="skeleton-body">
-        <div class="skeleton-tab-header">
-          <div class="skeleton-tab"></div>
-          <div class="skeleton-tab"></div>
-        </div>
-        <div class="skeleton-content-area">
-          <div class="skeleton-line" v-for="i in 8" :key="i"></div>
-        </div>
-      </div>
+  <div class="project-detail-layout">
+    <!-- 动态背景 -->
+    <div class="animated-bg">
+      <div class="gradient-orb orb-1"></div>
+      <div class="gradient-orb orb-2"></div>
+      <div class="grid-pattern"></div>
     </div>
 
-    <!-- 主要内容 -->
-    <div v-else class="content-wrapper">
-      <!-- 精简头部 - 单行展示 -->
-      <div v-if="project" class="hero-header">
-      <div class="hero-content">
-        <el-button :icon="ArrowLeft" class="back-btn" @click="goBack" circle />
+    <!-- 顶部导航栏 -->
+    <header class="top-nav">
+      <div class="nav-left">
+        <button class="back-btn" @click="goBack">
+          <el-icon><ArrowLeft /></el-icon>
+          <span>返回</span>
+        </button>
         
-        <div class="hero-info">
-          <!-- 项目标题和状态 -->
-          <div class="project-title-section">
-            <el-icon class="project-icon"><FolderOpened /></el-icon>
-            <h1 class="hero-title">{{ project.name }}</h1>
-            <el-tag :type="getStatusType(project.status)" effect="dark" class="status-tag">
-              {{ project.status }}
-            </el-tag>
+        <div class="project-info-compact" v-if="project">
+          <div class="project-icon-small">
+            <el-icon><FolderOpened /></el-icon>
           </div>
+          <div class="project-meta">
+            <h1 class="project-name">{{ project.name }}</h1>
+            <div class="project-stats-inline">
+              <el-tag :type="getStatusType(project.status)" size="small" effect="plain">{{ project.status }}</el-tag>
+              <span class="stat-inline">
+                <el-icon><Clock /></el-icon>
+                {{ gitCommits.length }} 提交
+              </span>
+              <span class="stat-inline">进度 {{ project.progress }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-right">
+        <!-- Git操作按钮组 -->
+        <el-button-group>
+          <el-button type="primary" :icon="Upload" size="small" @click="showGitCommitModal = true">提交</el-button>
+          <el-button :icon="Refresh" size="small" @click="showGitPullModal = true">拉取</el-button>
+        </el-button-group>
+        
+        <el-dropdown trigger="click">
+          <el-button size="small" :icon="MoreFilled">更多</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="showGitFilesModal = true">文件变更</el-dropdown-item>
+              <el-dropdown-item @click="showGitHistoryModal = true">历史记录</el-dropdown-item>
+              <el-dropdown-item @click="showGitBranchModal = true">分支管理</el-dropdown-item>
+              <el-dropdown-item @click="showGitStashModal = true">Stash暂存</el-dropdown-item>
+              <el-dropdown-item divided @click="showGitConflictModal = true" style="color: #f56c6c">冲突解决</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+
+        <el-tooltip content="打开本地文件夹" placement="bottom" v-if="project?.localPath">
+          <el-button size="small" :icon="Folder" @click="openLocalPath" circle />
+        </el-tooltip>
+        <el-tooltip content="打开Git仓库" placement="bottom" v-if="project?.repoUrl">
+          <el-button size="small" :icon="LinkIcon" @click="openGitRepo" circle />
+        </el-tooltip>
+      </div>
+    </header>
+
+    <!-- 主布局 -->
+    <div class="main-layout">
+      <!-- 侧边栏 -->
+      <aside class="sidebar">
+        <!-- 导航菜单 -->
+        <nav class="nav-menu">
+          <button 
+            v-for="item in navItems" 
+            :key="item.id"
+            class="nav-item"
+            :class="{ active: activeTab === item.id }"
+            @click="handleTabChange(item.id)"
+          >
+            <el-icon><component :is="item.icon" /></el-icon>
+            <span>{{ item.label }}</span>
+            <el-badge v-if="item.id === 'commits' && gitCommits.length > 0" :value="gitCommits.length" class="nav-badge" type="info" />
+          </button>
+        </nav>
+
+        <!-- 项目信息卡片 -->
+        <div class="project-card" v-if="project">
+          <div class="project-icon">
+            <el-icon><FolderOpened /></el-icon>
+          </div>
+          <h2 class="project-title">项目信息</h2>
+          
+          <!-- 进度条 -->
+          <div class="progress-track">
+            <div 
+              class="progress-fill" 
+              :style="{ width: project.progress + '%', background: getProgressColor(project.progress) }"
+            ></div>
+          </div>
+          <div class="progress-text">完成度 {{ project.progress }}%</div>
 
           <!-- 统计信息 -->
-          <div class="stats-section">
-            <div class="stat-box">
-              <el-icon><TrendCharts /></el-icon>
-              <span class="stat-text">{{ project.progress }}% 完成</span>
-            </div>
-            <div class="stat-box">
-              <el-icon><Clock /></el-icon>
-              <span class="stat-text">{{ gitCommits.length }} 次提交</span>
-            </div>
-            <div class="stat-box">
+          <div class="project-stats">
+            <div class="stat-row">
               <el-icon><Calendar /></el-icon>
-              <span class="stat-text">{{ formatDate(project.createdAt).split(' ')[0] }}</span>
+              <span>{{ formatDate(project.createdAt).split(' ')[0] }}</span>
             </div>
           </div>
 
-          <!-- 技术栈标签 -->
-          <div v-if="project.techStack && project.techStack.length > 0" class="tech-section">
-            <el-tag 
-              v-for="tech in project.techStack.slice(0, 5)" 
-              :key="tech" 
-              class="tech-tag"
-              size="small"
-            >
-              {{ tech }}
-            </el-tag>
-          </div>
-
-          <!-- Git 操作按钮组 -->
-          <div class="git-actions-section">
-            <el-button-group>
-              <el-button type="primary" :icon="Upload" @click="showGitCommitModal = true">
-                提交
-              </el-button>
-              <el-button :icon="ArrowLeft" @click="showGitPullModal = true">
-                拉取
-              </el-button>
-              <el-button @click="showGitFilesModal = true">
-                文件
-              </el-button>
-              <el-button @click="showGitHistoryModal = true">
-                历史
-              </el-button>
-              <el-button @click="showGitBranchModal = true">
-                分支
-              </el-button>
-              <el-button @click="showGitStashModal = true">
-                Stash
-              </el-button>
-              <el-button type="danger" @click="showGitConflictModal = true">
-                冲突
-              </el-button>
-            </el-button-group>
-          </div>
-
-          <!-- 项目地址和操作按钮 -->
-          <div class="path-section">
-            <div v-if="project.localPath" class="path-item" @click="openLocalPath">
-              <el-icon class="path-icon"><Folder /></el-icon>
-              <span class="path-text">本地路径</span>
-              <el-icon class="copy-icon" @click="copyLocalPath"><DocumentCopy /></el-icon>
-            </div>
-            <div v-if="project.repoUrl" class="path-item" @click="openGitRepo">
-              <el-icon class="path-icon"><LinkIcon /></el-icon>
-              <span class="path-text">Git仓库</span>
-              <el-icon class="jump-icon"><Location /></el-icon>
-            </div>
+          <!-- 技术栈 -->
+          <div class="tech-tags" v-if="project.techStack && project.techStack.length">
+            <span v-for="tech in project.techStack" :key="tech" class="tech-tag">{{ tech }}</span>
           </div>
         </div>
-      </div>
-    </div>
+      </aside>
 
-    <!-- 主内容区 - 全宽标签页 -->
-    <div v-if="project" class="main-container">
-      <div class="content-full">
-        <el-tabs v-model="activeTab" class="project-tabs" type="card" @tab-change="handleTabChange">
-            <!-- README标签 -->
-            <el-tab-pane name="readme">
-              <template #label>
-                <div class="tab-label">
-                  <el-icon><Document /></el-icon>
-                  <span>项目文档</span>
-                </div>
-              </template>
-              
-              <div class="readme-layout">
-                <!-- 目录切换按钮 -->
-                <div v-if="readmeHtml" class="toc-toggle-btn" @click="toggleToc" :title="showToc ? '收起目录' : '展开目录'">
-                  <el-icon :class="{ 'rotated': !showToc }">
-                    <DArrowLeft />
-                  </el-icon>
-                </div>
-                
-                <!-- 目录侧边栏 -->
-                <transition name="toc-slide">
-                  <div v-show="showToc && readmeHtml" class="toc-sidebar">
-                    <div class="toc-header">
-                      <el-icon><List /></el-icon>
-                      <span>目录</span>
-                      <el-icon v-if="tocLoading" class="toc-loading"><Loading /></el-icon>
-                    </div>
-                    <div class="toc-list">
-                      <!-- 加载中状态 -->
-                      <div v-if="tocLoading" class="toc-loading-state">
-                        <div class="toc-skeleton" v-for="i in 5" :key="i"></div>
-                      </div>
-                      <!-- 目录内容 -->
-                      <template v-else-if="tocItems.length > 0">
-                        <div 
-                          v-for="item in tocItems" 
-                          :key="item.id"
-                          class="toc-item"
-                          :class="`toc-level-${item.level}`"
-                          @click="scrollToHeading(item.id)"
-                        >
-                          {{ item.text }}
-                        </div>
-                      </template>
-                      <!-- 空状态 -->
-                      <div v-else class="toc-empty">
-                        <el-icon><Document /></el-icon>
-                        <span>文档暂无目录</span>
-                        <p class="toc-hint">请在文档中使用 # 标题语法</p>
-                      </div>
-                    </div>
-                  </div>
-                </transition>
+      <!-- 内容区域 -->
+      <div class="content-area">
+        <div class="content-header">
+          <h2 class="section-title">
+            {{ navItems.find(i => i.id === activeTab)?.label }}
+          </h2>
+        </div>
 
-                <!-- 内容区域 -->
-                <div ref="readmeContentRef" class="tab-content readme-content" @scroll="handleScroll">
-                  <!-- 编辑模式 -->
-                  <div v-if="isEditingReadme" class="readme-editor">
-                    <div class="editor-header">
-                      <span class="editor-title">📝 编辑README</span>
-                      <div class="editor-actions">
-                        <span class="hint-text">Ctrl+S保存 | Esc取消</span>
-                        <el-button size="small" @click="cancelEditingReadme">取消</el-button>
-                        <el-button type="primary" size="small" @click="saveReadme">保存</el-button>
-                      </div>
-                    </div>
-                    <div class="editor-layout">
-                      <div class="editor-pane">
-                        <div class="pane-title">Markdown源码</div>
-                        <el-input
-                          ref="editorTextareaRef"
-                          v-model="readmeEditContent"
-                          type="textarea"
-                          :autosize="{ minRows: 20, maxRows: 30 }"
-                          placeholder="请输入README内容，支持Markdown格式..."
-                          class="editor-textarea"
-                        />
-                      </div>
-                      <div class="preview-pane" ref="previewPaneRef">
-                        <div class="pane-title">实时预览</div>
-                        <div class="markdown-body preview-content" v-html="previewHtml"></div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <!-- 阅读模式 -->
-                  <div v-else>
-                    <div 
-                      v-if="readmeHtml" 
-                      class="markdown-body" 
-                      v-html="readmeHtml"
-                      @dblclick="startEditingReadme"
-                      title="双击编辑README"
-                      style="cursor: text;"
-                    ></div>
-                    <div v-else class="empty-state">
-                      <el-icon class="empty-icon"><Document /></el-icon>
-                      <p class="empty-title">暂无README文档</p>
-                      <p class="empty-desc">该项目还没有README文档，您可以创建一个来介绍项目</p>
-                      <el-button type="primary" size="small" plain @click="startEditingReadme">创建README</el-button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </el-tab-pane>
-
-            <!-- Git提交记录标签 -->
-            <el-tab-pane name="commits">
-              <template #label>
-                <div class="tab-label">
-                  <el-icon><Clock /></el-icon>
-                  <span>提交历史</span>
-                  <el-badge v-if="gitCommits.length > 0" :value="gitCommits.length" class="tab-badge" />
-                </div>
-              </template>
-              <div class="commits-header">
-                <div class="commits-info">
-                  <span class="info-text">
-                    共 {{ gitCommits.length }} 条提交记录
-                    <template v-if="hasActiveFilters">
-                      / 筛选后 <span class="highlight-text">{{ filteredCommits.length }}</span> 条
-                    </template>
-                  </span>
-                </div>
-                <div class="header-actions">
-                  <el-button 
-                    size="small" 
-                    :icon="Document"
-                    type="success"
-                    @click="showFileHistoryModal = true"
-                  >
-                    文件历史
-                  </el-button>
-                  <el-button 
-                    size="small" 
-                    :icon="Search"
-                    @click="showSearchPanel = !showSearchPanel"
-                    :type="hasActiveFilters ? 'primary' : 'default'"
-                  >
-                    {{ showSearchPanel ? '收起筛选' : '展开筛选' }}
-                  </el-button>
-                  <el-button 
-                    type="primary" 
-                    size="small" 
-                    :icon="Refresh" 
-                    :loading="refreshingCommits"
-                    @click="refreshGitCommits"
-                  >
-                    {{ refreshingCommits ? '刷新中...' : '刷新记录' }}
-                  </el-button>
-                </div>
+        <div class="content-body">
+          <!-- README -->
+          <div v-show="activeTab === 'readme'" class="tab-view readme-view">
+            <div class="readme-layout">
+              <!-- 目录切换按钮 -->
+              <div v-if="readmeHtml" class="toc-toggle-btn" @click="toggleToc" :title="showToc ? '收起目录' : '展开目录'">
+                <el-icon :class="{ 'rotated': !showToc }"><DArrowLeft /></el-icon>
               </div>
               
-              <!-- 搜索和筛选面板 -->
-              <transition name="el-zoom-in-top">
-                <div v-show="showSearchPanel" class="search-panel">
-                  <div class="filter-grid">
-                    <div class="filter-card">
-                      <div class="filter-label">关键词搜索</div>
-                      <el-input
-                        v-model="searchKeyword"
-                        placeholder="搜索提交信息或 Hash ..."
-                        :prefix-icon="Search"
-                        clearable
-                        size="small"
-                      />
+              <!-- 目录侧边栏 -->
+              <transition name="toc-slide">
+                <div v-show="showToc && readmeHtml" class="toc-sidebar">
+                  <div class="toc-header">
+                    <el-icon><List /></el-icon>
+                    <span>目录</span>
+                    <el-icon v-if="tocLoading" class="toc-loading"><Loading /></el-icon>
+                  </div>
+                  <div class="toc-list">
+                    <div v-if="tocLoading" class="toc-loading-state">
+                      <div class="toc-skeleton" v-for="i in 5" :key="i"></div>
                     </div>
-                    <div class="filter-card">
-                      <div class="filter-label">提交作者</div>
-                      <el-select
-                        v-model="filterAuthor"
-                        placeholder="选择作者筛选"
-                        clearable
-                        size="small"
-                        style="width: 100%"
+                    <template v-else-if="tocItems.length > 0">
+                      <div 
+                        v-for="item in tocItems" 
+                        :key="item.id"
+                        class="toc-item"
+                        :class="`toc-level-${item.level}`"
+                        @click="scrollToHeading(item.id)"
                       >
-                        <el-option
-                          v-for="author in authorList"
-                          :key="author"
-                          :label="author"
-                          :value="author"
-                        />
-                      </el-select>
-                    </div>
-                    <div class="filter-card">
-                      <div class="filter-label">提交时间范围</div>
-                      <el-date-picker
-                        v-model="filterDateRange"
-                        type="daterange"
-                        unlink-panels
-                        range-separator="至"
-                        start-placeholder="开始日期"
-                        end-placeholder="结束日期"
-                        size="small"
-                        class="commit-date-range-picker"
-                        value-format="YYYY-MM-DD"
-                      />
-                    </div>
-                    <div class="filter-card">
-                      <div class="filter-label">修改文件路径</div>
-                      <el-input
-                        v-model="filterFilePath"
-                        placeholder="支持输入目录或文件名"
-                        clearable
-                        size="small"
-                      />
-                    </div>
-                  </div>
-                  <div class="search-actions">
-                    <div class="filter-summary">
-                      <span class="filter-hint" v-if="hasActiveFilters">筛选结果：{{ filteredCommits.length }} 条</span>
-                      <span class="filter-hint muted" v-else>可组合多个条件快速定位目标提交</span>
-                    </div>
-                    <div class="action-buttons">
-                      <el-button size="small" @click="resetFilters" :disabled="!hasActiveFilters">
-                        清空筛选
-                      </el-button>
+                        {{ item.text }}
+                      </div>
+                    </template>
+                    <div v-else class="toc-empty">
+                      <el-icon><Document /></el-icon>
+                      <span>暂无目录</span>
                     </div>
                   </div>
                 </div>
               </transition>
-              <div ref="commitsContentRef" class="tab-content commits-content" @scroll="handleCommitsScroll">
-                <!-- 原始数据为空 -->
-                <div v-if="gitCommits.length === 0" class="empty-state">
-                  <el-icon class="empty-icon"><Clock /></el-icon>
-                  <p class="empty-title">暂无Git提交记录</p>
-                  <p class="empty-desc">该项目还没有Git提交记录，请检查：</p>
-                  <ul class="empty-tips">
-                    <li>✓ 确保项目是一个Git仓库</li>
-                    <li>✓ 检查是否有提交历史</li>
-                    <li>✓ 尝试点击右侧刷新按钮</li>
-                  </ul>
-                  <div class="empty-actions">
-                    <el-button type="primary" size="small" :icon="Refresh" @click="refreshGitCommits">刷新记录</el-button>
-                    <el-button size="small" plain>查看帮助</el-button>
+
+              <!-- README内容 -->
+              <div ref="readmeContentRef" class="readme-content" @scroll="handleScroll">
+                <div v-if="isEditingReadme" class="readme-editor">
+                  <div class="editor-toolbar">
+                    <span>编辑模式</span>
+                    <div class="editor-btns">
+                      <el-button size="small" @click="cancelEditingReadme">取消</el-button>
+                      <el-button type="primary" size="small" @click="saveReadme">保存 (Ctrl+S)</el-button>
+                    </div>
+                  </div>
+                  <div class="editor-split">
+                    <el-input
+                      ref="editorTextareaRef"
+                      v-model="readmeEditContent"
+                      type="textarea"
+                      class="editor-textarea"
+                      placeholder="请输入Markdown内容..."
+                    />
+                    <div class="editor-preview markdown-body" v-html="previewHtml"></div>
                   </div>
                 </div>
-                <!-- 筛选结果为空 -->
-                <div v-else-if="filteredCommits.length === 0" class="empty-state">
-                  <el-icon class="empty-icon"><Search /></el-icon>
-                  <p class="empty-title">未找到匹配的提交记录</p>
-                  <p class="empty-desc">当前筛选条件下没有结果，建议：</p>
-                  <ul class="empty-tips">
-                    <li>✓ 尝试修改搜索关键词</li>
-                    <li>✓ 调整筛选条件范围</li>
-                    <li>✓ 点击"清空筛选"查看所有记录</li>
-                  </ul>
-                  <div class="empty-actions">
-                    <el-button type="primary" size="small" @click="resetFilters">清空筛选</el-button>
-                  </div>
-                </div>
-                <!-- 显示提交记录 -->
-                <div v-else class="timeline">
-                  <div v-for="(commit, index) in paginatedCommits" :key="commit.hash" class="timeline-item" :data-hash="commit.hash" v-memo="[commit.hash]">
-                    <div class="timeline-dot"></div>
-                    <div v-if="index < gitCommits.length - 1" class="timeline-line"></div>
-                    <div class="timeline-content" @click="viewCommitDetail(commit)">
-                      <div class="commit-header">
-                        <span class="commit-hash">#{{ commit.hash.substring(0, 7) }}</span>
-                        <span class="commit-date">{{ formatDate(commit.date) }}</span>
-                      </div>
-                      <div class="commit-message">{{ commit.message }}</div>
-                      <div class="commit-author">
-                        <el-icon><User /></el-icon>
-                        <span>{{ commit.author }}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <!-- 加载更多提示 -->
-                  <div v-if="hasMore" class="load-more-container">
-                    <div v-if="isLoadingMore" class="loading-indicator">
-                      <el-icon class="is-loading"><Loading /></el-icon>
-                      <span>加载中...</span>
-                    </div>
-                    <div v-else class="load-more-hint">
-                      <span>继续滚动加载更多...</span>
-                      <span class="hint-text">已显示 {{ paginatedCommits.length }} / {{ gitCommits.length }} 条</span>
-                    </div>
-                  </div>
-                  
-                  <!-- 全部加载完成提示 -->
-                  <div v-else-if="gitCommits.length > 100" class="all-loaded">
-                    <span>✓ 已加载全部 {{ gitCommits.length }} 条提交记录</span>
+                
+                <div v-else>
+                  <div 
+                    v-if="readmeHtml" 
+                    class="markdown-body" 
+                    v-html="readmeHtml"
+                    @dblclick="startEditingReadme"
+                    title="双击编辑"
+                  ></div>
+                  <div v-else class="empty-state">
+                    <el-icon class="empty-icon"><Document /></el-icon>
+                    <p>暂无文档</p>
+                    <el-button type="primary" @click="startEditingReadme">创建文档</el-button>
                   </div>
                 </div>
               </div>
-            </el-tab-pane>
+            </div>
+            <!-- 结束 readme-layout -->
+          </div>
+          <!-- 结束 readme tab-view -->
 
-            <!-- API文档管理标签 -->
-            <el-tab-pane name="apis">
-              <template #label>
-                <div class="tab-label">
-                  <el-icon><Connection /></el-icon>
-                  <span>API文档</span>
+          <!-- Commits -->
+          <div v-show="activeTab === 'commits'" class="tab-view commits-view">
+            <div class="commits-toolbar">
+              <div class="search-bar">
+              <el-input v-model="searchKeyword" placeholder="搜索提交..." :prefix-icon="Search" clearable />
+            </div>
+            <div class="filter-actions">
+              <el-select v-model="filterAuthor" placeholder="作者" clearable style="width: 120px">
+                <el-option v-for="author in authorList" :key="author" :label="author" :value="author" />
+              </el-select>
+              <el-button :icon="Refresh" @click="refreshGitCommits" :loading="refreshingCommits" circle />
+            </div>
+          </div>
+
+          <div ref="commitsContentRef" class="commits-list" @scroll="handleCommitsScroll">
+            <div v-if="paginatedCommits.length > 0" class="timeline">
+              <div v-for="(commit, index) in paginatedCommits" :key="commit.hash" class="timeline-item" @click="viewCommitDetail(commit)">
+                <div class="timeline-left">
+                  <div class="commit-avatar">{{ commit.author[0].toUpperCase() }}</div>
+                  <div class="timeline-line" v-if="index < paginatedCommits.length - 1"></div>
                 </div>
-              </template>
-              <div class="tab-content full-height">
-                <ApiDocPanel v-if="project" :project-id="project.id" />
-              </div>
-            </el-tab-pane>
-
-            <!-- 开发环境管理标签 -->
-            <el-tab-pane name="devenv">
-              <template #label>
-                <div class="tab-label">
-                  <el-icon><Monitor /></el-icon>
-                  <span>开发环境</span>
+                <div class="timeline-content">
+                  <div class="commit-header">
+                    <span class="commit-msg">{{ commit.message }}</span>
+                    <span class="commit-time">{{ formatDate(commit.date) }}</span>
+                  </div>
+                  <div class="commit-meta">
+                    <span class="commit-author">{{ commit.author }}</span>
+                    <span class="commit-hash">{{ commit.hash.substring(0, 7) }}</span>
+                  </div>
                 </div>
-              </template>
-              <div class="tab-content full-height">
-                <DevEnvironmentPanel 
-                  v-if="project" 
-                  :project-id="project.id" 
-                  :project-path="project.localPath"
-                />
               </div>
-            </el-tab-pane>
-          </el-tabs>
-      </div>
-    </div>
+              <div v-if="isLoadingMore" class="loading-more">加载中...</div>
+            </div>
+            <div v-else class="empty-state">
+              <el-icon class="empty-icon"><Search /></el-icon>
+              <p>未找到提交记录</p>
+            </div>
+          </div>
+        </div>
 
-    <!-- 回到顶部按钮 + 滚动进度 -->
-    <transition name="fade">
-      <div v-show="showBackTop" class="back-to-top-wrapper" @click="scrollToTop">
-        <!-- 圆形进度环 -->
-        <svg class="progress-ring" width="56" height="56">
-          <defs>
-            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" style="stop-color:#a8edea;stop-opacity:1" />
-              <stop offset="100%" style="stop-color:#fed6e3;stop-opacity:1" />
-            </linearGradient>
-          </defs>
-          <circle
-            class="progress-ring-bg"
-            cx="28"
-            cy="28"
-            r="24"
+        <!-- API Docs -->
+        <div v-if="activeTab === 'apis'" class="tab-view">
+          <ApiDocPanel v-if="project" :project-id="project.id" />
+        </div>
+
+        <!-- Dev Env -->
+        <div v-if="activeTab === 'devenv'" class="tab-view">
+          <DevEnvironmentPanel 
+            v-if="project" 
+            :project-id="project.id" 
+            :project-path="project.localPath"
           />
-          <circle
-            class="progress-ring-circle"
-            cx="28"
-            cy="28"
-            r="24"
-            :style="{
-              strokeDashoffset: 150.8 - (150.8 * scrollProgress) / 100
-            }"
-          />
-        </svg>
-        
-        <!-- 按钮和百分比 -->
-        <div class="back-to-top-content">
-          <el-icon class="back-icon"><ArrowUpBold /></el-icon>
-          <span class="progress-text">{{ scrollProgress }}%</span>
         </div>
       </div>
-    </transition>
-
-    <!-- Git智能提交弹窗 -->
-    <GitCommitModal 
-      v-model="showGitCommitModal"
-      :project-id="project?.id"
-      @success="refreshGitCommits"
-    />
-
-    <!-- Git拉取弹窗 -->
-    <GitPullModal 
-      v-model="showGitPullModal"
-      :project-id="project?.id"
-      @success="refreshGitCommits"
-    />
-
-    <!-- Git历史弹窗 -->
-    <GitHistoryModal 
-      v-model="showGitHistoryModal"
-      :project-id="project?.id"
-      @refresh="refreshGitCommits"
-    />
-
-    <!-- Git分支管理弹窗 -->
-    <GitBranchModal 
-      v-model="showGitBranchModal"
-      :project-id="project?.id"
-      @refresh="refreshGitCommits"
-    />
-
-    <!-- Git Stash弹窗 -->
-    <GitStashModal 
-      v-model="showGitStashModal"
-      :project-id="project?.id"
-      @refresh="refreshGitCommits"
-    />
-
-    <!-- Git文件变更弹窗 -->
-    <GitFilesModal 
-      v-model="showGitFilesModal"
-      :project-id="project?.id"
-      @refresh="refreshGitCommits"
-      @commit="showGitCommitModal = true"
-    />
-
-    <!-- Git冲突管理弹窗 -->
-    <GitConflictModal 
-      v-model="showGitConflictModal"
-      :project-id="project?.id"
-      @resolved="refreshGitCommits"
-    />
-
-    <!-- 文件历史记录弹窗 -->
-    <FileHistoryModal 
-      v-model="showFileHistoryModal"
-      :project-id="project?.id"
-    />
     </div>
+    <!-- 结束 content-area -->
+    
+    </div>
+    <!-- 结束 main-layout -->
+
+    <!-- Modals -->
+    <GitCommitModal v-model="showGitCommitModal" :project-id="project?.id" @success="refreshGitCommits" />
+    <GitPullModal v-model="showGitPullModal" :project-id="project?.id" @success="refreshGitCommits" />
+    <GitHistoryModal v-model="showGitHistoryModal" :project-id="project?.id" @refresh="refreshGitCommits" />
+    <GitBranchModal v-model="showGitBranchModal" :project-id="project?.id" @refresh="refreshGitCommits" />
+    <GitStashModal v-model="showGitStashModal" :project-id="project?.id" @refresh="refreshGitCommits" />
+    <GitFilesModal v-model="showGitFilesModal" :project-id="project?.id" @refresh="refreshGitCommits" @commit="showGitCommitModal = true" />
+    <GitConflictModal v-model="showGitConflictModal" :project-id="project?.id" @resolved="refreshGitCommits" />
+    <FileHistoryModal v-model="showFileHistoryModal" :project-id="project?.id" />
+
+    <!-- Back to Top -->
+    <transition name="fade">
+      <div v-show="showBackTop" class="back-to-top" @click="scrollToTop">
+        <el-icon><ArrowUpBold /></el-icon>
+      </div>
+    </transition>
   </div>
 </template>
 
 <style scoped>
-/* 主容器 */
-.project-detail {
-  height: 92vh;
-  background: linear-gradient(to bottom, #f5f7fa 0%, #e8ecf1 100%);
-  padding: 0;
-  overflow-y: hidden;
-}
-
-/* 骨架屏样式 */
-.skeleton-container {
-  animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.skeleton-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
+/* ===== 布局容器 ===== */
+.project-detail-layout {
   display: flex;
-  align-items: center;
-  gap: 20px;
+  flex-direction: column;
+  height: calc(100vh - 64px);
+  width: 100vw;
+  overflow: hidden;
+  position: relative;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
-.skeleton-circle {
-  width: 40px;
-  height: 40px;
+/* ===== 动态背景 ===== */
+.animated-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.gradient-orb {
+  position: absolute;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  filter: blur(100px);
+  opacity: 0.25;
+  animation: float 25s ease-in-out infinite;
 }
 
-.skeleton-content {
-  flex: 1;
+.orb-1 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, transparent 70%);
+  top: -200px;
+  right: -200px;
 }
 
-.skeleton-title {
-  height: 28px;
-  width: 200px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  margin-bottom: 12px;
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
+.orb-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.2) 0%, transparent 70%);
+  bottom: -150px;
+  left: -150px;
+  animation-delay: -10s;
 }
 
-.skeleton-stats {
-  display: flex;
-  gap: 12px;
+.grid-pattern {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(99, 102, 241, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
 
-.skeleton-stat {
-  height: 32px;
-  width: 120px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 16px;
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(40px, -40px) scale(1.1); }
 }
 
-.skeleton-body {
-  background: white;
-  max-width: 1600px;
-  margin: 0 auto;
-}
-
-.skeleton-tab-header {
-  display: flex;
-  gap: 20px;
-  padding: 20px 30px;
-  border-bottom: 2px solid #f5f7fa;
-}
-
-.skeleton-tab {
-  height: 40px;
-  width: 100px;
-  background: #f0f2f5;
-  border-radius: 4px;
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
-}
-
-.skeleton-content-area {
-  padding: 24px;
-}
-
-.skeleton-line {
-  height: 16px;
-  background: linear-gradient(90deg, #f0f2f5 25%, #e4e7ed 50%, #f0f2f5 75%);
-  background-size: 200% 100%;
-  border-radius: 4px;
-  margin-bottom: 16px;
-  animation: skeleton-loading 1.5s ease-in-out infinite;
-}
-
-.skeleton-line:nth-child(1) { width: 90%; }
-.skeleton-line:nth-child(2) { width: 85%; }
-.skeleton-line:nth-child(3) { width: 95%; }
-.skeleton-line:nth-child(4) { width: 80%; }
-.skeleton-line:nth-child(5) { width: 90%; }
-.skeleton-line:nth-child(6) { width: 75%; }
-.skeleton-line:nth-child(7) { width: 88%; }
-.skeleton-line:nth-child(8) { width: 82%; }
-
-@keyframes skeleton-pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-@keyframes skeleton-loading {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
-/* 内容包装器 */
-.content-wrapper {
-  animation: fadeIn 0.5s ease;
-}
-
-/* Hero头部 - 紧凑单行 */
-.hero-header {
+/* ===== 顶部导航栏 ===== */
+.top-nav {
   position: relative;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 5px;
-  color: white;
-}
-
-.hero-content {
-  max-width: 1600px;
-  margin: 0 auto;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.9);
+  padding: 16px 32px;
   display: flex;
   align-items: center;
-  gap: 30px;
-  position: relative;
+  justify-content: space-between;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.03);
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
 .back-btn {
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
-  backdrop-filter: blur(10px);
-  transition: all 0.3s;
-  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .back-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: scale(1.05);
+  border-color: #6366f1;
+  color: #6366f1;
+  transform: translateX(-2px);
 }
 
-.hero-info {
-  flex: 1;
+.project-info-compact {
   display: flex;
   align-items: center;
-  gap: 30px;
-  flex-wrap: wrap;
+  gap: 16px;
 }
 
-/* 项目标题区 */
-.project-title-section {
+.project-icon-small {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 12px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-}
-
-.project-icon {
-  font-size: 28px;
-  opacity: 0.9;
-}
-
-.hero-title {
-  font-size: 24px;
-  font-weight: 700;
-  margin: 0;
-  white-space: nowrap;
-}
-
-.status-tag {
-  margin-left: 8px;
-}
-
-/* 统计信息区 */
-.stats-section {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  flex-shrink: 0;
-}
-
-.stat-box {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 20px;
-  backdrop-filter: blur(10px);
-  font-size: 14px;
-  white-space: nowrap;
-}
-
-.stat-box .el-icon {
-  font-size: 16px;
-}
-
-.stat-text {
-  font-weight: 500;
-}
-
-/* 技术栈区 */
-.tech-section {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  flex: 1;
-}
-
-.tech-tag {
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  justify-content: center;
   color: white;
-  font-weight: 500;
-  backdrop-filter: blur(10px);
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
-/* Git操作按钮组 */
-.git-actions-section {
+.project-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.project-stats-inline {
   display: flex;
   align-items: center;
-  margin-bottom: 12px;
-}
-
-.git-actions-section .el-button-group {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.git-actions-section .el-button {
+  gap: 16px;
   font-size: 13px;
+  color: #64748b;
 }
 
-/* 项目地址区 */
-.path-section {
+.stat-inline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-right {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* ===== 主内容区 ===== */
+.main-layout {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ===== 侧边栏 ===== */
+.sidebar {
+  width: 240px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  overflow-y: auto;
   flex-shrink: 0;
 }
 
-.path-item {
+.sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.nav-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nav-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 20px;
-  backdrop-filter: blur(10px);
+  gap: 10px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.action-btn {
-  background: rgba(102, 126, 234, 0.3); /* Distinct background for action button */
-  border-color: rgba(102, 126, 234, 0.4);
-}
-
-.action-btn:hover {
-  background: rgba(102, 126, 234, 0.5);
-}
-
-.path-item:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.path-icon {
-  font-size: 15px;
-  opacity: 0.9;
-}
-
-.path-text {
-  font-weight: 500;
-}
-
-.copy-icon,
-.jump-icon {
-  font-size: 13px;
-  opacity: 0.8;
-  margin-left: 2px;
-}
-
-.path-item:hover .copy-icon,
-.path-item:hover .jump-icon {
-  opacity: 1;
-  animation: bounce 0.5s ease;
-}
-
-@keyframes bounce {
-  0%, 100% {
-    transform: translateX(0);
-  }
-  50% {
-    transform: translateX(3px);
-  }
-}
-
-/* 主内容区域 */
-.main-container {
-  max-width: 1600px;
-  margin: 0 auto;
+  transition: all 0.2s;
   position: relative;
 }
 
-/* 全宽内容区 */
-.content-full {
-  max-width: 1600px;
-  margin: 0 auto;
+.nav-item:hover {
+  background: rgba(99, 102, 241, 0.08);
+  color: #6366f1;
 }
 
-/* 标签页样式 */
-.project-tabs {
-  background: white;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-  overflow: hidden;
+.nav-item.active {
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
 }
 
-.project-tabs :deep(.el-tabs__header) {
-  margin: 0;
-  border-bottom: 2px solid #f5f7fa;
-  background: linear-gradient(to right, #f8f9fa, #ffffff);
-}
-
-.project-tabs :deep(.el-tabs__nav) {
-  border: none;
-}
-
-.project-tabs :deep(.el-tabs__item) {
-  border: none !important;
-  color: #606266;
-  font-weight: 500;
-  padding: 20px 30px;
-  transition: all 0.3s;
-}
-
-.project-tabs :deep(.el-tabs__item:hover) {
-  color: #667eea;
-}
-
-.project-tabs :deep(.el-tabs__item.is-active) {
-  color: #667eea;
-  background: white;
-}
-
-.tab-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
-}
-
-.tab-label .el-icon {
-  font-size: 18px;
-}
-
-.tab-badge {
-  margin-left: 8px;
-}
-
-/* 标签内容区域 */
-.tab-content {
-  overflow-y: auto;
-  scroll-behavior: smooth;
-}
-
-/* 为readme布局定制 */
-.readme-layout {
-  display: flex;
-  height: 79vh; /* 固定高度 */
-  overflow: hidden;
-  background: white;
-}
-
-/* 目录切换按钮 */
-.toc-toggle-btn {
+.nav-item.active::before {
+  content: '';
   position: absolute;
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 32px;
-  height: 48px;
-  background: white;
-  border: 1px solid #e8ecf1;
-  border-left: none;
-  border-radius: 0 8px 8px 0;
+  width: 3px;
+  height: 60%;
+  background: #6366f1;
+  border-radius: 0 2px 2px 0;
+}
+
+.nav-badge {
+  margin-left: auto;
+}
+
+/* ===== 内容区域 ===== */
+.content-area {
+  flex: 1;
   display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.content-header {
+  padding: 20px 32px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 100;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
 }
 
-.toc-toggle-btn:hover {
-  background: #f5f7fa;
-  transform: translateY(-50%) translateX(2px);
-  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1);
+.section-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
 }
 
-.toc-toggle-btn .el-icon {
-  font-size: 16px;
-  color: #606266;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.content-body {
+  flex: 1;
+  overflow: hidden;
 }
 
-.toc-toggle-btn .el-icon.rotated {
-  transform: rotate(180deg);
-}
-
-/* 目录侧边栏展开/收起动画 */
-.toc-slide-enter-active,
-.toc-slide-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.toc-slide-enter-from,
-.toc-slide-leave-to {
-  transform: translateX(-100%);
-  opacity: 0;
-}
-
-.toc-slide-enter-to,
-.toc-slide-leave-from {
-  transform: translateX(0);
-  opacity: 1;
-}
-
-/* 目录侧边栏 */
-.toc-sidebar {
-  width: 260px;
-  flex-shrink: 0;
-  border-right: 1px solid #e8ecf1;
-  background: #f8f9fa;
+.tab-view {
+  height: 100%;
   display: flex;
   flex-direction: column;
 }
 
-.toc-header {
-  padding: 16px 20px;
-  font-weight: 600;
-  color: #2c3e50;
-  border-bottom: 1px solid #e8ecf1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* ===== README 视图 ===== */
+.readme-view {
   background: white;
 }
 
-.toc-header .toc-loading {
+.readme-layout {
+  display: flex;
+  height: 100%;
+  position: relative;
+}
+
+/* 目录侧边栏 */
+.toc-sidebar {
+  width: 240px;
+  border-right: 1px solid #e2e8f0;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.toc-header {
+  padding: 16px;
+  font-weight: 600;
+  color: #334155;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toc-loading {
   margin-left: auto;
   animation: spin 1s linear infinite;
-  color: #667eea;
 }
 
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
-}
-
-.toc-loading-state {
-  padding: 10px 20px;
-}
-
-.toc-skeleton {
-  height: 20px;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: 4px;
-  margin-bottom: 12px;
-}
-
-.toc-skeleton:nth-child(2) { width: 85%; margin-left: 15px; }
-.toc-skeleton:nth-child(3) { width: 70%; margin-left: 30px; }
-.toc-skeleton:nth-child(4) { width: 80%; margin-left: 15px; }
-.toc-skeleton:nth-child(5) { width: 60%; margin-left: 30px; }
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
 }
 
 .toc-list {
@@ -2010,38 +1571,67 @@ onUnmounted(() => {
   padding: 10px 0;
 }
 
-/* 自定义滚动条 */
 .toc-list::-webkit-scrollbar {
   width: 4px;
 }
+
 .toc-list::-webkit-scrollbar-thumb {
-  background: #dcdfe6;
-  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.toc-loading-state {
+  padding: 10px 16px;
+}
+
+.toc-skeleton {
+  height: 20px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+@keyframes loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .toc-item {
-  padding: 8px 20px;
+  padding: 6px 16px;
+  font-size: 13px;
+  color: #64748b;
   cursor: pointer;
-  color: #606266;
-  font-size: 14px;
-  line-height: 1.4;
+  border-left: 2px solid transparent;
   transition: all 0.2s;
-  border-left: 3px solid transparent;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .toc-item:hover {
-  background: #eef1f6;
-  color: #667eea;
-  border-left-color: #667eea;
+  color: #6366f1;
+  background: #f1f5f9;
+  border-left-color: #6366f1;
 }
 
-.toc-level-1 { font-weight: 600; color: #303133; }
-.toc-level-2 { padding-left: 35px; }
-.toc-level-3 { padding-left: 50px; font-size: 13px; }
-.toc-level-4 { padding-left: 65px; font-size: 13px; color: #909399; }
+.toc-level-1 {
+  font-weight: 600;
+  color: #334155;
+}
+
+.toc-level-2 {
+  padding-left: 28px;
+}
+
+.toc-level-3 {
+  padding-left: 40px;
+}
+
+.toc-level-4 {
+  padding-left: 52px;
+}
 
 .toc-empty {
   display: flex;
@@ -2049,833 +1639,515 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 40px 20px;
-  color: #909399;
-  font-size: 13px;
-  text-align: center;
-}
-
-.toc-empty .el-icon {
-  font-size: 36px;
-  margin-bottom: 12px;
-  color: #c0c4cc;
-}
-
-.toc-hint {
-  font-size: 12px;
-  color: #c0c4cc;
-  margin-top: 8px;
-  line-height: 1.5;
-}
-
-.readme-content {
-  flex: 1;
-  height: 100%;
-  padding: 0 32px 10px;
-}
-
-/* 提交记录头部 */
-.commits-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 24px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e8ecf1;
-}
-
-.commits-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.info-text {
-  font-size: 14px;
-  color: #606266;
-  font-weight: 500;
-}
-
-.highlight-text {
-  color: #409eff;
-  font-weight: bold;
-  font-size: 16px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
-
-/* 搜索面板 */
-.search-panel {
-  padding: 20px 24px;
-  background: #fafbfc;
-  border-bottom: 1px solid #eef0f5;
-  box-shadow: inset 0 4px 8px -4px rgba(0, 0, 0, 0.05);
-  position: relative;
-}
-
-.filter-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 16px;
-}
-
-/* 提交时间范围的日期选择器宽度略窄一些 */
-.commit-date-range-picker {
-  width: 230px;
-  max-width: 100%;
-}
-
-.filter-card {
-  background: #fff;
-  border: 1px solid #edf0f5;
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
-  display: flex;
-  flex-direction: column;
+  color: #94a3b8;
   gap: 8px;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
-.filter-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
-}
-
-.filter-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #4b5563;
-  letter-spacing: 0.02em;
-}
-
-/* 优化 Element Plus 输入框样式 */
-.search-panel :deep(.el-input__wrapper),
-.search-panel :deep(.el-select__wrapper),
-.search-panel :deep(.el-range-editor.el-input__wrapper) {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
-  border-radius: 8px;
-  border: 1px solid #e4e7ed;
-  transition: all 0.3s ease;
-  background-color: #ffffff;
-}
-
-.search-panel :deep(.el-input__wrapper:hover),
-.search-panel :deep(.el-select__wrapper:hover),
-.search-panel :deep(.el-range-editor.el-input__wrapper:hover) {
-  border-color: #c0c4cc;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05) !important;
-}
-
-.search-panel :deep(.el-input__wrapper.is-focus),
-.search-panel :deep(.el-select__wrapper.is-focus),
-.search-panel :deep(.el-range-editor.is-active) {
-  box-shadow: 0 0 0 1px #667eea, 0 4px 12px rgba(102, 126, 234, 0.15) !important;
-  border-color: #667eea;
-}
-
-.search-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #ebeef5;
-}
-
-.filter-summary {
-  display: flex;
-  align-items: center;
-}
-
-.filter-hint.muted {
-  color: #a0a8b7;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 12px;
-}
-
-.filter-hint {
-  font-size: 13px;
-  color: #606266;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.filter-hint::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  background-color: #667eea;
-  border-radius: 50%;
-}
-
-/* 提交记录Tab还是使用原来的高度限制 */
-.commits-content {
-  padding: 24px;
-  max-height: calc(79vh - 60px);
-}
-
-/* 滚动条样式 */
-.tab-content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.tab-content::-webkit-scrollbar-track {
-  background: #f5f7fa;
-  border-radius: 4px;
-}
-
-.tab-content::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  border-radius: 4px;
-}
-
-.tab-content::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #764ba2, #667eea);
-}
-
-/* 空状态 */
-.empty-state {
-  text-align: center;
-  padding: 80px 40px;
-  color: #909399;
-  background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
-  border-radius: 12px;
-  margin: 40px;
-  border: 2px dashed #e4e7ed;
-}
-
-.empty-icon {
-  font-size: 72px;
-  color: #667eea;
-  margin-bottom: 24px;
-  opacity: 0.6;
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-.empty-title {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 16px 0;
-  color: #303133;
-}
-
-.empty-desc {
-  font-size: 14px;
-  margin: 12px 0 20px;
-  color: #606266;
-  line-height: 1.6;
-}
-
-.empty-tips {
-  list-style: none;
-  padding: 0;
-  margin: 20px 0;
-  text-align: left;
-  display: inline-block;
-}
-
-.empty-tips li {
-  padding: 8px 0;
-  color: #606266;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.empty-actions {
-  margin-top: 24px;
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-
-/* Markdown样式 */
-.markdown-body {
-  line-height: 1.8;
-  color: #2c3e50;
-  font-size: 15px;
-}
-
-.markdown-body h1 {
-  font-size: 2em;
-  font-weight: 700;
-  color: #1a202c;
-  border-bottom: 3px solid #667eea;
-  padding-bottom: 12px;
-  margin: 24px 0 16px;
-}
-
-.markdown-body h2 {
-  font-size: 1.6em;
-  font-weight: 600;
-  color: #2d3748;
-  border-bottom: 2px solid #e2e8f0;
-  padding-bottom: 8px;
-  margin: 28px 0 16px;
-}
-
-.markdown-body h3 {
-  font-size: 1.3em;
-  font-weight: 600;
-  color: #4a5568;
-  margin: 24px 0 12px;
-}
-
-.markdown-body p {
-  margin-bottom: 16px;
-  line-height: 1.7;
-}
-
-.markdown-body ul,
-.markdown-body ol {
-  margin-bottom: 16px;
-  padding-left: 28px;
-}
-
-.markdown-body li {
-  margin-bottom: 8px;
-}
-
-.markdown-body code {
-  background: #f7fafc;
-  color: #e83e8c;
-  padding: 3px 6px;
-  border-radius: 4px;
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 0.88em;
+/* 目录切换按钮 */
+.toc-toggle-btn {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 40px;
+  background: white;
   border: 1px solid #e2e8f0;
-}
-
-.markdown-body pre {
-  background: #2d3748;
-  color: #e2e8f0;
-  padding: 20px;
-  border-radius: 8px;
-  overflow-x: auto;
-  margin-bottom: 20px;
-  box-shadow: inset 0 2px 6px rgba(0,0,0,0.1);
-}
-
-.markdown-body pre code {
-  background: none;
-  border: none;
-  color: inherit;
-  padding: 0;
-}
-
-.markdown-body a {
-  color: #667eea;
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
   transition: all 0.2s;
 }
 
-.markdown-body a:hover {
-  border-bottom-color: #667eea;
+.toc-toggle-btn:hover {
+  background: #f8fafc;
 }
 
-/* Git提交记录 */
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  color: #909399;
+.toc-toggle-btn .el-icon {
+  transition: transform 0.3s;
 }
 
-.empty-state .hint {
+.toc-toggle-btn .el-icon.rotated {
+  transform: rotate(180deg);
+}
+
+/* 目录滑动动画 */
+.toc-slide-enter-active,
+.toc-slide-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toc-slide-enter-from,
+.toc-slide-leave-to {
+  width: 0;
+  opacity: 0;
+}
+
+/* README 内容区 */
+.readme-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 40px;
+  scroll-behavior: smooth;
+}
+
+.readme-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.readme-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.readme-content::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.3);
+  border-radius: 4px;
+}
+
+.readme-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.5);
+}
+
+/* README 编辑器 */
+.readme-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.editor-toolbar {
+  padding: 12px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+}
+
+.editor-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.editor-split {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.editor-textarea {
+  flex: 1;
+  height: 100%;
+}
+
+.editor-textarea :deep(.el-textarea__inner) {
+  height: 100%;
+  border: none;
+  padding: 24px;
+  resize: none;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 14px;
-  margin-top: 8px;
+  line-height: 1.6;
 }
 
-/* 时间线样式 */
-.timeline {
-  position: relative;
+.editor-preview {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  border-left: 1px solid #e2e8f0;
+  background: white;
+}
+
+.editor-preview::-webkit-scrollbar {
+  width: 8px;
+}
+
+.editor-preview::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+/* ===== 提交历史视图 ===== */
+.commits-view {
+  background: white;
+}
+
+.commits-toolbar {
+  padding: 16px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.search-bar {
+  flex: 1;
+  max-width: 400px;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.commits-list {
+  flex: 1;
+  overflow-y: auto;
   padding: 24px;
 }
 
-.timeline-item {
-  position: relative;
-  padding-left: 40px;
-  padding-bottom: 30px;
+.commits-list::-webkit-scrollbar {
+  width: 8px;
 }
 
-.timeline-dot {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 12px;
-  height: 12px;
+.commits-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.commits-list::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.3);
+  border-radius: 4px;
+}
+
+.timeline {
+  position: relative;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 24px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.timeline-item:hover {
+  transform: translateX(6px);
+}
+
+.timeline-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 40px;
+  flex-shrink: 0;
+}
+
+.commit-avatar {
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  border: 3px solid white;
-  box-shadow: 0 0 0 3px #e8ecf1;
-  z-index: 2;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  z-index: 1;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
 .timeline-line {
-  position: absolute;
-  left: 5px;
-  top: 12px;
-  bottom: 0;
   width: 2px;
-  background: linear-gradient(to bottom, #e8ecf1 0%, transparent 100%);
+  flex: 1;
+  background: #e2e8f0;
+  margin-top: 4px;
 }
 
 .timeline-content {
-  background: #f8f9fa;
-  padding: 16px;
+  flex: 1;
+  background: #f8fafc;
   border-radius: 12px;
-  border: 1px solid #e8ecf1;
-  transition: all 0.3s;
-  cursor: pointer;
-  position: relative;
+  padding: 16px;
+  border: 1px solid #f1f5f9;
+  transition: all 0.2s;
 }
 
-.timeline-content:hover {
+.timeline-item:hover .timeline-content {
   background: white;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  transform: translateX(4px);
-  border-color: #667eea;
-}
-
-.timeline-content:active {
-  transform: translateX(2px);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-}
-
-/* 高亮动画效果 */
-.highlight-commit .timeline-content {
-  animation: highlightPulse 2s ease-in-out;
-  background: linear-gradient(135deg, #e8f4fd 0%, #d4e9f7 100%);
-  border-color: #409eff;
-  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.3);
-}
-
-@keyframes highlightPulse {
-  0%, 100% {
-    transform: translateX(0);
-    box-shadow: 0 4px 16px rgba(64, 158, 255, 0.3);
-  }
-  50% {
-    transform: translateX(8px);
-    box-shadow: 0 6px 20px rgba(64, 158, 255, 0.5);
-  }
+  border-color: #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .commit-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  gap: 16px;
+}
+
+.commit-msg {
+  font-weight: 600;
+  color: #1e293b;
+  flex: 1;
+}
+
+.commit-time {
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.commit-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #64748b;
+  gap: 16px;
+}
+
+.commit-author {
+  flex: 1;
 }
 
 .commit-hash {
   font-family: 'Consolas', 'Monaco', monospace;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
-.commit-date {
-  color: #909399;
-  font-size: 13px;
-}
-
-.commit-message {
-  font-size: 15px;
-  color: #2c3e50;
-  font-weight: 500;
-  margin-bottom: 10px;
-  line-height: 1.6;
-}
-
-.commit-author {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: #606266;
-}
-
-.commit-author .el-icon {
-  font-size: 14px;
-  color: #667eea;
-}
-
-/* 加载更多容器 */
-.load-more-container {
-  text-align: center;
-  padding: 30px 20px;
-  margin-top: 20px;
-}
-
-.loading-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-size: 14px;
-  color: #667eea;
-}
-
-.loading-indicator .el-icon {
-  font-size: 20px;
-  animation: rotate 1s linear infinite;
-}
-
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.load-more-hint {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  color: #909399;
-  font-size: 14px;
-}
-
-.load-more-hint .hint-text {
-  font-size: 12px;
-  color: #c0c4cc;
-}
-
-.all-loaded {
+.loading-more {
   text-align: center;
   padding: 20px;
-  margin-top: 20px;
+  color: #94a3b8;
   font-size: 14px;
-  color: #67c23a;
-  background: #f0f9ff;
+}
+
+/* ===== Markdown 样式覆盖 ===== */
+.markdown-body {
+  font-family: inherit;
+  color: #334155;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.markdown-body h1,
+.markdown-body h2 {
+  border-bottom-color: #e2e8f0;
+}
+
+.markdown-body pre {
+  background: #1e293b;
   border-radius: 8px;
-  border: 1px dashed #67c23a;
-}
-
-/* 图片懒加载样式 */
-.markdown-body img.lazy-image {
-  filter: blur(5px);
-  transition: filter 0.3s ease;
-}
-
-.markdown-body img.loaded {
-  filter: none;
-}
-
-/* README编辑器样式 */
-.readme-editor {
-  padding: 24px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.editor-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #f0f2f5;
-}
-
-.editor-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.editor-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.hint-text {
-  font-size: 12px;
-  color: #909399;
-  padding: 4px 12px;
-  background: #f5f7fa;
-  border-radius: 4px;
-}
-
-.editor-layout {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-}
-
-.editor-pane,
-.preview-pane {
-  min-height: 500px;
-  max-height: 70vh;
-  overflow-y: auto;
-  position: relative;
-  scroll-behavior: smooth;
-}
-
-/* 美化滚动条 */
-.editor-pane::-webkit-scrollbar,
-.preview-pane::-webkit-scrollbar {
-  width: 8px;
-}
-
-.editor-pane::-webkit-scrollbar-track,
-.preview-pane::-webkit-scrollbar-track {
-  background: #f5f7fa;
-  border-radius: 4px;
-}
-
-.editor-pane::-webkit-scrollbar-thumb,
-.preview-pane::-webkit-scrollbar-thumb {
-  background: #dcdfe6;
-  border-radius: 4px;
-}
-
-.editor-pane::-webkit-scrollbar-thumb:hover,
-.preview-pane::-webkit-scrollbar-thumb:hover {
-  background: #c0c4cc;
-}
-
-.pane-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #606266;
-  margin-bottom: 12px;
-  padding-left: 12px;
-  border-left: 3px solid #667eea;
-}
-
-.editor-textarea :deep(.el-textarea__inner) {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 14px;
-  line-height: 1.8;
-  border: 1px solid #e4e7ed;
-  border-radius: 4px;
-  padding: 16px;
-}
-
-.preview-content {
-  border: 1px solid #e4e7ed;
-  border-radius: 4px;
-  padding: 24px;
-  min-height: 500px;
-  background: #fafafa;
-  overflow-y: auto;
-}
-
-/* 回到顶部按钮 + 进度环 */
-.back-to-top-wrapper {
-  position: fixed;
-  right: 40px;
-  bottom: 40px;
-  width: 56px;
-  height: 56px;
-  z-index: 1000;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.back-to-top-wrapper:hover {
-  transform: translateY(-4px) scale(1.1);
-}
-
-/* 进度环SVG */
-.progress-ring {
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform: rotate(-90deg);
-}
-
-.progress-ring-bg {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.2);
-  stroke-width: 3;
-}
-
-.progress-ring-circle {
-  fill: none;
-  stroke: url(#progressGradient);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-dasharray: 150.8;
-  stroke-dashoffset: 150.8;
-  transition: stroke-dashoffset 0.3s ease;
-}
-
-/* 按钮内容 */
-.back-to-top-content {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  border-radius: 50%;
-  color: white;
-  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
-}
-
-.back-to-top-wrapper:hover .back-to-top-content {
-  box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
-  background: linear-gradient(135deg, #764ba2, #667eea);
-}
-
-.back-icon {
-  font-size: 18px;
-  margin-bottom: -2px;
-}
-
-.progress-text {
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-/* 淡入淡出动画 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: all 0.3s ease;
-}
-
-.fade-enter-from {
-  opacity: 0;
-  transform: translateY(20px) scale(0.8);
-}
-
-.fade-leave-to {
-  opacity: 0;
-  transform: translateY(20px) scale(0.8);
-}
-
-/* Markdown-it 自动生成的目录样式 */
-.table-of-contents {
-  background: linear-gradient(135deg, #fafbfd 0%, #f6f8fb 100%);
-  border-left: 4px solid #667eea;
-  padding: 20px 24px;
-  margin: 24px 0;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-.table-of-contents::before {
-  content: '📑 目录';
-  display: block;
-  font-size: 18px;
-  font-weight: 600;
-  color: #667eea;
-  margin-bottom: 16px;
-  letter-spacing: 0.5px;
-}
-
-.table-of-contents ul {
-  list-style: none;
-  padding-left: 0;
-  margin: 0;
-}
-
-.table-of-contents li {
-  padding: 6px 0;
-  line-height: 1.8;
-}
-
-.table-of-contents a {
-  color: #4a5568;
-  text-decoration: none;
-  transition: all 0.3s ease;
-  padding: 4px 8px;
-  border-radius: 4px;
-  display: inline-block;
-}
-
-.table-of-contents a:hover {
-  color: #667eea;
-  background: rgba(102, 126, 234, 0.1);
-  transform: translateX(4px);
-}
-
-/* 代码块高亮增强 */
-.markdown-body pre.hljs {
-  background: #f6f8fa;
-  border: 1px solid #e1e4e8;
-  border-radius: 8px;
-  padding: 16px;
-  margin: 16px 0;
-  overflow-x: auto;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .markdown-body code {
-  background: #f6f8fa;
+  background: #f1f5f9;
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.9em;
-  color: #d73a49;
-  border: 1px solid #e1e4e8;
 }
 
 .markdown-body pre code {
   background: transparent;
   padding: 0;
-  border: none;
-  color: inherit;
 }
 
-/* 标题锚点样式 */
-.markdown-body h1 .header-anchor,
-.markdown-body h2 .header-anchor,
-.markdown-body h3 .header-anchor,
-.markdown-body h4 .header-anchor,
-.markdown-body h5 .header-anchor,
-.markdown-body h6 .header-anchor {
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  margin-left: 8px;
-  color: #667eea;
-  text-decoration: none;
+/* ===== 空状态 ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #94a3b8;
+  padding: 60px 20px;
 }
 
-.markdown-body h1:hover .header-anchor,
-.markdown-body h2:hover .header-anchor,
-.markdown-body h3:hover .header-anchor,
-.markdown-body h4:hover .header-anchor,
-.markdown-body h5:hover .header-anchor,
-.markdown-body h6:hover .header-anchor {
-  opacity: 1;
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
 }
 
-/* 全高度内容区 */
-.tab-content.full-height {
-  height: calc(100vh - 280px);
+/* ===== 项目卡片（侧边栏） ===== */
+.project-card {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.project-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 24px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.project-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 12px;
+  line-height: 1.3;
+}
+
+.project-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.progress-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: #6366f1;
+}
+
+.progress-track {
+  height: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
   overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.project-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.tech-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tech-tag {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.08);
+  color: #6366f1;
+  border-radius: 6px;
+}
+
+/* ===== 侧边栏底部 ===== */
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  gap: 8px;
+}
+
+.icon-btn {
+  flex: 1;
+  padding: 10px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  font-size: 18px;
+}
+
+.icon-btn:hover {
+  border-color: #6366f1;
+  color: #6366f1;
+  transform: translateY(-2px);
+}
+
+/* ===== 回到顶部按钮 ===== */
+.back-to-top {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  transition: all 0.3s;
+}
+
+.back-to-top:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(99, 102, 241, 0.5);
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 200px;
+  }
+  
+  .content-header,
+  .content-body {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .project-detail-layout {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  }
+  
+  .nav-menu {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  
+  .nav-item {
+    flex-shrink: 0;
+  }
 }
 </style>

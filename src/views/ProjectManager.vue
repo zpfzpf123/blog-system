@@ -1,27 +1,90 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Edit, Delete, View, Search, Filter, Star, StarFilled, Calendar, TrendCharts, FolderOpened } from '@element-plus/icons-vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  Calendar,
+  Delete,
+  Edit,
+  Filter,
+  FolderOpened,
+  Plus,
+  RefreshRight,
+  Search,
+  Star,
+  StarFilled,
+  TrendCharts,
+  View,
+} from '@element-plus/icons-vue'
 import axios from '@/utils/axios'
 import FolderSelectorDialog from '@/components/FolderSelectorDialog.vue'
 
-// 类型定义
+defineOptions({
+  name: 'ProjectManagerPage',
+})
+
+type ProjectStatus = '进行中' | '已完成' | '暂停' | '计划中'
+type StatusFilter = ProjectStatus | ''
+type StatusTagType = 'primary' | 'success' | 'warning' | 'info'
+type GitUserSelectValue = number | string | undefined
+
+interface ProjectApiItem {
+  id: number
+  name: string
+  description?: string
+  status?: string
+  progress?: number | string
+  techStack?: string[] | string | null
+  localPath?: string
+  repoUrl?: string
+  gitCommits?: string
+  gitUserId?: number | string
+  isFavorite?: boolean
+  createdAt?: string
+  updatedAt?: string
+}
+
 interface Project {
   id: number
   name: string
   description: string
-  coverImage?: string
-  status: '进行中' | '已完成' | '暂停' | '计划中'
+  status: ProjectStatus
   progress: number
   techStack: string[]
-  localPath?: string
-  repoUrl?: string
-  gitCommits?: string
+  localPath: string
+  repoUrl: string
+  gitCommits: string
   gitUserId?: number
   isFavorite: boolean
   createdAt: string
   updatedAt: string
+}
+
+interface ProjectForm {
+  id?: number
+  name: string
+  description: string
+  status: ProjectStatus
+  progress: number
+  techStack: string[]
+  localPath: string
+  repoUrl: string
+  gitCommits: string
+  gitUserId?: GitUserSelectValue
+  isFavorite: boolean
+}
+
+interface ProjectPayload {
+  name: string
+  description: string
+  status: ProjectStatus
+  progress: number
+  techStack: string
+  localPath: string
+  repoUrl: string
+  gitCommits: string
+  gitUserId?: number
+  isFavorite: boolean
 }
 
 interface GitUser {
@@ -33,58 +96,42 @@ interface GitUser {
   isDefault?: boolean
 }
 
-interface GitCommit {
-  hash: string
-  author: string
-  date: string
-  message: string
+interface GitCommitItem {
+  hash?: string
+  author?: string
+  date?: string
+  message?: string
 }
 
-// 状态管理
-const router = useRouter()
-const projects = ref<Project[]>([])
-const gitUsers = ref<GitUser[]>([])
-const loading = ref(false)
-const dialogVisible = ref(false)
-const dialogTitle = ref('新建项目')
-const isEdit = ref(false)
-const searchKeyword = ref('')
-const statusFilter = ref<string>('')
-const folderSelectorVisible = ref(false)
-const analyzingProject = ref(false)
-const addGitUserDialogVisible = ref(false)
-const newGitUserName = ref('')
-const newGitUserData = ref({
-  name: '',
-  username: '',
-  password: '',
-  email: '',
-  description: ''
-})
+interface AnalyzeResult {
+  projectName?: string
+  readmeContent?: string
+  gitRemoteUrl?: string
+  gitCommits?: GitCommitItem[]
+}
 
-// 表单数据
-const formData = ref<Partial<Project>>({
-  name: '',
-  description: '',
-  status: '进行中',
-  progress: 0,
-  techStack: [],
-  localPath: '',
-  repoUrl: '',
-  gitCommits: '',
-  isFavorite: false,
-})
+interface GitUserCreatePayload {
+  name: string
+  username: string
+  password: string
+  email: string
+  description: string
+}
 
-// 技术栈选项
-const techOptions = [
-  'Vue 3', 'React', 'Angular', 'TypeScript', 'JavaScript',
-  'Spring Boot', 'Node.js', 'Express', 'Nest.js',
-  'MySQL', 'MongoDB', 'Redis', 'PostgreSQL',
-  'Docker', 'Kubernetes', 'CI/CD'
-]
+interface GitUserCreateResponse {
+  id: number
+}
 
-// 状态选项
-const statusOptions = [
+interface ApiErrorLike {
+  response?: {
+    data?: {
+      message?: string
+    }
+  }
+  message?: string
+}
+
+const statusOptions: Array<{ label: string; value: StatusFilter }> = [
   { label: '全部', value: '' },
   { label: '进行中', value: '进行中' },
   { label: '已完成', value: '已完成' },
@@ -92,91 +139,60 @@ const statusOptions = [
   { label: '计划中', value: '计划中' },
 ]
 
-// 计算属性 - 筛选后的项目列表
-const filteredProjects = computed(() => {
-  let result = projects.value
+const techOptions = [
+  'Vue 3',
+  'React',
+  'Angular',
+  'TypeScript',
+  'JavaScript',
+  'Node.js',
+  'Express',
+  'Nest.js',
+  'Spring Boot',
+  'MySQL',
+  'MongoDB',
+  'Redis',
+  'PostgreSQL',
+  'Docker',
+  'Kubernetes',
+  'CI/CD',
+]
 
-  // 按关键词搜索
-  if (searchKeyword.value) {
-    const keyword = searchKeyword.value.toLowerCase()
-    result = result.filter(
-      (p) =>
-        p.name.toLowerCase().includes(keyword) ||
-        p.description?.toLowerCase().includes(keyword) ||
-        p.techStack.some((tech) => tech.toLowerCase().includes(keyword))
-    )
-  }
+const statusTypeMap: Record<ProjectStatus, StatusTagType> = {
+  进行中: 'primary',
+  已完成: 'success',
+  暂停: 'warning',
+  计划中: 'info',
+}
 
-  // 按状态筛选
-  if (statusFilter.value) {
-    result = result.filter((p) => p.status === statusFilter.value)
-  }
+const router = useRouter()
+const projects = ref<Project[]>([])
+const gitUsers = ref<GitUser[]>([])
+const loading = ref(false)
+const savingProject = ref(false)
+const analyzingProject = ref(false)
+const addingGitUser = ref(false)
 
-  // 收藏项目排在前面
-  return result.sort((a, b) => {
-    if (a.isFavorite && !b.isFavorite) return -1
-    if (!a.isFavorite && b.isFavorite) return 1
-    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  })
+const dialogVisible = ref(false)
+const dialogTitle = ref('新建项目')
+const isEdit = ref(false)
+const folderSelectorVisible = ref(false)
+const addGitUserDialogVisible = ref(false)
+
+const searchKeyword = ref('')
+const statusFilter = ref<StatusFilter>('')
+
+const formData = ref<ProjectForm>(createDefaultForm())
+const newGitUserData = ref<GitUserCreatePayload>({
+  name: '',
+  username: '',
+  password: '',
+  email: '',
+  description: '',
 })
 
-// 统计数据
-const statistics = computed(() => {
+function createDefaultForm(): ProjectForm {
   return {
-    total: projects.value.length,
-    inProgress: projects.value.filter((p) => p.status === '进行中').length,
-    completed: projects.value.filter((p) => p.status === '已完成').length,
-    paused: projects.value.filter((p) => p.status === '暂停').length,
-  }
-})
-
-// API 方法
-// 获取Git用户列表
-const fetchGitUsers = async () => {
-  try {
-    const response = await axios.get('/api/git-users')
-    gitUsers.value = response.data
-  } catch (error) {
-    console.error('获取Git用户列表失败:', error)
-    // 不显示错误，因为Git用户可能还没有配置
-  }
-}
-
-const fetchProjects = async () => {
-  try {
-    loading.value = true
-    const response = await axios.get('/api/projects')
-    // 解析techStack字段（从JSON字符串转为数组）
-    projects.value = response.data.map((project: any) => {
-      let techStack = []
-      try {
-        if (typeof project.techStack === 'string' && project.techStack.trim()) {
-          const parsed = JSON.parse(project.techStack)
-          techStack = Array.isArray(parsed) ? parsed.filter(t => t && t.trim()) : []
-        } else if (Array.isArray(project.techStack)) {
-          techStack = project.techStack.filter(t => t && t.trim())
-        }
-      } catch (e) {
-        console.warn('解析techStack失败:', project.id, e)
-        techStack = []
-      }
-      return {
-        ...project,
-        techStack
-      }
-    })
-  } catch (error) {
-    console.error('获取项目列表失败:', error)
-    ElMessage.error('获取项目列表失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-const openCreateDialog = () => {
-  isEdit.value = false
-  dialogTitle.value = '新建项目'
-  formData.value = {
     name: '',
     description: '',
     status: '进行中',
@@ -188,873 +204,1358 @@ const openCreateDialog = () => {
     gitUserId: undefined,
     isFavorite: false,
   }
-  dialogVisible.value = true
 }
 
-// 打开文件夹选择器
-const openFolderSelector = () => {
-  folderSelectorVisible.value = true
+function isProjectStatus(value: string | undefined): value is ProjectStatus {
+  return value === '进行中' || value === '已完成' || value === '暂停' || value === '计划中'
 }
 
-// 处理文件夹选择
-const handleFolderSelected = async (path: string) => {
-  console.log('选择的文件夹:', path)
-  formData.value.localPath = path
-  
-  // 自动解析项目
-  await analyzeProject(path)
+function normalizeProgress(value: unknown): number {
+  const parsed = Number(value)
+  if (Number.isNaN(parsed)) return 0
+  return Math.max(0, Math.min(100, Math.round(parsed)))
 }
 
-// 解析项目
-const analyzeProject = async (path: string) => {
-  try {
-    analyzingProject.value = true
-    ElMessage.info('正在解析项目...')
-    
-    const response = await axios.post('/api/filesystem/analyze', JSON.stringify(path), {
-      headers: {
-        'Content-Type': 'application/json'
+function normalizeTechStack(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean)
+  }
+
+  if (typeof value === 'string') {
+    const source = value.trim()
+    if (!source) return []
+
+    try {
+      const parsed = JSON.parse(source) as unknown
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item).trim()).filter(Boolean)
       }
-    })
-    
-    const result = response.data
-    console.log('项目解析结果:', result)
-    
-    // 自动填充项目名称
-    if (result.projectName && !formData.value.name) {
-      formData.value.name = result.projectName
+    } catch {
+      return source
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
     }
-    
-    // 自动填充README内容
-    if (result.readmeContent) {
-      formData.value.description = result.readmeContent // 使用完整README内容作为描述
-    }
-    
-    // 自动填充Git远程仓库地址
-    if (result.gitRemoteUrl) {
-      formData.value.repoUrl = result.gitRemoteUrl
-      console.log('自动填充仓库地址:', result.gitRemoteUrl)
-    }
-    
-    // 保存Git提交记录
-    if (result.gitCommits && result.gitCommits.length > 0) {
-      formData.value.gitCommits = JSON.stringify(result.gitCommits)
-      ElMessage.success(`成功解析项目！找到 ${result.gitCommits.length} 条Git提交记录`)
-    } else {
-      ElMessage.success('项目解析成功！')
-    }
-    
-  } catch (error) {
-    console.error('解析项目失败:', error)
-    ElMessage.error('解析项目失败')
-  } finally {
-    analyzingProject.value = false
+  }
+
+  return []
+}
+
+function mapProjectFromApi(item: ProjectApiItem): Project {
+  return {
+    id: Number(item.id),
+    name: typeof item.name === 'string' && item.name.trim() ? item.name.trim() : '未命名项目',
+    description: typeof item.description === 'string' ? item.description : '',
+    status: isProjectStatus(item.status) ? item.status : '计划中',
+    progress: normalizeProgress(item.progress),
+    techStack: normalizeTechStack(item.techStack),
+    localPath: typeof item.localPath === 'string' ? item.localPath : '',
+    repoUrl: typeof item.repoUrl === 'string' ? item.repoUrl : '',
+    gitCommits: typeof item.gitCommits === 'string' ? item.gitCommits : '',
+    gitUserId: typeof item.gitUserId === 'number' ? item.gitUserId : undefined,
+    isFavorite: Boolean(item.isFavorite),
+    createdAt: typeof item.createdAt === 'string' ? item.createdAt : '',
+    updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : '',
   }
 }
 
+function buildProjectPayload(source: ProjectForm | Project): ProjectPayload {
+  const normalizedTech = Array.from(
+    new Set(source.techStack.map((item) => item.trim()).filter(Boolean)),
+  )
+
+  const payload: ProjectPayload = {
+    name: source.name.trim(),
+    description: source.description.trim(),
+    status: source.status,
+    progress: normalizeProgress(source.progress),
+    techStack: JSON.stringify(normalizedTech),
+    localPath: source.localPath.trim(),
+    repoUrl: source.repoUrl.trim(),
+    gitCommits: source.gitCommits || '',
+    isFavorite: Boolean(source.isFavorite),
+  }
+
+  if (typeof source.gitUserId === 'number') {
+    payload.gitUserId = source.gitUserId
+  }
+
+  return payload
+}
+
+function parseGitCommitCount(raw: string): number {
+  if (!raw.trim()) return 0
+
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (Array.isArray(parsed)) return parsed.length
+  } catch {
+    return 0
+  }
+
+  return 0
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  const resolved = error as ApiErrorLike
+  return resolved.response?.data?.message || resolved.message || fallback
+}
+
+function isActionCancelled(error: unknown): boolean {
+  return error === 'cancel' || error === 'close'
+}
+
+const statistics = computed(() => {
+  const total = projects.value.length
+  const inProgress = projects.value.filter((project) => project.status === '进行中').length
+  const completed = projects.value.filter((project) => project.status === '已完成').length
+  const favorites = projects.value.filter((project) => project.isFavorite).length
+
+  return {
+    total,
+    inProgress,
+    completed,
+    favorites,
+  }
+})
+
+const statCards = computed(() => [
+  {
+    key: 'total',
+    label: '项目总数',
+    hint: '全部项目',
+    value: statistics.value.total,
+    icon: TrendCharts,
+    tone: 'is-blue',
+  },
+  {
+    key: 'inProgress',
+    label: '进行中',
+    hint: '当前推进',
+    value: statistics.value.inProgress,
+    icon: Calendar,
+    tone: 'is-cyan',
+  },
+  {
+    key: 'completed',
+    label: '已完成',
+    hint: '交付归档',
+    value: statistics.value.completed,
+    icon: View,
+    tone: 'is-green',
+  },
+  {
+    key: 'favorites',
+    label: '收藏项目',
+    hint: '重点关注',
+    value: statistics.value.favorites,
+    icon: StarFilled,
+    tone: 'is-gold',
+  },
+])
+
+const filteredProjects = computed<Project[]>(() => {
+  const keyword = searchKeyword.value.trim().toLowerCase()
+  const activeStatus = statusFilter.value
+
+  const list = projects.value.filter((project) => {
+    const keywordMatched = !keyword
+      || project.name.toLowerCase().includes(keyword)
+      || project.description.toLowerCase().includes(keyword)
+      || project.techStack.some((tech) => tech.toLowerCase().includes(keyword))
+
+    const statusMatched = !activeStatus || project.status === activeStatus
+    return keywordMatched && statusMatched
+  })
+
+  return [...list].sort((prev, next) => {
+    if (prev.isFavorite && !next.isFavorite) return -1
+    if (!prev.isFavorite && next.isFavorite) return 1
+    return new Date(next.updatedAt).getTime() - new Date(prev.updatedAt).getTime()
+  })
+})
+
+const activeFilterLabel = computed(() => {
+  const labels: string[] = []
+  if (searchKeyword.value.trim()) {
+    labels.push(`关键词: ${searchKeyword.value.trim()}`)
+  }
+  if (statusFilter.value) {
+    labels.push(`状态: ${statusFilter.value}`)
+  }
+  return labels.length > 0 ? labels.join(' | ') : '当前未设置筛选条件'
+})
+
+const showAddGitUserButton = computed(() => {
+  if (typeof formData.value.gitUserId !== 'string') return false
+
+  const inputName = formData.value.gitUserId.trim().toLowerCase()
+  if (!inputName) return false
+
+  return !gitUsers.value.some((user) => user.username.toLowerCase() === inputName)
+})
+
+const gitCommitCountForForm = computed(() => parseGitCommitCount(formData.value.gitCommits))
+
+const fetchGitUsers = async () => {
+  try {
+    const response = await axios.get<GitUser[]>('/api/git-users')
+    gitUsers.value = response.data
+  } catch (error) {
+    console.warn('获取 Git 用户列表失败:', error)
+  }
+}
+
+const fetchProjects = async () => {
+  try {
+    loading.value = true
+    const response = await axios.get<ProjectApiItem[]>('/api/projects')
+    projects.value = response.data.map(mapProjectFromApi)
+  } catch (error) {
+    console.error('获取项目列表失败:', error)
+    ElMessage.error(getErrorMessage(error, '获取项目列表失败'))
+  } finally {
+    loading.value = false
+  }
+}
+
+const openCreateDialog = () => {
+  dialogTitle.value = '新建项目'
+  isEdit.value = false
+  formData.value = createDefaultForm()
+  dialogVisible.value = true
+}
+
 const openEditDialog = (project: Project) => {
-  isEdit.value = true
   dialogTitle.value = '编辑项目'
-  formData.value = { ...project }
+  isEdit.value = true
+  formData.value = {
+    id: project.id,
+    name: project.name,
+    description: project.description,
+    status: project.status,
+    progress: project.progress,
+    techStack: [...project.techStack],
+    localPath: project.localPath,
+    repoUrl: project.repoUrl,
+    gitCommits: project.gitCommits,
+    gitUserId: project.gitUserId,
+    isFavorite: project.isFavorite,
+  }
   dialogVisible.value = true
 }
 
 const saveProject = async () => {
-  if (!formData.value.name) {
+  if (!formData.value.name.trim()) {
     ElMessage.warning('请输入项目名称')
     return
   }
 
   try {
-    // 准备数据：将数组字段转换为JSON字符串
-    const projectData = {
-      ...formData.value,
-      techStack: JSON.stringify(formData.value.techStack || [])
-    }
-    
-    if (isEdit.value) {
-      await axios.put(`/api/projects/${formData.value.id}`, projectData)
+    savingProject.value = true
+    const payload = buildProjectPayload(formData.value)
+
+    if (isEdit.value && formData.value.id) {
+      await axios.put(`/api/projects/${formData.value.id}`, payload)
       ElMessage.success('项目更新成功')
     } else {
-      await axios.post('/api/projects', projectData)
+      await axios.post('/api/projects', payload)
       ElMessage.success('项目创建成功')
     }
+
     dialogVisible.value = false
-    fetchProjects()
+    await fetchProjects()
   } catch (error) {
     console.error('保存项目失败:', error)
-    ElMessage.error('保存项目失败')
+    ElMessage.error(getErrorMessage(error, '保存项目失败'))
+  } finally {
+    savingProject.value = false
   }
 }
 
 const deleteProject = async (id: number) => {
   try {
-    await ElMessageBox.confirm('确定要删除该项目吗？', '提示', {
-      confirmButtonText: '确定',
+    await ElMessageBox.confirm('确定删除该项目吗？删除后不可恢复。', '删除确认', {
+      confirmButtonText: '删除',
       cancelButtonText: '取消',
       type: 'warning',
     })
 
     await axios.delete(`/api/projects/${id}`)
-    ElMessage.success('项目删除成功')
-    fetchProjects()
+    ElMessage.success('项目已删除')
+    await fetchProjects()
   } catch (error) {
-    if (error !== 'cancel') {
-      console.error('删除项目失败:', error)
-      ElMessage.error('删除项目失败')
-    }
+    if (isActionCancelled(error)) return
+    console.error('删除项目失败:', error)
+    ElMessage.error(getErrorMessage(error, '删除项目失败'))
   }
 }
 
 const toggleFavorite = async (project: Project) => {
+  const previousValue = project.isFavorite
+  project.isFavorite = !project.isFavorite
+
   try {
-    project.isFavorite = !project.isFavorite
-    await axios.put(`/api/projects/${project.id}`, project)
-    ElMessage.success(project.isFavorite ? '已添加到收藏' : '已取消收藏')
+    await axios.put(`/api/projects/${project.id}`, buildProjectPayload(project))
+    ElMessage.success(project.isFavorite ? '已加入收藏' : '已取消收藏')
   } catch (error) {
+    project.isFavorite = previousValue
     console.error('更新收藏状态失败:', error)
-    project.isFavorite = !project.isFavorite
-    ElMessage.error('操作失败')
+    ElMessage.error(getErrorMessage(error, '收藏状态更新失败'))
   }
 }
 
-// 状态标签样式
-const getStatusType = (status: string) => {
-  const typeMap: Record<string, string> = {
-    进行中: 'primary',
-    已完成: 'success',
-    暂停: 'warning',
-    计划中: 'info',
+const openFolderSelector = () => {
+  folderSelectorVisible.value = true
+}
+
+const analyzeProject = async (path: string) => {
+  try {
+    analyzingProject.value = true
+    ElMessage.info('正在解析项目目录...')
+
+    const response = await axios.post<AnalyzeResult>(
+      '/api/filesystem/analyze',
+      JSON.stringify(path),
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+    )
+
+    const result = response.data
+
+    if (result.projectName && !formData.value.name.trim()) {
+      formData.value.name = result.projectName
+    }
+    if (result.readmeContent) {
+      formData.value.description = result.readmeContent
+    }
+    if (result.gitRemoteUrl) {
+      formData.value.repoUrl = result.gitRemoteUrl
+    }
+    if (result.gitCommits && result.gitCommits.length > 0) {
+      formData.value.gitCommits = JSON.stringify(result.gitCommits)
+      ElMessage.success(`解析成功，读取到 ${result.gitCommits.length} 条提交记录`)
+      return
+    }
+
+    ElMessage.success('项目解析成功')
+  } catch (error) {
+    console.error('解析项目失败:', error)
+    ElMessage.error(getErrorMessage(error, '项目解析失败'))
+  } finally {
+    analyzingProject.value = false
   }
-  return typeMap[status] || 'info'
 }
 
-// 格式化日期
-const formatDate = (dateStr: string) => {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('zh-CN')
+const handleFolderSelected = async (path: string) => {
+  formData.value.localPath = path
+  await analyzeProject(path)
 }
 
-// 进度条颜色
-const getProgressColor = (progress: number) => {
-  if (progress >= 80) return '#67c23a'
-  if (progress >= 50) return '#409eff'
-  if (progress >= 30) return '#e6a23c'
-  return '#f56c6c'
-}
-
-// 查看项目详情
-const viewProjectDetail = (project: Project) => {
-  router.push({
-    name: 'ProjectDetail',
-    params: { id: project.id }
-  })
-}
-
-// 显示新增Git用户按钮
-const showAddGitUserButton = computed(() => {
-  if (!formData.value.gitUserId) return false
-  // 检查输入的是否是新用户名（不在现有用户列表中）
-  const inputValue = formData.value.gitUserId
-  return typeof inputValue === 'string' && !gitUsers.value.some(u => u.id === inputValue)
-})
-
-// 打开新增Git用户对话框
 const openAddGitUserDialog = () => {
-  // 获取输入的用户名
-  const inputUsername = formData.value.gitUserId as string
+  if (typeof formData.value.gitUserId !== 'string') return
+
+  const username = formData.value.gitUserId.trim()
+  if (!username) {
+    ElMessage.warning('请先输入新的 Git 用户名')
+    return
+  }
+
   newGitUserData.value = {
-    name: inputUsername,
-    username: inputUsername,
+    name: username,
+    username,
     password: '',
     email: '',
-    description: ''
+    description: '',
   }
   addGitUserDialogVisible.value = true
 }
 
-// 新增Git用户
 const addGitUser = async () => {
-  if (!newGitUserData.value.username || !newGitUserData.value.password) {
-    ElMessage.warning('请输入用户名和Token')
+  if (!newGitUserData.value.username.trim() || !newGitUserData.value.password.trim()) {
+    ElMessage.warning('请输入用户名和 Token')
     return
   }
 
   try {
-    const response = await axios.post('/api/git-users', newGitUserData.value)
-    ElMessage.success('Git用户创建成功')
-    
-    // 刷新Git用户列表
+    addingGitUser.value = true
+    const response = await axios.post<GitUserCreateResponse>('/api/git-users', newGitUserData.value)
+
     await fetchGitUsers()
-    
-    // 将新创建的用户设置为当前项目的Git用户
-    formData.value.gitUserId = response.data.id
-    
-    // 关闭对话框
+
+    if (typeof response.data.id === 'number') {
+      formData.value.gitUserId = response.data.id
+    }
+
     addGitUserDialogVisible.value = false
-  } catch (error: any) {
-    console.error('创建Git用户失败:', error)
-    ElMessage.error(error.response?.data?.message || '创建Git用户失败')
+    ElMessage.success('Git 用户创建成功')
+  } catch (error) {
+    console.error('创建 Git 用户失败:', error)
+    ElMessage.error(getErrorMessage(error, '创建 Git 用户失败'))
+  } finally {
+    addingGitUser.value = false
   }
 }
 
+const resetFilters = () => {
+  searchKeyword.value = ''
+  statusFilter.value = ''
+}
+
+const getStatusCount = (status: StatusFilter) => {
+  if (!status) return projects.value.length
+  return projects.value.filter((project) => project.status === status).length
+}
+
+const getStatusType = (status: ProjectStatus) => statusTypeMap[status]
+
+const getProgressColor = (progress: number) => {
+  if (progress >= 80) return '#1fa971'
+  if (progress >= 55) return '#3d78ff'
+  if (progress >= 30) return '#f2a53c'
+  return '#e46a8a'
+}
+
+const formatDate = (dateValue: string) => {
+  if (!dateValue) return '--'
+  const date = new Date(dateValue)
+  if (Number.isNaN(date.getTime())) return '--'
+  return date.toLocaleDateString('zh-CN')
+}
+
+const viewProjectDetail = (project: Project) => {
+  router.push({
+    name: 'ProjectDetail',
+    params: { id: project.id },
+  })
+}
+
 onMounted(() => {
-  fetchProjects()
-  fetchGitUsers()
+  void Promise.all([fetchProjects(), fetchGitUsers()])
 })
 </script>
 
 <template>
-  <div class="project-manager">
-    <!-- 统计卡片区 -->
-    <div class="statistics-section">
-      <el-row :gutter="20">
-        <el-col :xs="12" :sm="6">
-          <div class="stat-card stat-total">
-            <div class="stat-icon">
-              <el-icon><TrendCharts /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ statistics.total }}</div>
-              <div class="stat-label">项目总数</div>
-            </div>
-          </div>
-        </el-col>
-        <el-col :xs="12" :sm="6">
-          <div class="stat-card stat-progress">
-            <div class="stat-icon">
-              <el-icon><Calendar /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ statistics.inProgress }}</div>
-              <div class="stat-label">进行中</div>
-            </div>
-          </div>
-        </el-col>
-        <el-col :xs="12" :sm="6">
-          <div class="stat-card stat-completed">
-            <div class="stat-icon">
-              <el-icon><View /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ statistics.completed }}</div>
-              <div class="stat-label">已完成</div>
-            </div>
-          </div>
-        </el-col>
-        <el-col :xs="12" :sm="6">
-          <div class="stat-card stat-paused">
-            <div class="stat-icon">
-              <el-icon><Filter /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ statistics.paused }}</div>
-              <div class="stat-label">已暂停</div>
-            </div>
-          </div>
-        </el-col>
-      </el-row>
-    </div>
+  <div class="project-page">
+    <div class="page-bg-orb orb-left"></div>
+    <div class="page-bg-orb orb-right"></div>
 
-    <!-- 筛选栏 -->
-    <div class="filter-section">
-      <div class="filter-left">
+    <section class="hero-panel">
+      <div class="hero-main">
+        <p class="hero-kicker">PROJECT WORKSPACE</p>
+        <h1 class="hero-title">项目管理中心</h1>
+        <p class="hero-subtitle">
+          以卡片视图集中管理项目进度、技术栈和仓库信息，从概览到详情只需一次点击。
+        </p>
+      </div>
+
+      <div class="hero-actions">
+        <el-button class="hero-btn hero-btn-light" :icon="RefreshRight" @click="fetchProjects">
+          刷新列表
+        </el-button>
+        <el-button class="hero-btn hero-btn-primary" type="primary" :icon="Plus" @click="openCreateDialog">
+          新建项目
+        </el-button>
+      </div>
+
+      <div class="stats-grid">
+        <article
+          v-for="item in statCards"
+          :key="item.key"
+          class="stat-card"
+          :class="item.tone"
+        >
+          <div class="stat-icon">
+            <el-icon>
+              <component :is="item.icon" />
+            </el-icon>
+          </div>
+          <div class="stat-text">
+            <p class="stat-label">{{ item.label }}</p>
+            <p class="stat-value">{{ item.value }}</p>
+            <p class="stat-hint">{{ item.hint }}</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="controls-panel">
+      <div class="search-row">
         <el-input
           v-model="searchKeyword"
-          placeholder="搜索项目名称、描述、技术栈..."
+          class="search-input"
           :prefix-icon="Search"
           clearable
-          style="width: 300px"
+          placeholder="搜索项目名称、描述或技术栈"
         />
-        <el-select
-          v-model="statusFilter"
-          placeholder="选择状态"
-          clearable
-          style="width: 150px; margin-left: 12px"
+        <el-button
+          class="reset-btn"
+          :disabled="!searchKeyword.trim() && !statusFilter"
+          @click="resetFilters"
         >
-          <el-option
-            v-for="item in statusOptions"
-            :key="item.value"
-            :label="item.label"
-            :value="item.value"
-          />
-        </el-select>
+          清空筛选
+        </el-button>
       </div>
-      <div class="filter-right">
-        <el-button type="primary" :icon="Plus" @click="openCreateDialog">新建项目</el-button>
-      </div>
-    </div>
 
-    <!-- 项目列表 -->
-    <div v-loading="loading" class="projects-grid">
-      <div v-if="!loading && filteredProjects.length === 0" class="empty-container">
-        <el-empty description="暂无项目" />
+      <div class="status-pills">
+        <button
+          v-for="item in statusOptions"
+          :key="item.value || 'all'"
+          class="status-pill"
+          :class="{ 'is-active': statusFilter === item.value }"
+          type="button"
+          @click="statusFilter = item.value"
+        >
+          <span>{{ item.label }}</span>
+          <em>{{ getStatusCount(item.value) }}</em>
+        </button>
       </div>
-      
-      <div v-for="project in filteredProjects" :key="project.id" class="project-card">
-        <div class="card-header">
-          <div class="card-title">
-            <el-icon
-              class="favorite-icon"
-              :class="{ 'is-favorite': project.isFavorite }"
-              @click="toggleFavorite(project)"
-            >
+
+      <p class="filter-tip">
+        <el-icon><Filter /></el-icon>
+        <span>{{ activeFilterLabel }}</span>
+      </p>
+    </section>
+
+    <section v-loading="loading" class="cards-panel">
+      <el-empty v-if="!loading && filteredProjects.length === 0" description="暂无项目，点击“新建项目”开始">
+        <el-button type="primary" :icon="Plus" @click="openCreateDialog">创建第一个项目</el-button>
+      </el-empty>
+
+      <article
+        v-for="project in filteredProjects"
+        :key="project.id"
+        class="project-card"
+        :class="{ 'is-favorite': project.isFavorite }"
+      >
+        <header class="card-header">
+          <button class="favorite-btn" type="button" @click="toggleFavorite(project)">
+            <el-icon>
               <StarFilled v-if="project.isFavorite" />
               <Star v-else />
             </el-icon>
-            <span class="project-name">{{ project.name }}</span>
+          </button>
+
+          <div class="title-block">
+            <h3 class="project-name">{{ project.name }}</h3>
+            <p class="project-repo">{{ project.repoUrl || '未配置仓库地址' }}</p>
           </div>
-          <el-tag :type="getStatusType(project.status)" size="small">
+
+          <el-tag class="status-tag" :type="getStatusType(project.status)" round>
             {{ project.status }}
           </el-tag>
+        </header>
+
+        <p class="project-description">
+          {{ project.description || '暂无项目描述，可在编辑中补充目标、里程碑和关键实现。' }}
+        </p>
+
+        <div class="progress-card">
+          <div class="progress-top">
+            <span>项目进度</span>
+            <strong>{{ project.progress }}%</strong>
+          </div>
+          <el-progress
+            :percentage="project.progress"
+            :stroke-width="10"
+            :color="getProgressColor(project.progress)"
+          />
         </div>
 
-        <div class="card-body">
-          <p class="project-description">{{ project.description || '暂无描述' }}</p>
-
-          <div class="progress-section">
-            <div class="progress-label">项目进度</div>
-            <el-progress 
-              :percentage="project.progress" 
-              :color="getProgressColor(project.progress)"
-              :stroke-width="8"
-            />
-          </div>
-
-          <div v-if="project.techStack && project.techStack.length > 0" class="tech-tags">
-            <el-tag
-              v-for="tech in project.techStack.slice(0, 4)"
-              :key="tech"
-              size="small"
-              effect="plain"
-              class="tech-tag"
-            >
-              {{ tech }}
-            </el-tag>
-            <el-tag v-if="project.techStack.length > 4" size="small" effect="plain">
-              +{{ project.techStack.length - 4 }}
-            </el-tag>
-          </div>
-
-          <div class="project-meta">
-            <span class="meta-item">创建于 {{ formatDate(project.createdAt) }}</span>
-            <span class="meta-item">更新于 {{ formatDate(project.updatedAt) }}</span>
-          </div>
+        <div class="tech-stack" v-if="project.techStack.length > 0">
+          <el-tag
+            v-for="tech in project.techStack.slice(0, 5)"
+            :key="tech"
+            class="tech-chip"
+            effect="plain"
+          >
+            {{ tech }}
+          </el-tag>
+          <span v-if="project.techStack.length > 5" class="more-tech">
+            +{{ project.techStack.length - 5 }}
+          </span>
+        </div>
+        <div class="tech-stack empty-tech" v-else>
+          <span>尚未配置技术栈</span>
         </div>
 
-        <div class="card-footer">
-          <el-button size="small" :icon="View" @click="viewProjectDetail(project)">查看详情</el-button>
-          <el-button size="small" :icon="Edit" @click="openEditDialog(project)">编辑</el-button>
-          <el-button size="small" type="danger" :icon="Delete" @click="deleteProject(project.id)">
+        <div class="meta-row">
+          <span>
+            <el-icon><Calendar /></el-icon>
+            创建 {{ formatDate(project.createdAt) }}
+          </span>
+          <span>
+            <el-icon><Calendar /></el-icon>
+            更新 {{ formatDate(project.updatedAt) }}
+          </span>
+        </div>
+
+        <footer class="card-actions">
+          <el-button text bg :icon="View" @click="viewProjectDetail(project)">详情</el-button>
+          <el-button text bg :icon="Edit" @click="openEditDialog(project)">编辑</el-button>
+          <el-button text bg type="danger" :icon="Delete" @click="deleteProject(project.id)">
             删除
           </el-button>
-        </div>
-      </div>
-    </div>
+        </footer>
+      </article>
+    </section>
 
-    <!-- 新建/编辑对话框 -->
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
-      width="600px"
+      width="760px"
+      class="project-dialog"
       :close-on-click-modal="false"
     >
-      <el-form :model="formData" label-width="100px">
-        <el-form-item label="项目名称" required>
-          <el-input v-model="formData.name" placeholder="请输入项目名称" />
-        </el-form-item>
+      <el-form :model="formData" label-position="top" class="project-form">
+        <div class="form-grid">
+          <el-form-item label="项目名称" required class="span-2">
+            <el-input v-model="formData.name" placeholder="例如：企业知识库平台" />
+          </el-form-item>
 
-        <el-form-item label="项目描述">
-          <el-input
-            v-model="formData.description"
-            type="textarea"
-            :rows="8"
-            :autosize="{ minRows: 8, maxRows: 20 }"
-            placeholder="请输入项目描述（支持任意长度）"
-          />
-        </el-form-item>
+          <el-form-item label="项目状态">
+            <el-select v-model="formData.status" style="width: 100%">
+              <el-option
+                v-for="item in statusOptions.filter((option) => option.value)"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </el-form-item>
 
-        <el-form-item label="项目状态">
-          <el-select v-model="formData.status" style="width: 100%">
-            <el-option label="进行中" value="进行中" />
-            <el-option label="已完成" value="已完成" />
-            <el-option label="暂停" value="暂停" />
-            <el-option label="计划中" value="计划中" />
-          </el-select>
-        </el-form-item>
+          <el-form-item label="项目进度">
+            <el-slider v-model="formData.progress" :min="0" :max="100" :step="5" show-input />
+          </el-form-item>
 
-        <el-form-item label="项目进度">
-          <el-slider v-model="formData.progress" :min="0" :max="100" :step="5" show-input />
-        </el-form-item>
-
-        <el-form-item label="技术栈">
-          <el-select
-            v-model="formData.techStack"
-            multiple
-            filterable
-            allow-create
-            placeholder="选择或输入技术栈"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="tech in techOptions"
-              :key="tech"
-              :label="tech"
-              :value="tech"
+          <el-form-item label="项目描述" class="span-2">
+            <el-input
+              v-model="formData.description"
+              type="textarea"
+              :rows="8"
+              :autosize="{ minRows: 8, maxRows: 18 }"
+              placeholder="简要描述项目目标、功能范围和当前阶段"
             />
-          </el-select>
-        </el-form-item>
+          </el-form-item>
 
-        <el-form-item label="本地路径">
-          <div style="display: flex; gap: 12px;">
-            <el-input 
-              v-model="formData.localPath" 
-              placeholder="点击右侧按钮选择项目文件夹"
-              readonly
-              style="flex: 1;"
-            />
-            <el-button 
-              :icon="FolderOpened" 
-              @click="openFolderSelector"
-              :loading="analyzingProject"
-            >
-              {{ analyzingProject ? '解析中...' : '选择文件夹' }}
-            </el-button>
-          </div>
-          <div v-if="formData.gitCommits" style="margin-top: 8px; font-size: 12px; color: #409eff;">
-            ✓ 已读取 {{ JSON.parse(formData.gitCommits).length }} 条Git提交记录
-          </div>
-        </el-form-item>
-
-        <el-form-item label="仓库地址">
-          <el-input v-model="formData.repoUrl" placeholder="如：https://github.com/username/repo" />
-        </el-form-item>
-
-        <el-form-item label="Git用户">
-          <div style="display: flex; gap: 12px; align-items: flex-start;">
-            <el-select 
-              v-model="formData.gitUserId" 
-              placeholder="选择或输入新Git用户名"
+          <el-form-item label="技术栈" class="span-2">
+            <el-select
+              v-model="formData.techStack"
+              multiple
               filterable
               allow-create
-              clearable
-              style="flex: 1;"
+              default-first-option
+              placeholder="选择或输入技术栈标签"
+              style="width: 100%"
             >
-              <el-option
-                v-for="user in gitUsers"
-                :key="user.id"
-                :label="`${user.name} (${user.username})`"
-                :value="user.id"
-              >
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span>{{ user.name }}</span>
-                  <span style="font-size: 12px; color: #999;">{{ user.username }}</span>
-                  <el-tag v-if="user.isDefault" size="small" type="success">默认</el-tag>
-                </div>
-              </el-option>
+              <el-option v-for="tech in techOptions" :key="tech" :label="tech" :value="tech" />
             </el-select>
-            <el-button 
-              v-if="showAddGitUserButton" 
-              type="primary" 
-              @click="openAddGitUserDialog"
-            >
-              新增
-            </el-button>
-          </div>
-          <div style="margin-top: 8px; font-size: 12px; color: #909399;">
-            💡 提示：可以选择已有用户，或输入新用户名后点击"新增"按钮创建
-          </div>
-        </el-form-item>
+          </el-form-item>
 
-        <el-form-item label="收藏项目">
-          <el-switch v-model="formData.isFavorite" />
-        </el-form-item>
+          <el-form-item label="本地路径" class="span-2">
+            <div class="path-picker">
+              <el-input
+                v-model="formData.localPath"
+                readonly
+                placeholder="点击右侧按钮选择项目文件夹"
+              />
+              <el-button :icon="FolderOpened" :loading="analyzingProject" @click="openFolderSelector">
+                {{ analyzingProject ? '解析中...' : '选择文件夹' }}
+              </el-button>
+            </div>
+            <p v-if="gitCommitCountForForm > 0" class="inline-hint success">
+              已读取 {{ gitCommitCountForForm }} 条 Git 提交记录
+            </p>
+          </el-form-item>
+
+          <el-form-item label="仓库地址" class="span-2">
+            <el-input v-model="formData.repoUrl" placeholder="例如：https://github.com/username/project" />
+          </el-form-item>
+
+          <el-form-item label="Git 用户" class="span-2">
+            <div class="git-user-row">
+              <el-select
+                v-model="formData.gitUserId"
+                filterable
+                allow-create
+                clearable
+                placeholder="选择已有用户或输入新用户名"
+                style="flex: 1"
+              >
+                <el-option
+                  v-for="user in gitUsers"
+                  :key="user.id"
+                  :label="`${user.name} (${user.username})`"
+                  :value="user.id"
+                />
+              </el-select>
+              <el-button v-if="showAddGitUserButton" type="primary" plain @click="openAddGitUserDialog">
+                新增用户
+              </el-button>
+            </div>
+            <p class="inline-hint">可直接输入用户名，再点击“新增用户”快速创建。</p>
+          </el-form-item>
+
+          <el-form-item label="收藏项目" class="span-2">
+            <el-switch v-model="formData.isFavorite" active-text="已收藏" inactive-text="未收藏" />
+          </el-form-item>
+        </div>
       </el-form>
 
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveProject">保存</el-button>
+        <el-button type="primary" :loading="savingProject" @click="saveProject">保存项目</el-button>
       </template>
     </el-dialog>
 
-    <!-- 文件夹选择器 -->
-    <FolderSelectorDialog 
+    <FolderSelectorDialog
       v-model="folderSelectorVisible"
       @confirm="handleFolderSelected"
     />
 
-    <!-- 新增Git用户对话框 -->
     <el-dialog
       v-model="addGitUserDialogVisible"
-      title="新增Git用户"
-      width="500px"
+      title="新增 Git 用户"
+      width="560px"
       :close-on-click-modal="false"
+      class="project-dialog"
     >
-      <el-form :model="newGitUserData" label-width="100px">
+      <el-form :model="newGitUserData" label-position="top">
         <el-form-item label="显示名称" required>
-          <el-input v-model="newGitUserData.name" placeholder="请输入显示名称" />
+          <el-input v-model="newGitUserData.name" placeholder="例如：工作账号" />
         </el-form-item>
-
         <el-form-item label="用户名" required>
-          <el-input v-model="newGitUserData.username" placeholder="请输入Git用户名" />
+          <el-input v-model="newGitUserData.username" placeholder="Git 用户名" />
         </el-form-item>
-
         <el-form-item label="Token" required>
-          <el-input 
-            v-model="newGitUserData.password" 
+          <el-input
+            v-model="newGitUserData.password"
             type="password"
             show-password
-            placeholder="请输入Personal Access Token"
+            placeholder="Personal Access Token"
           />
-          <div style="margin-top: 4px; font-size: 12px; color: #909399;">
-            提示：用于Git操作的访问令牌
-          </div>
+          <p class="inline-hint">用于 Git 操作鉴权，请妥善保管。</p>
         </el-form-item>
-
         <el-form-item label="邮箱">
-          <el-input v-model="newGitUserData.email" placeholder="请输入邮箱（可选）" />
+          <el-input v-model="newGitUserData.email" placeholder="可选" />
         </el-form-item>
-
         <el-form-item label="描述">
-          <el-input 
-            v-model="newGitUserData.description" 
-            type="textarea"
-            :rows="3"
-            placeholder="请输入描述（可选）"
-          />
+          <el-input v-model="newGitUserData.description" type="textarea" :rows="3" placeholder="可选" />
         </el-form-item>
       </el-form>
 
       <template #footer>
         <el-button @click="addGitUserDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="addGitUser">新增用户</el-button>
+        <el-button type="primary" :loading="addingGitUser" @click="addGitUser">创建用户</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <style scoped>
-.project-manager {
-  padding: var(--spacing-6);
-  background: var(--bg-body);
+.project-page {
+  --pm-bg: #f4f8ff;
+  --pm-surface: #ffffff;
+  --pm-surface-soft: #f7faff;
+  --pm-text: #1f2f4e;
+  --pm-text-soft: #627393;
+  --pm-border: #dfe7f5;
+  --pm-accent: #3869ff;
+  --pm-accent-soft: #e8efff;
+  --pm-teal: #35b4ad;
+  --pm-green: #34b57f;
+  --pm-gold: #f0a32d;
+  --pm-danger: #e46a8a;
+  --pm-shadow: 0 24px 48px rgba(39, 73, 142, 0.1);
+  --pm-shadow-soft: 0 12px 24px rgba(39, 73, 142, 0.08);
+  position: relative;
   min-height: 100vh;
+  padding: 28px clamp(14px, 3vw, 40px) 34px;
+  overflow: hidden;
+  color: var(--pm-text);
+  font-family: Manrope, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background:
+    radial-gradient(circle at 8% 6%, #e9f1ff 0, #e9f1ff 17%, transparent 48%),
+    radial-gradient(circle at 94% 12%, #eef9ff 0, #eef9ff 18%, transparent 50%),
+    linear-gradient(180deg, #f9fbff 0%, var(--pm-bg) 100%);
 }
 
-/* 统计卡片 */
-.statistics-section {
-  margin-bottom: var(--spacing-6);
+.page-bg-orb {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  filter: blur(2px);
+  opacity: 0.7;
+  animation: floatY 10s ease-in-out infinite;
+}
+
+.orb-left {
+  width: 220px;
+  height: 220px;
+  left: -95px;
+  top: 320px;
+  background: radial-gradient(circle at 30% 30%, #dce8ff 0, #eaf1ff 50%, transparent 100%);
+}
+
+.orb-right {
+  width: 280px;
+  height: 280px;
+  right: -130px;
+  top: 120px;
+  background: radial-gradient(circle at 40% 40%, #d9f7f4 0, #ebfbf9 58%, transparent 100%);
+  animation-delay: 2s;
+}
+
+.hero-panel {
+  position: relative;
+  z-index: 1;
+  border: 1px solid var(--pm-border);
+  border-radius: 26px;
+  padding: clamp(20px, 3vw, 30px);
+  background: linear-gradient(135deg, #ffffff 0%, #f4f8ff 100%);
+  box-shadow: var(--pm-shadow);
+  margin-bottom: 24px;
+}
+
+.hero-main {
+  max-width: 760px;
+}
+
+.hero-kicker {
+  margin: 0 0 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 700;
+  color: #7f93b7;
+}
+
+.hero-title {
+  margin: 0;
+  font-size: clamp(30px, 4vw, 42px);
+  line-height: 1.1;
+  font-weight: 800;
+  color: #1a2a49;
+}
+
+.hero-subtitle {
+  margin: 14px 0 0;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--pm-text-soft);
+}
+
+.hero-actions {
+  margin-top: 20px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hero-btn {
+  height: 42px;
+  border-radius: 12px;
+  padding: 0 18px;
+  font-weight: 600;
+}
+
+.hero-btn-light {
+  border: 1px solid #cedaf4;
+  color: #315cba;
+  background: #f5f8ff;
+}
+
+.hero-btn-light:hover {
+  color: #214a9e;
+  border-color: #b7caee;
+  background: #ebf2ff;
+}
+
+.hero-btn-primary {
+  background: linear-gradient(135deg, #4e7cff 0%, #3a66f5 100%);
+  border-color: transparent;
+}
+
+.stats-grid {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .stat-card {
-  background: var(--gradient-primary);
-  border-radius: var(--radius-xl);
-  padding: var(--spacing-5);
+  border-radius: 18px;
+  padding: 16px;
   display: flex;
   align-items: center;
-  gap: var(--spacing-4);
-  box-shadow: var(--shadow-primary);
-  transition: all var(--transition-normal);
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-}
-
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-  transition: left 0.5s ease;
-}
-
-.stat-card:hover::before {
-  left: 100%;
+  gap: 12px;
+  border: 1px solid transparent;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
 .stat-card:hover {
-  transform: translateY(-6px) scale(1.02);
-  box-shadow: var(--shadow-primary-lg);
+  transform: translateY(-3px);
+  box-shadow: var(--pm-shadow-soft);
 }
 
-.stat-card.stat-total {
-  background: var(--gradient-primary);
+.stat-card.is-blue {
+  background: linear-gradient(160deg, #ecf2ff 0%, #f7f9ff 100%);
+  border-color: #d4e0fb;
 }
 
-.stat-card.stat-progress {
-  background: var(--gradient-secondary);
+.stat-card.is-cyan {
+  background: linear-gradient(160deg, #eafaf9 0%, #f8fdfd 100%);
+  border-color: #ccefea;
 }
 
-.stat-card.stat-completed {
-  background: var(--gradient-info);
+.stat-card.is-green {
+  background: linear-gradient(160deg, #effbf5 0%, #f8fdfb 100%);
+  border-color: #d8efdf;
 }
 
-.stat-card.stat-paused {
-  background: var(--gradient-success);
+.stat-card.is-gold {
+  background: linear-gradient(160deg, #fff5e8 0%, #fffaf2 100%);
+  border-color: #f5e2bf;
 }
 
 .stat-icon {
-  width: 56px;
-  height: 56px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-lg);
-  display: flex;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
-  color: var(--text-inverse);
-  backdrop-filter: blur(10px);
-  transition: transform var(--transition-normal);
+  font-size: 22px;
+  color: #355baf;
+  background: rgba(255, 255, 255, 0.82);
 }
 
-.stat-card:hover .stat-icon {
-  transform: scale(1.1) rotate(-5deg);
-}
-
-.stat-info {
-  color: var(--text-inverse);
-}
-
-.stat-value {
-  font-size: var(--text-3xl);
-  font-weight: var(--font-extrabold);
-  line-height: 1;
-  margin-bottom: var(--spacing-2);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.stat-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .stat-label {
-  font-size: var(--text-sm);
-  opacity: 0.9;
-  font-weight: var(--font-medium);
+  margin: 0;
+  font-size: 12px;
+  color: #7487a8;
 }
 
-/* 筛选栏 */
-.filter-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-6);
-  flex-wrap: wrap;
-  gap: var(--spacing-4);
-  background: var(--bg-card);
-  padding: var(--spacing-4) var(--spacing-5);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-light);
+.stat-value {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 800;
+  color: #20365f;
 }
 
-.filter-left {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--spacing-3);
+.stat-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #8898b5;
 }
 
-/* 项目卡片网格 */
-.projects-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: var(--spacing-5);
-  min-height: 300px;
-}
-
-.empty-container {
-  grid-column: 1 / -1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 400px;
-  background: var(--bg-card);
-  border-radius: var(--radius-xl);
-  border: 2px dashed var(--border-color);
-}
-
-.project-card {
-  background: var(--bg-card);
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-  box-shadow: var(--shadow-card);
-  transition: all var(--transition-normal);
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--border-light);
+.controls-panel {
   position: relative;
+  z-index: 1;
+  margin-bottom: 22px;
+  border-radius: 20px;
+  border: 1px solid var(--pm-border);
+  background: var(--pm-surface);
+  padding: 16px 18px;
+  box-shadow: var(--pm-shadow-soft);
 }
 
-.project-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: var(--gradient-primary);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform var(--transition-normal);
-}
-
-.project-card:hover {
-  transform: translateY(-8px);
-  box-shadow: var(--shadow-card-hover);
-  border-color: rgba(99, 102, 241, 0.2);
-}
-
-.project-card:hover::before {
-  transform: scaleX(1);
-}
-
-.card-header {
-  padding: var(--spacing-5);
-  border-bottom: 1px solid var(--border-light);
+.search-row {
   display: flex;
-  justify-content: space-between;
+  gap: 12px;
   align-items: center;
-  background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-muted) 100%);
 }
 
-.card-title {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-3);
-}
-
-.favorite-icon {
-  font-size: 22px;
-  color: var(--gray-300);
-  cursor: pointer;
-  transition: all var(--transition-normal);
-}
-
-.favorite-icon:hover {
-  transform: scale(1.2) rotate(-10deg);
-  color: var(--warning-color);
-}
-
-.favorite-icon.is-favorite {
-  color: var(--warning-color);
-  filter: drop-shadow(0 2px 4px rgba(245, 158, 11, 0.4));
-}
-
-.project-name {
-  font-size: var(--text-lg);
-  font-weight: var(--font-semibold);
-  color: var(--text-main);
-  transition: color var(--transition-fast);
-}
-
-.project-card:hover .project-name {
-  color: var(--primary-color);
-}
-
-.card-body {
-  padding: var(--spacing-5);
+.search-input {
   flex: 1;
 }
 
-.project-description {
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-  line-height: var(--leading-relaxed);
-  margin-bottom: var(--spacing-4);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.reset-btn {
+  border-radius: 10px;
+  border: 1px solid #d2ddf5;
+  color: #4b6698;
 }
 
-.progress-section {
-  margin-bottom: var(--spacing-4);
-}
-
-.progress-label {
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-  font-weight: var(--font-medium);
-  margin-bottom: var(--spacing-2);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.tech-tags {
+.status-pills {
+  margin-top: 14px;
   display: flex;
+  gap: 8px;
   flex-wrap: wrap;
-  gap: var(--spacing-2);
-  margin-bottom: var(--spacing-4);
 }
 
-.tech-tag {
-  border-radius: var(--radius-md);
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
+.status-pill {
+  border: 1px solid #d2ddf5;
+  background: #f8fbff;
+  color: #4f648d;
+  border-radius: 999px;
+  padding: 7px 12px 7px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
 }
 
-.project-meta {
+.status-pill em {
+  font-style: normal;
+  min-width: 22px;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  border-radius: 999px;
+  background: rgba(54, 102, 214, 0.12);
+  color: #3561c6;
+  font-size: 12px;
+}
+
+.status-pill:hover {
+  border-color: #b5caef;
+  color: #3458a8;
+}
+
+.status-pill.is-active {
+  background: linear-gradient(135deg, #4e7cff 0%, #3d6df9 100%);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.status-pill.is-active em {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.filter-tip {
+  margin: 12px 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #6f81a0;
+}
+
+.cards-panel {
+  position: relative;
+  z-index: 1;
+  min-height: 320px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 16px;
+}
+
+.project-card {
+  border-radius: 20px;
+  border: 1px solid #dbe5f5;
+  background: linear-gradient(180deg, #ffffff 0%, var(--pm-surface-soft) 100%);
+  box-shadow: 0 14px 30px rgba(41, 71, 126, 0.08);
+  padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-1);
-  font-size: var(--text-xs);
-  color: var(--text-muted);
+  min-height: 350px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
-.meta-item {
-  display: flex;
+.project-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 36px rgba(41, 71, 126, 0.12);
+  border-color: #c4d5f2;
+}
+
+.project-card.is-favorite {
+  border-color: #f1d39f;
+  box-shadow: 0 20px 34px rgba(240, 163, 45, 0.16);
+}
+
+.card-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.favorite-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #d8e0f0;
+  border-radius: 10px;
+  display: inline-flex;
   align-items: center;
-  gap: var(--spacing-1);
+  justify-content: center;
+  background: #ffffff;
+  color: #96a4be;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.card-footer {
-  padding: var(--spacing-4) var(--spacing-5);
-  border-top: 1px solid var(--border-light);
+.favorite-btn:hover {
+  transform: translateY(-1px);
+  border-color: #f0bf68;
+  color: var(--pm-gold);
+}
+
+.project-card.is-favorite .favorite-btn {
+  border-color: #f0bf68;
+  color: var(--pm-gold);
+  background: #fff7eb;
+}
+
+.title-block {
+  min-width: 0;
+}
+
+.project-name {
+  margin: 2px 0 0;
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 800;
+  color: #21365f;
+  word-break: break-all;
+}
+
+.project-repo {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #7a8baa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-tag {
+  margin-top: 2px;
+}
+
+.project-description {
+  margin: 14px 0;
+  font-size: 14px;
+  line-height: 1.72;
+  color: #556a8f;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  min-height: 72px;
+}
+
+.progress-card {
+  border: 1px solid #dce6f6;
+  background: #f9fbff;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.progress-top {
   display: flex;
-  gap: var(--spacing-3);
-  background: var(--bg-muted);
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #5f739a;
 }
 
-/* 响应式 */
-@media (max-width: 768px) {
-  .project-manager {
-    padding: var(--spacing-4);
+.progress-top strong {
+  color: #284780;
+  font-weight: 700;
+}
+
+.tech-stack {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.tech-chip {
+  border-radius: 999px;
+}
+
+.more-tech {
+  font-size: 12px;
+  color: #6e7f9f;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #edf2fc;
+}
+
+.empty-tech {
+  font-size: 12px;
+  color: #91a0ba;
+}
+
+.meta-row {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #7283a3;
+}
+
+.meta-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.card-actions {
+  margin-top: 12px;
+  border-top: 1px solid #e0e8f7;
+  padding-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.project-form {
+  padding-right: 4px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+.path-picker {
+  display: flex;
+  gap: 10px;
+}
+
+.git-user-row {
+  display: flex;
+  gap: 10px;
+}
+
+.inline-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #7a8eaf;
+}
+
+.inline-hint.success {
+  color: #1fa971;
+}
+
+:deep(.project-dialog .el-dialog) {
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid #dbe6f7;
+}
+
+:deep(.project-dialog .el-dialog__header) {
+  margin: 0;
+  padding: 18px 22px 16px;
+  border-bottom: 1px solid #e2eafa;
+  background: linear-gradient(180deg, #f6f9ff 0%, #ffffff 100%);
+}
+
+:deep(.project-dialog .el-dialog__title) {
+  font-size: 17px;
+  font-weight: 700;
+  color: #233a64;
+}
+
+:deep(.project-dialog .el-dialog__body) {
+  padding: 18px 22px;
+}
+
+:deep(.project-dialog .el-input__wrapper),
+:deep(.project-dialog .el-textarea__inner),
+:deep(.project-dialog .el-select__wrapper) {
+  border-radius: 12px;
+}
+
+:deep(.project-dialog .el-input__wrapper.is-focus),
+:deep(.project-dialog .el-select__wrapper.is-focused),
+:deep(.project-dialog .el-textarea__inner:focus) {
+  box-shadow: 0 0 0 1px #5f86f4 inset;
+}
+
+@keyframes floatY {
+  0%,
+  100% {
+    transform: translateY(0);
   }
-  
-  .projects-grid {
-    grid-template-columns: 1fr;
-    gap: var(--spacing-4);
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@media (max-width: 1320px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .filter-section {
-    flex-direction: column;
-    align-items: stretch;
-    padding: var(--spacing-4);
+  .cards-panel {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+@media (max-width: 960px) {
+  .project-page {
+    padding: 18px 14px 28px;
   }
 
-  .filter-left {
-    flex-direction: column;
+  .hero-title {
+    font-size: 30px;
+  }
+
+  .hero-actions {
     width: 100%;
   }
 
-  .filter-left .el-input,
-  .filter-left .el-select {
-    width: 100% !important;
-    margin-left: 0 !important;
+  .hero-btn {
+    flex: 1;
+    min-width: 130px;
   }
-  
-  .stat-card {
-    padding: var(--spacing-4);
+
+  .search-row {
+    flex-direction: column;
+    align-items: stretch;
   }
-  
-  .stat-value {
-    font-size: var(--text-2xl);
+
+  .cards-panel {
+    grid-template-columns: 1fr;
   }
-  
-  .stat-icon {
-    width: 48px;
-    height: 48px;
-    font-size: 22px;
+}
+
+@media (max-width: 640px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .span-2 {
+    grid-column: span 1;
+  }
+
+  .path-picker,
+  .git-user-row {
+    flex-direction: column;
+  }
+
+  .project-card {
+    min-height: 0;
   }
 }
 </style>

@@ -88,12 +88,12 @@ const handleManagerRefresh = () => {
 // Computed
 const greeting = computed(() => {
   const hour = new Date().getHours()
-  if (hour < 5) return '夜深了，注意休息'
-  if (hour < 9) return '早上好，开启美好一天'
-  if (hour < 12) return '上午好，保持专注'
-  if (hour < 14) return '中午好，记得午休'
-  if (hour < 18) return '下午好，继续加油'
-  return '晚上好，享受宁静时光'
+  if (hour < 5) return '澶滄繁浜嗭紝娉ㄦ剰浼戞伅'
+  if (hour < 9) return '鏃╀笂濂斤紝寮€鍚編濂戒竴澶?
+  if (hour < 12) return '涓婂崍濂斤紝淇濇寔涓撴敞'
+  if (hour < 14) return '涓崍濂斤紝璁板緱鍗堜紤'
+  if (hour < 18) return '涓嬪崍濂斤紝缁х画鍔犳补'
+  return '鏅氫笂濂斤紝浜彈瀹侀潤鏃跺厜'
 })
 
 const hasActiveFilters = computed(() => {
@@ -108,7 +108,7 @@ const fetchCategories = async () => {
     const response = await axios.get('/api/categories')
     categories.value = response.data
   } catch (error) {
-    console.error('获取分类失败:', error)
+    console.error('鑾峰彇鍒嗙被澶辫触:', error)
   }
 }
 
@@ -117,7 +117,7 @@ const fetchTags = async () => {
     const response = await axios.get('/api/tags')
     tags.value = response.data
   } catch (error) {
-    console.error('获取标签失败:', error)
+    console.error('鑾峰彇鏍囩澶辫触:', error)
   }
 }
 
@@ -152,8 +152,8 @@ const fetchBlogPosts = async (page = 1) => {
     total.value = response.data.pagination.totalPosts
     currentPage.value = response.data.pagination.currentPage
   } catch (error) {
-    console.error('获取博客文章失败:', error)
-    ElMessage.error('获取文章列表失败，请稍后重试')
+    console.error('鑾峰彇鍗氬鏂囩珷澶辫触:', error)
+    ElMessage.error('鑾峰彇鏂囩珷鍒楄〃澶辫触锛岃绋嶅悗閲嶈瘯')
   } finally {
     loading.value = false
   }
@@ -187,7 +187,7 @@ const goToCreateBlog = () => router.push('/admin/posts/create?from=home')
 
 const goToBlogDetail = (id: number) => {
   if (mainContentRef.value) {
-    // 保存状态以便返回时恢复
+    // 淇濆瓨鐘舵€佷互渚胯繑鍥炴椂鎭㈠
     const state = {
       scrollTop: mainContentRef.value.scrollTop,
       page: currentPage.value,
@@ -209,21 +209,21 @@ const handleEdit = (post: BlogPost, e: MouseEvent) => {
 const handleDelete = (post: BlogPost, e: MouseEvent) => {
   e.stopPropagation()
   ElMessageBox.confirm(
-    `确定要删除文章《${post.title}》吗？此操作不可恢复。`,
-    '删除确认',
+    `纭畾瑕佸垹闄ゆ枃绔犮€?{post.title}銆嬪悧锛熸鎿嶄綔涓嶅彲鎭㈠銆俙,
+    '鍒犻櫎纭',
     {
-      confirmButtonText: '确认删除',
-      cancelButtonText: '取消',
+      confirmButtonText: '纭鍒犻櫎',
+      cancelButtonText: '鍙栨秷',
       type: 'warning',
       confirmButtonClass: 'el-button--danger',
     }
   ).then(async () => {
     try {
       await axios.delete(`/api/posts/${post.id}`)
-      ElMessage.success('文章已删除')
+      ElMessage.success('鏂囩珷宸插垹闄?)
       fetchBlogPosts(currentPage.value)
     } catch {
-      ElMessage.error('删除失败，请重试')
+      ElMessage.error('鍒犻櫎澶辫触锛岃閲嶈瘯')
     }
   })
 }
@@ -235,10 +235,10 @@ const handleCopy = async (post: BlogPost, e: MouseEvent) => {
     let content = post.desc ? post.desc + '\n\n' : ''
     if (data?.content) content += data.content
     const ok = await copyEnhancedRichContent(content)
-    if (ok) ElMessage.success('内容已复制到剪贴板')
-    else ElMessage.error('复制失败')
+    if (ok) ElMessage.success('鍐呭宸插鍒跺埌鍓创鏉?)
+    else ElMessage.error('澶嶅埗澶辫触')
   } catch {
-    ElMessage.error('获取内容失败')
+    ElMessage.error('鑾峰彇鍐呭澶辫触')
   }
 }
 
@@ -263,12 +263,12 @@ const formatDate = (dateString: string) => {
   const now = new Date()
   const diff = now.getTime() - date.getTime()
 
-  // 3天内显示相对时间
+  // 3澶╁唴鏄剧ず鐩稿鏃堕棿
   if (diff < 3 * 24 * 60 * 60 * 1000) {
-    if (diff < 60 * 1000) return '刚刚'
-    if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))}分钟前`
-    if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / (60 * 60 * 1000))}小时前`
-    return `${Math.floor(diff / (24 * 60 * 60 * 1000))}天前`
+    if (diff < 60 * 1000) return '鍒氬垰'
+    if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))}鍒嗛挓鍓峘
+    if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / (60 * 60 * 1000))}灏忔椂鍓峘
+    return `${Math.floor(diff / (24 * 60 * 60 * 1000))}澶╁墠`
   }
 
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
@@ -351,12 +351,10 @@ onUnmounted(() => {
               {{ greeting }}
             </span>
             <h1 class="hero-title">
-              发现值得反复阅读的
-              <span class="hero-title-highlight">文章卡片</span>
+              鍙戠幇鍊煎緱鍙嶅闃呰鐨?              <span class="hero-title-highlight">鏂囩珷鍗＄墖</span>
             </h1>
             <p class="hero-subtitle">
-              以更清晰的信息层级与更轻盈的浅色设计，快速定位你感兴趣的内容。
-            </p>
+              浠ユ洿娓呮櫚鐨勪俊鎭眰绾т笌鏇磋交鐩堢殑娴呰壊璁捐锛屽揩閫熷畾浣嶄綘鎰熷叴瓒ｇ殑鍐呭銆?            </p>
           </div>
           <div class="hero-metrics">
             <div class="metric-card">
@@ -384,21 +382,20 @@ onUnmounted(() => {
             <section class="panel action-panel">
               <button class="btn-create" @click="goToCreateBlog">
                 <el-icon><Plus /></el-icon>
-                写文章
-              </button>
+                鍐欐枃绔?              </button>
               <div class="quick-actions">
-                <el-tooltip content="全局搜索 (Ctrl+K)" placement="top">
-                  <button class="icon-square" @click="openGlobalSearch" title="全局搜索">
+                <el-tooltip content="鍏ㄥ眬鎼滅储 (Ctrl+K)" placement="top">
+                  <button class="icon-square" @click="openGlobalSearch" title="鍏ㄥ眬鎼滅储">
                     <el-icon><Search /></el-icon>
                   </button>
                 </el-tooltip>
-                <el-tooltip content="分类标签管理" placement="top">
-                  <button class="icon-square" @click="openCategoryTagManager" title="分类标签管理">
+                <el-tooltip content="鍒嗙被鏍囩绠＄悊" placement="top">
+                  <button class="icon-square" @click="openCategoryTagManager" title="鍒嗙被鏍囩绠＄悊">
                     <el-icon><Setting /></el-icon>
                   </button>
                 </el-tooltip>
-                <el-tooltip content="主题设置" placement="top">
-                  <button class="icon-square" @click="openThemeSettings" title="主题设置">
+                <el-tooltip content="涓婚璁剧疆" placement="top">
+                  <button class="icon-square" @click="openThemeSettings" title="涓婚璁剧疆">
                     <el-icon><Monitor /></el-icon>
                   </button>
                 </el-tooltip>
@@ -406,7 +403,7 @@ onUnmounted(() => {
             </section>
 
             <section class="panel search-panel">
-              <label class="search-label" for="home-search-input">检索文章</label>
+              <label class="search-label" for="home-search-input">妫€绱㈡枃绔?/label>
               <div class="search-field">
                 <el-icon class="search-field-icon"><Search /></el-icon>
                 <input
@@ -414,7 +411,7 @@ onUnmounted(() => {
                   v-model="searchKeyword"
                   type="text"
                   class="search-input"
-                  placeholder="按标题或内容搜索..."
+                  placeholder="鎸夋爣棰樻垨鍐呭鎼滅储..."
                 />
               </div>
             </section>
@@ -422,8 +419,7 @@ onUnmounted(() => {
             <section v-if="categories.length" class="panel filter-panel">
               <h3 class="panel-title">
                 <el-icon><Folder /></el-icon>
-                分类筛选
-              </h3>
+                鍒嗙被绛涢€?              </h3>
               <div class="category-list">
                 <button
                   v-for="cat in categories"
@@ -441,8 +437,7 @@ onUnmounted(() => {
             <section v-if="tags.length" class="panel filter-panel">
               <h3 class="panel-title">
                 <el-icon><CollectionTag /></el-icon>
-                标签筛选
-              </h3>
+                鏍囩绛涢€?              </h3>
               <div class="tag-cloud">
                 <button
                   v-for="tag in tags"
@@ -462,35 +457,34 @@ onUnmounted(() => {
               @click="handleReset"
             >
               <el-icon><RefreshLeft /></el-icon>
-              清除筛选
-            </button>
+              娓呴櫎绛涢€?            </button>
           </div>
         </aside>
 
         <section class="feed">
           <header class="feed-head">
             <div>
-              <h2 class="feed-title">精选文章卡片</h2>
-              <p class="feed-desc">更突出标题、摘要和标签，帮助你快速浏览并进入正文。</p>
+              <h2 class="feed-title">绮鹃€夋枃绔犲崱鐗?/h2>
+              <p class="feed-desc">鏇寸獊鍑烘爣棰樸€佹憳瑕佸拰鏍囩锛屽府鍔╀綘蹇€熸祻瑙堝苟杩涘叆姝ｆ枃銆?/p>
             </div>
             <div class="feed-pills">
-              <span class="feed-pill">共 {{ total }} 篇</span>
-              <span class="feed-pill muted">{{ categories.length }} 分类 · {{ tags.length }} 标签</span>
+              <span class="feed-pill">鍏?{{ total }} 绡?/span>
+              <span class="feed-pill muted">{{ categories.length }} 鍒嗙被 路 {{ tags.length }} 鏍囩</span>
             </div>
           </header>
 
           <div v-if="hasActiveFilters" class="active-strip">
-            <span class="active-result">当前筛选结果：{{ total }} 篇文章</span>
+            <span class="active-result">褰撳墠绛涢€夌粨鏋滐細{{ total }} 绡囨枃绔?/span>
             <div class="active-strip-tags">
               <span v-if="searchKeyword" class="active-pill">
-                搜索 "{{ searchKeyword }}"
+                鎼滅储 "{{ searchKeyword }}"
                 <el-icon class="active-pill-close" @click="searchKeyword = ''"><Delete /></el-icon>
               </span>
               <span v-if="selectedCategoryIds.length" class="active-pill">
-                分类 {{ selectedCategoryIds.length }}
+                鍒嗙被 {{ selectedCategoryIds.length }}
               </span>
               <span v-if="selectedTagIds.length" class="active-pill">
-                标签 {{ selectedTagIds.length }}
+                鏍囩 {{ selectedTagIds.length }}
               </span>
             </div>
           </div>
@@ -504,17 +498,16 @@ onUnmounted(() => {
               @click="goToBlogDetail(post.id)"
             >
               <div :class="['card-cover', `tone-${(index % 6) + 1}`]">
-                <span class="cover-serial">VOL.{{ String(index + 1).padStart(2, '0') }}</span>
+                <span v-if="post.category" class="cover-category">{{ post.category.name }}</span>
                 <span class="cover-date">
                   <el-icon><Timer /></el-icon>
                   {{ formatDate(post.createdAt) }}
                 </span>
-                <span v-if="post.category" class="cover-category">{{ post.category.name }}</span>
               </div>
 
               <div class="card-body">
                 <h3 class="card-title" :title="post.title">{{ post.title }}</h3>
-                <p class="card-excerpt">{{ post.desc || '暂无简介，点击查看全文内容。' }}</p>
+                <p class="card-excerpt">{{ post.desc || '鏆傛棤绠€浠嬶紝鐐瑰嚮鏌ョ湅鍏ㄦ枃鍐呭銆? }}</p>
 
                 <div class="card-tags">
                   <span
@@ -524,19 +517,19 @@ onUnmounted(() => {
                   >
                     #{{ tag.name }}
                   </span>
-                  <span v-if="post.tags.length === 0" class="card-tag card-tag-empty">未设置标签</span>
+                  <span v-if="post.tags.length === 0" class="card-tag card-tag-empty">鏈缃爣绛?/span>
                 </div>
 
                 <div class="card-bottom">
-                  <span class="author-chip">{{ post.author || '匿名作者' }}</span>
+                  <span class="author-chip">{{ post.author || '鍖垮悕浣滆€? }}</span>
                   <div class="card-actions">
-                    <button class="action-btn" title="编辑" @click="handleEdit(post, $event)">
+                    <button class="action-btn" title="缂栬緫" @click="handleEdit(post, $event)">
                       <el-icon><Edit /></el-icon>
                     </button>
-                    <button class="action-btn" title="复制内容" @click="handleCopy(post, $event)">
+                    <button class="action-btn" title="澶嶅埗鍐呭" @click="handleCopy(post, $event)">
                       <el-icon><CopyDocument /></el-icon>
                     </button>
-                    <button class="action-btn danger" title="删除" @click="handleDelete(post, $event)">
+                    <button class="action-btn danger" title="鍒犻櫎" @click="handleDelete(post, $event)">
                       <el-icon><Delete /></el-icon>
                     </button>
                   </div>
@@ -544,7 +537,7 @@ onUnmounted(() => {
               </div>
 
               <div class="card-read-more">
-                阅读详情
+                闃呰璇︽儏
                 <el-icon><ArrowRight /></el-icon>
               </div>
             </article>
@@ -573,12 +566,11 @@ onUnmounted(() => {
             <div class="empty-icon">
               <el-icon><Document /></el-icon>
             </div>
-            <h3 class="empty-title">没有找到相关文章</h3>
-            <p class="empty-text">换个关键词试试，或者立即写一篇新文章。</p>
+            <h3 class="empty-title">娌℃湁鎵惧埌鐩稿叧鏂囩珷</h3>
+            <p class="empty-text">鎹釜鍏抽敭璇嶈瘯璇曪紝鎴栬€呯珛鍗冲啓涓€绡囨柊鏂囩珷銆?/p>
             <button class="btn-empty-reset" @click="handleReset">
               <el-icon><RefreshLeft /></el-icon>
-              重置筛选
-            </button>
+              閲嶇疆绛涢€?            </button>
           </div>
 
           <div v-if="total > pageSize" class="pagination-wrap">
@@ -596,7 +588,7 @@ onUnmounted(() => {
     </main>
 
     <transition name="fade-slide">
-      <button v-if="showBackToTop" class="back-top-btn" @click="scrollToTop" title="回到顶部">
+      <button v-if="showBackToTop" class="back-top-btn" @click="scrollToTop" title="鍥炲埌椤堕儴">
         <el-icon><Top /></el-icon>
       </button>
     </transition>
@@ -633,8 +625,6 @@ onUnmounted(() => {
   --radius-md: 12px;
   --shadow-soft: 0 18px 44px rgba(30, 64, 175, 0.07);
   --shadow-card: 0 20px 48px rgba(15, 23, 42, 0.08);
-  --content-max-width: 1880px;
-  --content-gutter: clamp(14px, 1.6vw, 30px);
   --font-display: "Fraunces", "STZhongsong", "Source Han Serif SC", serif;
   --font-body: "Outfit", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
 
@@ -676,9 +666,9 @@ onUnmounted(() => {
 }
 
 .hero-content {
-  max-width: var(--content-max-width);
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 0 var(--content-gutter);
+  padding: 0 30px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -781,9 +771,9 @@ onUnmounted(() => {
 }
 
 .page-layout {
-  max-width: var(--content-max-width);
+  max-width: 1440px;
   margin: 20px auto 0;
-  padding: 0 var(--content-gutter);
+  padding: 0 30px;
   display: grid;
   grid-template-columns: 280px 1fr;
   gap: 26px;
@@ -1100,43 +1090,23 @@ onUnmounted(() => {
 .article-card {
   position: relative;
   overflow: hidden;
-  border-radius: 24px;
-  border: 1px solid rgba(150, 177, 221, 0.42);
-  background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
-  box-shadow: 0 18px 40px rgba(26, 43, 77, 0.11);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-soft);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-card);
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: 310px;
   animation: cardIn 0.55s ease backwards;
   animation-delay: var(--delay, 0ms);
   transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
 }
 
 .article-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 26px 56px rgba(26, 61, 128, 0.18);
-  border-color: rgba(49, 104, 201, 0.45);
-}
-
-.article-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(
-    165deg,
-    rgba(118, 153, 216, 0.15) 0%,
-    rgba(255, 255, 255, 0) 35%,
-    rgba(246, 171, 116, 0.12) 100%
-  );
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-
-.article-card:hover::before {
-  opacity: 1;
+  transform: translateY(-5px);
+  box-shadow: 0 26px 52px rgba(30, 64, 175, 0.16);
+  border-color: rgba(37, 99, 235, 0.35);
 }
 
 .article-card.is-viewed {
@@ -1144,7 +1114,7 @@ onUnmounted(() => {
 }
 
 .article-card.is-viewed::after {
-  content: "最近阅读";
+  content: "鏈€杩戦槄璇?;
   position: absolute;
   right: 14px;
   top: 14px;
@@ -1160,13 +1130,13 @@ onUnmounted(() => {
 
 .card-cover {
   position: relative;
-  min-height: 78px;
-  padding: 11px 14px 9px;
+  min-height: 104px;
+  padding: 16px 16px 12px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
+  grid-template-columns: 1fr auto;
+  align-content: space-between;
   gap: 8px;
-  border-bottom: 1px solid rgba(201, 216, 239, 0.95);
+  border-bottom: 1px solid rgba(221, 231, 243, 0.9);
 }
 
 .card-cover::before {
@@ -1181,8 +1151,8 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 80% 18%, rgba(255, 255, 255, 0.82) 0%, transparent 46%),
-    linear-gradient(150deg, transparent 0%, rgba(255, 255, 255, 0.62) 100%);
+    radial-gradient(circle at 75% 25%, rgba(255, 255, 255, 0.82) 0%, transparent 44%),
+    linear-gradient(150deg, transparent 0%, rgba(255, 255, 255, 0.56) 100%);
   z-index: 1;
 }
 
@@ -1215,59 +1185,41 @@ onUnmounted(() => {
   background: linear-gradient(120deg, #e7f4ff 0%, #dff0ff 100%);
 }
 
-.cover-serial {
-  justify-self: start;
-  align-self: center;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #2f4f86;
-  font-weight: 800;
-  border-radius: 999px;
-  padding: 4px 9px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.78);
-}
-
 .cover-category {
   justify-self: end;
-  align-self: center;
+  align-self: start;
   font-size: 11px;
-  padding: 4px 11px;
+  padding: 4px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.86);
   color: var(--accent-hover);
   font-weight: 700;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 4px 10px rgba(20, 58, 122, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.92);
 }
 
 .cover-date {
-  grid-column: 2 / 3;
-  justify-self: center;
+  grid-column: 1 / -1;
   width: fit-content;
   display: inline-flex;
   align-items: center;
   gap: 5px;
   font-size: 12px;
-  color: #4c6388;
-  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-  padding: 14px 14px 11px;
+  flex: 1;
+  display: grid;
+  gap: 12px;
+  padding: 15px 16px 14px;
 }
 
 .card-title {
   margin: 0;
   color: var(--text-title);
-  font-size: clamp(19px, 1.2vw, 22px);
-  line-height: 1.32;
-  letter-spacing: -0.018em;
-  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.42;
+  letter-spacing: -0.012em;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -1276,50 +1228,39 @@ onUnmounted(() => {
 
 .card-excerpt {
   margin: 0;
-  color: #556b8f;
+  color: var(--text-secondary);
   font-size: 14px;
-  line-height: 1.62;
+  line-height: 1.65;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: calc(1.62em * 2);
 }
 
 .card-tags {
   display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 6px;
-  min-height: 30px;
-  max-height: 30px;
-  overflow: hidden;
+  flex-wrap: wrap;
+  gap: 7px;
 }
 
 .card-tag {
-  flex: 0 1 auto;
-  max-width: 120px;
-  font-size: 11px;
-  color: #314f82;
-  background: #eef3fc;
-  padding: 4px 10px;
+  font-size: 12px;
+  color: #35558d;
+  background: #edf3ff;
+  padding: 5px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(49, 79, 130, 0.14);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  border: 1px solid rgba(53, 85, 141, 0.12);
 }
 
 .card-tag-empty {
-  color: #627da7;
-  background: #f3f6fc;
-  border-style: dashed;
+  color: var(--text-muted);
+  background: #f6f8fb;
 }
 
 .card-bottom {
-  margin-top: 1px;
-  padding-top: 9px;
-  border-top: 1px dashed #d6e2f4;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px dashed #dce5f2;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1328,16 +1269,21 @@ onUnmounted(() => {
 
 .author-chip {
   font-size: 12px;
-  color: #5d7191;
+  color: var(--text-secondary);
   border-radius: 999px;
-  padding: 5px 11px;
-  background: #f4f7fd;
-  border: 1px solid rgba(140, 162, 198, 0.3);
+  padding: 5px 10px;
+  background: #f7faff;
+  border: 1px solid rgba(148, 163, 184, 0.25);
 }
 
 .card-actions {
   display: flex;
   gap: 6px;
+  opacity: 0.72;
+  transition: opacity 0.2s ease;
+}
+
+.article-card:hover .card-actions {
   opacity: 1;
 }
 
@@ -1348,41 +1294,38 @@ onUnmounted(() => {
   border-radius: 9px;
   display: grid;
   place-items: center;
-  background: #f1f5fc;
-  color: #5b6f91;
+  background: #f3f6fb;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .action-btn:hover {
-  color: #1d4fb5;
+  color: var(--accent-hover);
   background: #e5edff;
-  transform: translateY(-1px);
 }
 
 .action-btn.danger:hover {
-  color: #be2f24;
-  background: #ffeceb;
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 
 .card-read-more {
-  height: 36px;
+  height: 0;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  color: #1f4fc2;
+  color: var(--accent-hover);
   font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  background: linear-gradient(112deg, rgba(228, 237, 252, 0.82) 0%, rgba(255, 250, 245, 0.8) 100%);
-  border-top: 1px solid rgba(201, 216, 239, 0.9);
-  transition: gap 0.2s ease, background 0.2s ease;
+  font-weight: 700;
+  background: linear-gradient(120deg, rgba(227, 237, 255, 0.78) 0%, rgba(255, 255, 255, 0.86) 100%);
+  transition: height 0.25s ease;
 }
 
 .article-card:hover .card-read-more {
-  gap: 11px;
-  background: linear-gradient(112deg, rgba(213, 228, 252, 0.95) 0%, rgba(255, 245, 236, 0.9) 100%);
+  height: 38px;
 }
 
 .skeleton-card {
@@ -1532,9 +1475,8 @@ onUnmounted(() => {
   .posts-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
 
-@media (max-width: 1040px) {
+  @media (max-width: 1040px) {
   .hero-content {
     flex-direction: column;
   }

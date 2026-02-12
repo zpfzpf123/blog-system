@@ -139,6 +139,33 @@ const performSearch = async () => {
 
 const handleResultClick = (item: SearchResultItem) => {
   const currentQuery = searchQuery.value
+  
+  // 保存首页滚动位置，以便返回时恢复
+  const mainContent = document.querySelector('.main-container') as HTMLElement
+  if (mainContent) {
+    localStorage.setItem('homeScrollPosition', mainContent.scrollTop.toString())
+    // 保存当前页码等状态（从 localStorage 读取当前值或使用默认值）
+    const currentPage = localStorage.getItem('homeCurrentPage') || '1'
+    const pageSize = localStorage.getItem('homePageSize') || '12'
+    const categoryIds = localStorage.getItem('homeSelectedCategoryIds') || '[]'
+    const tagIds = localStorage.getItem('homeSelectedTagIds') || '[]'
+    
+    // 如果这些值不存在，设置默认值
+    if (!localStorage.getItem('homeCurrentPage')) {
+      localStorage.setItem('homeCurrentPage', currentPage)
+    }
+    if (!localStorage.getItem('homePageSize')) {
+      localStorage.setItem('homePageSize', pageSize)
+    }
+    if (!localStorage.getItem('homeSelectedCategoryIds')) {
+      localStorage.setItem('homeSelectedCategoryIds', categoryIds)
+    }
+    if (!localStorage.getItem('homeSelectedTagIds')) {
+      localStorage.setItem('homeSelectedTagIds', tagIds)
+    }
+    localStorage.setItem('lastViewedPostId', item.id.toString())
+  }
+  
   close()
   router.push(`/blog/${item.id}?q=${encodeURIComponent(currentQuery)}`)
 }

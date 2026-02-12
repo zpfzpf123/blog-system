@@ -139,11 +139,24 @@ import MarkdownIt from 'markdown-it'
 import markdownItAnchor from 'markdown-it-anchor'
 import markdownItToc from 'markdown-it-table-of-contents'
 import hljs from 'highlight.js'
+import mermaid from 'mermaid'
 import { useThemeStore } from '@/stores/theme'
 
 import 'github-markdown-css/github-markdown.css'
 
 import { processImageUrlsInMarkdown, copyEnhancedRichContent } from '@/utils/imageUtils'
+
+// 初始化mermaid
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'default',
+  securityLevel: 'loose',
+  flowchart: {
+    useMaxWidth: true,
+    htmlLabels: true,
+    curve: 'basis'
+  }
+})
 
 // 类型定义
 interface Category {
@@ -321,6 +334,16 @@ const md: MarkdownIt = new MarkdownIt({
   linkify: true,
   typographer: true,
   highlight: function (str: string, lang: string): string {
+    // 处理mermaid代码块 - 不进行语法高亮，保留原始内容供后续渲染
+    if (lang && lang.toLowerCase().startsWith('mermaid')) {
+      // 提取实际的图表类型（如果有的话，比如mermaidgraph）
+      const chartType = lang.toLowerCase().replace('mermaid', '')
+      const actualCode = chartType ? chartType + '\n' + str : str
+      return '<pre class="mermaid-block"><code class="language-mermaid">' + 
+             MarkdownIt().utils.escapeHtml(actualCode) + 
+             '</code></pre>'
+    }
+    
     if (lang && hljs.getLanguage(lang)) {
       try {
         // hljs 类放在 code 上，让主题样式生效
@@ -375,6 +398,7 @@ const fetchBlogPost = async (id: string) => {
       setTimeout(() => {
         extractTocItems()
         enhanceCodeBlocks()
+        renderMermaidDiagrams()
       }, 100)
       
       highlightQueryInContent()
@@ -519,6 +543,51 @@ const enhanceCodeBlocks = () => {
     // 插入工具栏
     pre.insertBefore(toolbar, pre.firstChild)
   })
+}
+
+// 渲染Mermaid图表
+const renderMermaidDiagrams = async () => {
+  const container = document.querySelector('.markdown-body')
+  if (!container) return
+  
+  // 查找所有mermaid代码块
+  const mermaidBlocks = container.querySelectorAll('pre code[class*="language-mermaid"], pre code[class*="mermaid"]')
+  
+  if (mermaidBlocks.length === 0) return
+  
+  for (let i = 0; i < mermaidBlocks.length; i++) {
+    const codeBlock = mermaidBlocks[i]
+    const pre = codeBlock.parentElement
+    if (!pre) continue
+    
+    const mermaidCode = codeBlock.textContent || ''
+    
+    // 修复格式问题
+    let fixedCode = mermaidCode
+    if (!/^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt|pie|gitGraph)/i.test(mermaidCode)) {
+      const className = codeBlock.className || ''
+      const match = className.match(/language-mermaid(\w+)/i)
+      if (match) {
+        fixedCode = match[1] + '\n' + mermaidCode
+      }
+    }
+    
+    try {
+      const mermaidDiv = document.createElement('div')
+      mermaidDiv.className = 'mermaid-container'
+      const mermaidId = `mermaid-${Date.now()}-${i}`
+      
+      const { svg } = await mermaid.render(mermaidId, fixedCode)
+      mermaidDiv.innerHTML = svg
+      
+      pre.parentNode?.replaceChild(mermaidDiv, pre)
+    } catch (error) {
+      const errorDiv = document.createElement('div')
+      errorDiv.className = 'mermaid-error'
+      errorDiv.textContent = 'Mermaid图表渲染失败: ' + (error as Error).message
+      pre.parentNode?.insertBefore(errorDiv, pre)
+    }
+  }
 }
 
 // 跳转到标题
@@ -817,6 +886,32 @@ watch(
 </script>
 
 <style scoped>
+/* Mermaid图表样式 */
+.mermaid-container {
+  display: flex;
+  justify-content: center;
+  margin: var(--spacing-6) 0;
+  padding: var(--spacing-4);
+  background: var(--bg-glass);
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(99, 102, 241, 0.1);
+  overflow-x: auto;
+}
+
+.mermaid-container svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-error {
+  color: var(--danger-color);
+  padding: var(--spacing-3);
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-2);
+  font-size: var(--text-sm);
+}
+
 /* 基础布局 */
 .blog-detail-container {
   margin: 0 auto;
@@ -836,7 +931,6 @@ watch(
   gap: var(--spacing-8);
   margin: 0 auto;
   position: relative;
-  max-width: 1400px;
 }
 
 .blog-main {

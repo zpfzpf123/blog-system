@@ -71,9 +71,22 @@ const parseFullCode = (code: string) => {
   
   if (scriptMatch) {
     const scriptContent = scriptMatch[1]
+    // 先尝试匹配 handleSubmit 之后的内容（普通模板）
     const customMatch = scriptContent.match(/handleSubmit[\s\S]*?\}\s*\n([\s\S]*)$/)
-    if (customMatch) {
+    if (customMatch && customMatch[1].trim()) {
       jsCode = customMatch[1].trim()
+    } else {
+      // 如果没有 handleSubmit，提取 import 语句之后的所有代码（大屏模板）
+      // 移除 import 语句和通用变量声明
+      let content = scriptContent
+      // 移除 import 语句
+      content = content.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*/g, '')
+      // 移除通用的 form/loading/activeTab 声明
+      content = content.replace(/const\s+form\s*=\s*reactive\s*\(\s*\{[\s\S]*?\}\s*\)\s*/g, '')
+      content = content.replace(/const\s+loading\s*=\s*ref\s*\(\s*false\s*\)\s*/g, '')
+      content = content.replace(/const\s+activeTab\s*=\s*ref\s*\(\s*['"][^'"]*['"]\s*\)\s*/g, '')
+      content = content.replace(/const\s+handleSubmit\s*=\s*\(\s*\)\s*=>\s*\{[\s\S]*?\}\s*/g, '')
+      jsCode = content.trim()
     }
   }
   
@@ -100,7 +113,7 @@ const generatePreviewHtml = (htmlCode: string, cssCode: string, jsCode: string) 
 <body>
   <div id="app">${htmlCode}</div>
   <script>
-    const { createApp, ref, reactive } = Vue
+    const { createApp, ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } = Vue
     const app = createApp({
       setup() {
         const form = reactive({ username: '', password: '', email: '', phone: '', remember: false, agree: false })

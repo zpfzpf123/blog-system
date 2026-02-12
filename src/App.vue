@@ -180,9 +180,9 @@ onUnmounted(() => {
 }
 
 .header-content {
-  max-width: 1600px;
+  max-width: 1880px;
   margin: 0 auto;
-  padding: 0 var(--spacing-6);
+  padding: 0 clamp(14px, 1.4vw, var(--spacing-6));
   display: flex;
   align-items: center;
   justify-content: space-between;

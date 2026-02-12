@@ -1,137 +1,5 @@
-<template>
-  <div class="ai-chat-container">
-    <!-- 顶部导航栏 -->
-    <div class="top-nav">
-      <div class="nav-content">
-        <h1 class="nav-title">
-          <span class="title-icon">🤖</span>
-          AI 智能问答
-        </h1>
-        <div class="nav-controls">
-          <div class="model-selector">
-            <select
-              id="model-select"
-              v-model="selectedModel"
-              @change="onModelChange"
-              :disabled="isLoading"
-              class="model-select"
-            >
-              <option value="">加载中...</option>
-              <option v-for="model in availableModels" :key="model.name" :value="model.name">
-                {{ model.name }} ({{ formatModelSize(model.size) }})
-              </option>
-            </select>
-            <button @click="refreshModels" :disabled="isLoading" class="refresh-btn">
-              <span class="btn-icon">🔄</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 主要内容区域：已移除旧版左右布局，统一使用下方 chat-main -->
-
-    <div class="chat-main">
-      <div class="messages-container" ref="messagesContainer">
-        <div v-if="messages.length === 0" class="empty-state">
-          <div class="empty-icon">💬</div>
-          <h3 class="empty-title">开始你的AI对话</h3>
-          <p class="empty-description">选择一个AI模型，输入你的问题，开始智能对话之旅</p>
-        </div>
-
-        <div v-for="(message, index) in messages" :key="index" :class="['message', message.role]">
-          <div class="message-avatar">
-            <div class="avatar-icon">
-              {{ message.role === 'user' ? '👤' : '🤖' }}
-            </div>
-            <div class="avatar-badge">{{ message.role === 'user' ? '用户' : 'AI' }}</div>
-          </div>
-          <div class="message-content">
-            <div class="message-header">
-              <span class="message-role-text">{{ message.role === 'user' ? '你' : 'AI助手' }}</span>
-              <span class="message-time">{{ formatTime(message.timestamp) }}</span>
-            </div>
-            <div class="message-text" v-html="formatMessage(message.content)"></div>
-            <div v-if="message.role === 'assistant'" class="message-actions">
-              <button 
-                @click="copyMessage(message.content, message.timestamp.getTime())" 
-                class="copy-btn"
-                :title="copyStatus[message.timestamp.getTime()] || '复制回答'"
-              >
-                <span class="copy-icon">📋</span>
-                <span class="copy-text">{{ copyStatus[message.timestamp.getTime()] || '复制' }}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="isLoading" class="message assistant typing-message">
-          <div class="message-avatar">
-            <div class="avatar-icon">🤖</div>
-            <div class="avatar-badge">AI</div>
-          </div>
-          <div class="message-content">
-            <div class="message-header">
-              <span class="message-role-text">AI助手</span>
-              <span class="message-time">正在思考...</span>
-            </div>
-            <div class="typing-indicator">
-              <span class="dot"></span>
-              <span class="dot"></span>
-              <span class="dot"></span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="input-container">
-        <div class="input-wrapper">
-          <div class="input-header">
-            <span class="input-label">
-              <span class="label-icon">💭</span>
-              输入你的问题
-            </span>
-            <span class="input-hint">Enter发送，Ctrl+Enter换行</span>
-          </div>
-          <textarea
-            v-model="userInput"
-            @keydown.enter.exact.prevent="sendMessage"
-            @keydown.ctrl.enter="sendMessage"
-            placeholder="请描述你的问题，AI助手将为你提供专业解答..."
-            :disabled="isLoading || !selectedModel"
-            ref="inputTextarea"
-            rows="4"
-            class="message-input"
-          ></textarea>
-          <div class="input-footer">
-            <button
-              @click="sendMessage"
-              :disabled="isLoading || !userInput.trim() || !selectedModel"
-              class="send-btn"
-            >
-              <span class="btn-icon">📤</span>
-              <span class="btn-text">发送消息</span>
-            </button>
-          </div>
-        </div>
-
-        <div class="input-actions">
-          <button @click="clearChat" class="action-btn clear-btn">
-            <span class="btn-icon">🗑️</span>
-            <span class="btn-text">清空对话</span>
-          </button>
-          <button @click="exportChat" class="action-btn export-btn">
-            <span class="btn-icon">📥</span>
-            <span class="btn-text">导出对话</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
-<script setup lang="ts">
-import { ref, onMounted, nextTick, watch } from 'vue'
+﻿<script setup lang="ts">
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { marked } from 'marked'
 
 interface Model {
@@ -154,26 +22,35 @@ const availableModels = ref<Model[]>([])
 const messages = ref<Message[]>([])
 const userInput = ref('')
 const isLoading = ref(false)
-const messagesContainer = ref<HTMLElement>()
-const inputTextarea = ref<HTMLTextAreaElement>()
+const messagesContainer = ref<HTMLElement | null>(null)
+const inputTextarea = ref<HTMLTextAreaElement | null>(null)
 const copyStatus = ref<Record<number, string>>({})
 
-// 获取可用模型列表
+const quickPrompts = [
+  '请帮我总结这篇文章的核心观点，并输出 3 条可执行建议。',
+  '我会给你一段代码，请指出潜在 bug 和性能问题。',
+  '把下面内容改写成更有逻辑的博客段落，语气专业但易懂。',
+  '基于这个需求给我一个 Vue3 + TS 的实现方案和目录结构。',
+]
+
+const messageCount = computed(() => messages.value.length)
+const userMessageCount = computed(() => messages.value.filter((m) => m.role === 'user').length)
+const aiMessageCount = computed(() => messages.value.filter((m) => m.role === 'assistant').length)
+const canSend = computed(() => userInput.value.trim().length > 0 && selectedModel.value && !isLoading.value)
+
 const fetchModels = async () => {
   try {
     const response = await fetch(`${OLLAMA_BASE_URL}/api/tags`)
     if (!response.ok) {
-      throw new Error('无法连接到Ollama服务')
+      throw new Error('无法连接到 Ollama 服务')
     }
+
     const data = await response.json()
     availableModels.value = data.models || []
 
-    // 如果没有选择模型，默认选择 deepseek-r1:8b
     if (!selectedModel.value && availableModels.value.length > 0) {
-      const defaultModel = availableModels.value.find((model) =>
-        model.name.includes('deepseek-r1:8b'),
-      )
-      selectedModel.value = defaultModel ? defaultModel.name : availableModels.value[0].name
+      const preferred = availableModels.value.find((model) => model.name.includes('deepseek-r1:8b'))
+      selectedModel.value = preferred?.name || availableModels.value[0].name
     }
   } catch (error) {
     console.error('获取模型列表失败:', error)
@@ -181,22 +58,43 @@ const fetchModels = async () => {
   }
 }
 
-// 发送消息到AI
-const sendMessage = async () => {
-  if (!userInput.value.trim() || !selectedModel.value || isLoading.value) {
-    return
-  }
+const removeThinkTags = (content: string): string => {
+  return content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+}
 
+const scrollToBottom = () => {
+  if (!messagesContainer.value) return
+  messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+}
+
+const resizeTextarea = () => {
+  if (!inputTextarea.value) return
+
+  const textarea = inputTextarea.value
+  textarea.style.height = 'auto'
+  const nextHeight = Math.min(Math.max(textarea.scrollHeight, 56), 220)
+  textarea.style.height = `${nextHeight}px`
+}
+
+const focusTextarea = () => {
+  inputTextarea.value?.focus()
+}
+
+const sendMessage = async () => {
+  if (!canSend.value) return
+
+  const prompt = userInput.value.trim()
   const userMessage: Message = {
     role: 'user',
-    content: userInput.value.trim(),
+    content: prompt,
     timestamp: new Date(),
   }
 
   messages.value.push(userMessage)
-  const currentInput = userInput.value.trim()
   userInput.value = ''
   isLoading.value = true
+  await nextTick()
+  resizeTextarea()
 
   try {
     const response = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
@@ -206,59 +104,77 @@ const sendMessage = async () => {
       },
       body: JSON.stringify({
         model: selectedModel.value,
-        prompt: currentInput,
+        prompt,
         stream: false,
       }),
     })
 
     if (!response.ok) {
-      throw new Error('AI服务响应错误')
+      throw new Error('AI 服务响应错误')
     }
 
     const data = await response.json()
 
-    // 去除<think>标签中的内容
-    const cleanedContent = removeThinkTags(data.response || '抱歉，我没有得到有效的回复。')
-
     const assistantMessage: Message = {
       role: 'assistant',
-      content: cleanedContent,
+      content: removeThinkTags(data.response || '抱歉，我没有得到有效的回复。'),
       timestamp: new Date(),
     }
 
     messages.value.push(assistantMessage)
   } catch (error) {
     console.error('发送消息失败:', error)
-    const errorMessage: Message = {
+    messages.value.push({
       role: 'assistant',
-      content: '抱歉，发生了错误，请检查Ollama服务是否正常运行。',
+      content: '抱歉，发生了错误。请检查 Ollama 服务是否正常运行，然后重试。',
       timestamp: new Date(),
-    }
-    messages.value.push(errorMessage)
+    })
   } finally {
     isLoading.value = false
     await nextTick()
     scrollToBottom()
+    resizeTextarea()
   }
 }
 
-// 滚动到底部
-const scrollToBottom = () => {
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+const insertLineBreak = () => {
+  if (!inputTextarea.value) {
+    userInput.value += '\n'
+    return
   }
+
+  const textarea = inputTextarea.value
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  const value = userInput.value
+
+  userInput.value = `${value.slice(0, start)}\n${value.slice(end)}`
+
+  nextTick(() => {
+    if (!inputTextarea.value) return
+    const cursor = start + 1
+    inputTextarea.value.selectionStart = cursor
+    inputTextarea.value.selectionEnd = cursor
+    resizeTextarea()
+  })
 }
 
-// 格式化消息内容（支持Markdown）
+const applyPrompt = (prompt: string) => {
+  userInput.value = prompt
+  nextTick(() => {
+    focusTextarea()
+    resizeTextarea()
+  })
+}
+
 const formatMessage = (content: string) => {
   try {
-    return marked(content)
+    return marked.parse(content) as string
   } catch {
     return content.replace(/\n/g, '<br>')
   }
 }
 
-// 格式化时间
 const formatTime = (timestamp: Date) => {
   return timestamp.toLocaleTimeString('zh-CN', {
     hour: '2-digit',
@@ -266,541 +182,834 @@ const formatTime = (timestamp: Date) => {
   })
 }
 
-// 格式化模型大小
-const formatModelSize = (size: number) => {
-  if (size >= 1024 * 1024 * 1024) {
-    return `${(size / (1024 * 1024 * 1024)).toFixed(1)}GB`
-  } else if (size >= 1024 * 1024) {
-    return `${(size / (1024 * 1024)).toFixed(1)}MB`
-  } else {
-    return `${(size / 1024).toFixed(1)}KB`
-  }
-}
-
-// 去除<think>标签中的内容
-const removeThinkTags = (content: string): string => {
-  // 移除所有<think>...</think>标签及其内容
-  return content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
-}
-
-// 模型变更处理
 const onModelChange = () => {
-  console.log('切换到模型:', selectedModel.value)
+  // keep for future side effects (e.g. warmup model)
 }
 
-// 刷新模型列表
 const refreshModels = async () => {
   await fetchModels()
 }
 
-// 清空对话
 const clearChat = () => {
-  if (confirm('确定要清空所有对话吗？')) {
+  if (messages.value.length === 0) return
+  if (confirm('确定要清空当前对话吗？')) {
     messages.value = []
   }
 }
 
-// 导出对话
 const exportChat = () => {
+  if (messages.value.length === 0) return
+
   const chatContent = messages.value
-    .map((msg) => `${msg.role === 'user' ? '用户' : 'AI'}: ${msg.content}`)
-    .join('\n\n')
+    .map((msg) => `${msg.role === 'user' ? '用户' : 'AI'} [${formatTime(msg.timestamp)}]\n${msg.content}`)
+    .join('\n\n------------------------------\n\n')
 
   const blob = new Blob([chatContent], { type: 'text/plain;charset=utf-8' })
   const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `AI对话_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `AI对话_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
   URL.revokeObjectURL(url)
 }
 
-// 复制消息内容
-const copyMessage = async (content: string, messageTimestamp: number) => {
+const copyMessage = async (content: string, key: number) => {
   try {
-    // 移除HTML标签，获取纯文本内容
-    const tempDiv = document.createElement('div')
-    tempDiv.innerHTML = content
-    const plainText = tempDiv.textContent || tempDiv.innerText || ''
-    
-    // 使用现代Clipboard API
+    const plainText = content.replace(/<[^>]*>/g, '')
+
     if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(plainText)
     } else {
-      // 降级方案：使用传统的复制方法
-      const textArea = document.createElement('textarea')
-      textArea.value = plainText
-      textArea.style.position = 'fixed'
-      textArea.style.left = '-999999px'
-      textArea.style.top = '-999999px'
-      document.body.appendChild(textArea)
-      textArea.focus()
-      textArea.select()
+      const textarea = document.createElement('textarea')
+      textarea.value = plainText
+      textarea.style.position = 'fixed'
+      textarea.style.left = '-999999px'
+      textarea.style.top = '-999999px'
+      document.body.appendChild(textarea)
+      textarea.focus()
+      textarea.select()
       document.execCommand('copy')
-      document.body.removeChild(textArea)
+      document.body.removeChild(textarea)
     }
-    
-    // 显示复制成功状态
-    copyStatus.value[messageTimestamp] = '已复制!'
-    
-    // 3秒后恢复原始状态
-    setTimeout(() => {
-      copyStatus.value[messageTimestamp] = ''
-    }, 3000)
-    
+
+    copyStatus.value[key] = '已复制'
   } catch (error) {
     console.error('复制失败:', error)
-    // 显示复制失败状态
-    copyStatus.value[messageTimestamp] = '复制失败'
-    
-    // 3秒后恢复原始状态
-    setTimeout(() => {
-      copyStatus.value[messageTimestamp] = ''
-    }, 3000)
+    copyStatus.value[key] = '复制失败'
   }
+
+  setTimeout(() => {
+    copyStatus.value[key] = ''
+  }, 1800)
 }
 
-// 监听消息变化，自动滚动
-watch(messages, () => {
-  nextTick(() => {
-    scrollToBottom()
-  })
+watch(messages, async () => {
+  await nextTick()
+  scrollToBottom()
 })
 
-onMounted(() => {
-  fetchModels()
+watch(userInput, async () => {
+  await nextTick()
+  resizeTextarea()
+})
+
+onMounted(async () => {
+  await fetchModels()
+  await nextTick()
+  resizeTextarea()
 })
 </script>
 
+<template>
+  <div class="ai-chat-page">
+    <div class="bg-orb orb-left"></div>
+    <div class="bg-orb orb-right"></div>
+    <div class="bg-grid"></div>
+
+    <div class="ai-chat-layout">
+      <aside class="control-panel card-surface">
+        <header class="panel-header">
+          <p class="eyebrow">AI Chat Studio</p>
+          <h1 class="panel-title">本地 AI 对话工作台</h1>
+          <p class="panel-subtitle">连接 Ollama 模型，完成问答、写作和代码协作。</p>
+        </header>
+
+        <section class="panel-block">
+          <label class="block-label" for="model-select">当前模型</label>
+          <select
+            id="model-select"
+            v-model="selectedModel"
+            :disabled="isLoading"
+            class="model-select"
+            @change="onModelChange"
+          >
+            <option value="">请选择模型...</option>
+            <option v-for="model in availableModels" :key="model.digest" :value="model.name">
+              {{ model.name }}
+            </option>
+          </select>
+        </section>
+
+        <section class="panel-block stats-grid">
+          <article class="stat-card">
+            <span class="stat-label">总消息</span>
+            <strong class="stat-value">{{ messageCount }}</strong>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">用户</span>
+            <strong class="stat-value">{{ userMessageCount }}</strong>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">AI</span>
+            <strong class="stat-value">{{ aiMessageCount }}</strong>
+          </article>
+        </section>
+
+        <section class="panel-block">
+          <p class="block-label">快捷动作</p>
+          <div class="action-row">
+            <button class="tool-btn" :disabled="isLoading" @click="refreshModels">刷新模型</button>
+            <button class="tool-btn" :disabled="messages.length === 0" @click="clearChat">清空对话</button>
+            <button class="tool-btn" :disabled="messages.length === 0" @click="exportChat">导出文本</button>
+          </div>
+        </section>
+
+        <section class="panel-block">
+          <p class="block-label">提示词模板</p>
+          <div class="prompt-list">
+            <button
+              v-for="prompt in quickPrompts"
+              :key="prompt"
+              class="prompt-item"
+              @click="applyPrompt(prompt)"
+            >
+              {{ prompt }}
+            </button>
+          </div>
+        </section>
+      </aside>
+
+      <section class="chat-stage card-surface">
+        <header class="stage-header">
+          <div>
+            <h2 class="stage-title">对话区</h2>
+            <p class="stage-subtitle">
+              {{ selectedModel ? `已连接 ${selectedModel}` : '请先在左侧选择模型' }}
+            </p>
+          </div>
+          <span class="status-pill" :class="{ offline: !selectedModel }">
+            <span class="status-dot"></span>
+            {{ selectedModel ? 'Ready' : 'Offline' }}
+          </span>
+        </header>
+
+        <div ref="messagesContainer" class="chat-scroll">
+          <div v-if="messages.length === 0" class="empty-view">
+            <div class="empty-badge">AI</div>
+            <h3>开始一段高质量对话</h3>
+            <p>左侧选择模型后，在下方输入框输入问题即可开始。</p>
+          </div>
+
+          <article
+            v-for="(message, index) in messages"
+            :key="`${message.role}-${message.timestamp.getTime()}-${index}`"
+            class="chat-card"
+            :class="message.role"
+          >
+            <header class="chat-card-header">
+              <div class="avatar">{{ message.role === 'user' ? '你' : 'AI' }}</div>
+              <div class="meta">
+                <strong>{{ message.role === 'user' ? '你' : 'AI 助手' }}</strong>
+                <time>{{ formatTime(message.timestamp) }}</time>
+              </div>
+            </header>
+
+            <div class="chat-card-body" v-html="formatMessage(message.content)"></div>
+
+            <footer v-if="message.role === 'assistant'" class="chat-card-footer">
+              <button class="copy-btn" @click="copyMessage(message.content, message.timestamp.getTime())">
+                {{ copyStatus[message.timestamp.getTime()] || '复制内容' }}
+              </button>
+            </footer>
+          </article>
+
+          <article v-if="isLoading" class="chat-card assistant loading-card">
+            <header class="chat-card-header">
+              <div class="avatar">AI</div>
+              <div class="meta">
+                <strong>AI 助手</strong>
+                <time>思考中...</time>
+              </div>
+            </header>
+            <div class="typing-dots">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </article>
+        </div>
+
+        <footer class="composer">
+          <div class="composer-box">
+            <textarea
+              ref="inputTextarea"
+              v-model="userInput"
+              :disabled="isLoading || !selectedModel"
+              placeholder="输入你的问题...（Enter 发送，Ctrl+Enter 换行）"
+              rows="1"
+              @input="resizeTextarea"
+              @keydown.enter.exact.prevent="sendMessage"
+              @keydown.ctrl.enter.prevent="insertLineBreak"
+            ></textarea>
+            <button class="send-btn" :disabled="!canSend" @click="sendMessage">
+              发送
+            </button>
+          </div>
+          <p class="composer-hint" :class="{ warn: !selectedModel }">
+            {{ !selectedModel ? '请先选择模型' : isLoading ? 'AI 正在生成内容...' : 'Enter 发送 · Ctrl+Enter 换行' }}
+          </p>
+        </footer>
+      </section>
+    </div>
+  </div>
+</template>
+
 <style scoped>
-/* AI聊天容器 */
-.ai-chat-container {
-  width: 100%;
+.ai-chat-page {
+  --bg-page: #f7f9fc;
+  --bg-surface: #ffffff;
+  --bg-soft: #f1f6ff;
+  --line: #d9e5f3;
+  --line-strong: #c7d9ee;
+  --text-title: #0f1b3d;
+  --text-main: #334155;
+  --text-muted: #66768e;
+  --accent: #2563eb;
+  --accent-2: #f59e0b;
+  --success: #16a34a;
+  --shadow-soft: 0 20px 50px rgba(37, 99, 235, 0.09);
+  --radius-xl: 24px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --font-display: 'Fraunces', 'Source Han Serif SC', 'STZhongsong', serif;
+  --font-body: 'Outfit', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+
+  position: relative;
+  overflow: hidden;
+  min-height: calc(100vh - 64px);
+  padding: 24px 0 28px;
+  background: var(--bg-page);
+  color: var(--text-main);
+  font-family: var(--font-body);
+}
+
+.bg-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(54px);
+  pointer-events: none;
+}
+
+.orb-left {
+  width: 320px;
+  height: 320px;
+  left: -120px;
+  top: -80px;
+  background: rgba(59, 130, 246, 0.3);
+}
+
+.orb-right {
+  width: 280px;
+  height: 280px;
+  right: -80px;
+  top: 12%;
+  background: rgba(245, 158, 11, 0.25);
+}
+
+.bg-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.09) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(ellipse at center, black 0%, transparent 78%);
+}
+
+.ai-chat-layout {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 1880px);
   margin: 0 auto;
-  padding: var(--spacing-4);
+  padding: 0 clamp(12px, 1.25vw, 24px);
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 18px;
+  height: calc(100vh - 120px);
+}
+
+.card-surface {
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(10px);
+}
+
+.control-panel {
+  padding: 18px;
   display: flex;
   flex-direction: column;
-  background: var(--bg-body);
-  min-height: calc(100vh - 64px);
+  gap: 14px;
+  overflow-y: auto;
 }
 
-/* 顶部导航 */
-.top-nav {
-  display: flex;
-  justify-content: center;
-  margin-bottom: var(--spacing-4);
-  background: var(--bg-card);
-  padding: var(--spacing-4) var(--spacing-5);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border-light);
+.panel-header {
+  display: grid;
+  gap: 7px;
 }
 
-.nav-content {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-4);
-}
-
-.nav-title {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-3);
-  font-size: var(--text-xl);
-  font-weight: var(--font-bold);
+.eyebrow {
   margin: 0;
-  background: var(--gradient-primary);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #1843aa;
+  background: #e4eeff;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
-.title-icon {
-  font-size: 1.5rem;
+.panel-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.72rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--text-title);
 }
 
-.nav-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-3);
+.panel-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+  font-size: 13px;
 }
 
-/* 模型选择器 */
-.model-selector {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-3);
+.panel-block {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(145deg, #ffffff 0%, #f7fbff 100%);
+}
+
+.block-label {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .model-select {
-  padding: var(--spacing-3) var(--spacing-4);
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  background: var(--bg-card);
+  width: 100%;
+  height: 40px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: #ffffff;
   color: var(--text-main);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  min-width: 220px;
-  cursor: pointer;
-  transition: all var(--transition-normal);
-}
-
-.model-select:hover {
-  border-color: var(--primary-color);
+  font-size: 14px;
+  padding: 0 12px;
+  transition: all 0.2s ease;
 }
 
 .model-select:focus {
   outline: none;
-  border-color: var(--primary-color);
-  box-shadow: var(--shadow-focus);
+  border-color: rgba(37, 99, 235, 0.5);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
 }
 
-.refresh-btn {
-  padding: var(--spacing-3);
-  background: var(--gradient-primary);
-  border: none;
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  color: var(--text-inverse);
-  transition: all var(--transition-normal);
-  box-shadow: var(--shadow-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.stats-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
-.refresh-btn:hover:not(:disabled) {
-  transform: translateY(-2px) rotate(180deg);
-  box-shadow: var(--shadow-primary-lg);
+.stat-card {
+  border-radius: 12px;
+  border: 1px solid #deebfa;
+  background: #f8fbff;
+  padding: 10px 8px;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
 }
 
-.refresh-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-icon {
-  font-size: 1.1rem;
-}
-
-.btn-text {
-  font-weight: var(--font-semibold);
-}
-
-/* 聊天主区域 */
-.chat-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  background: var(--bg-card);
-  border-radius: var(--radius-2xl);
-  overflow: hidden;
-  box-shadow: var(--shadow-lg);
-  border: 1px solid var(--border-light);
-}
-
-/* 消息容器 */
-.messages-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--spacing-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-5);
-  background: linear-gradient(180deg, var(--bg-muted) 0%, var(--bg-card) 100%);
-}
-
-.messages-container::-webkit-scrollbar {
-  width: 6px;
-}
-
-.messages-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.messages-container::-webkit-scrollbar-thumb {
-  background: var(--gray-300);
-  border-radius: var(--radius-full);
-}
-
-.messages-container::-webkit-scrollbar-thumb:hover {
-  background: var(--gray-400);
-}
-
-/* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-16) var(--spacing-6);
-  text-align: center;
-  color: var(--text-secondary);
-}
-
-.empty-icon {
-  font-size: 4rem;
-  margin-bottom: var(--spacing-5);
-  opacity: 0.6;
-  animation: float 3s ease-in-out infinite;
-}
-
-.empty-title {
-  font-size: var(--text-xl);
-  font-weight: var(--font-semibold);
-  margin: 0 0 var(--spacing-3) 0;
-  color: var(--text-main);
-}
-
-.empty-description {
-  font-size: var(--text-base);
-  margin: 0;
-  line-height: var(--leading-relaxed);
-  max-width: 400px;
-  color: var(--text-secondary);
-}
-
-/* 消息样式 */
-.message {
-  display: flex;
-  gap: var(--spacing-4);
-  max-width: 85%;
-  animation: messageSlideIn 0.4s var(--ease-out) forwards;
-  opacity: 0;
-  transform: translateY(16px);
-}
-
-.message.user {
-  align-self: flex-end;
-  flex-direction: row-reverse;
-}
-
-.message.assistant {
-  align-self: flex-start;
-}
-
-/* 头像 */
-.message-avatar {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-2);
-  flex-shrink: 0;
-}
-
-.avatar-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  background: var(--bg-card);
-  border: 2px solid var(--border-color);
-  box-shadow: var(--shadow-md);
-  transition: all var(--transition-normal);
-}
-
-.message.user .avatar-icon {
-  background: var(--gradient-primary);
-  color: var(--text-inverse);
-  border-color: var(--primary-color);
-}
-
-.message.assistant .avatar-icon {
-  background: var(--gradient-success);
-  color: var(--text-inverse);
-  border-color: var(--success-color);
-}
-
-.avatar-badge {
-  font-size: var(--text-xs);
-  font-weight: var(--font-semibold);
-  color: var(--text-secondary);
-  background: var(--bg-card);
-  padding: var(--spacing-1) var(--spacing-2);
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-sm);
-}
-
-@keyframes messageSlideIn {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 消息内容 */
-.message-content {
-  flex: 1;
-  background: var(--bg-card);
-  padding: var(--spacing-4) var(--spacing-5);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
-  max-width: 100%;
-  border: 1px solid var(--border-light);
-  transition: all var(--transition-normal);
-}
-
-.message.user .message-content {
-  background: var(--gradient-primary);
-  color: var(--text-inverse);
-  box-shadow: var(--shadow-primary);
-  border: none;
-}
-
-.message.assistant .message-content {
-  background: var(--bg-card);
-  color: var(--text-main);
-}
-
-.message-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-3);
-  padding-bottom: var(--spacing-2);
-  border-bottom: 1px solid var(--border-light);
-}
-
-.message.user .message-header {
-  border-bottom-color: rgba(255, 255, 255, 0.2);
-}
-
-.message-role-text {
-  font-weight: var(--font-semibold);
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-.message.user .message-role-text {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.message-time {
-  font-size: var(--text-xs);
+.stat-label {
+  font-size: 11px;
   color: var(--text-muted);
-  font-weight: var(--font-medium);
 }
 
-.message.user .message-time {
-  color: rgba(255, 255, 255, 0.7);
+.stat-value {
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-title);
 }
 
-.message-text {
-  line-height: var(--leading-relaxed);
-  word-wrap: break-word;
-  font-size: var(--text-sm);
+.action-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
-.message-text :deep(p) {
-  margin: 0 0 var(--spacing-3) 0;
-}
-
-.message-text :deep(p:last-child) {
-  margin-bottom: 0;
-}
-
-.message-text :deep(code) {
-  background: rgba(0, 0, 0, 0.08);
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
-  font-size: 0.9em;
-}
-
-.message.user .message-text :deep(code) {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.message-text :deep(pre) {
-  background: var(--gray-800);
-  color: var(--gray-100);
-  padding: var(--spacing-4);
-  border-radius: var(--radius-lg);
-  overflow-x: auto;
-  margin: var(--spacing-3) 0;
-}
-
-/* 消息操作按钮 */
-.message-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--spacing-3);
-  padding-top: var(--spacing-2);
-  border-top: 1px solid var(--border-light);
-}
-
-.copy-btn {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  padding: var(--spacing-2) var(--spacing-3);
-  background: var(--bg-muted);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
+.tool-btn {
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all var(--transition-fast);
-  min-width: 72px;
-  justify-content: center;
+  transition: all 0.2s ease;
 }
 
-.copy-btn:hover {
-  background: var(--primary-lighter);
-  border-color: var(--primary-color);
-  color: var(--primary-color);
+.tool-btn:hover:not(:disabled) {
+  border-color: rgba(37, 99, 235, 0.35);
+  color: #1e40af;
   transform: translateY(-1px);
 }
 
-.copy-btn:active {
-  transform: translateY(0);
+.tool-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
-.copy-icon {
-  font-size: 0.9rem;
+.prompt-list {
+  display: grid;
+  gap: 8px;
 }
 
-.copy-text {
-  font-size: var(--text-xs);
+.prompt-item {
+  text-align: left;
+  border: 1px solid #dfeafb;
+  border-radius: 11px;
+  background: #f8fbff;
+  color: #354968;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 9px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-/* 打字指示器 */
-.typing-indicator {
+.prompt-item:hover {
+  border-color: rgba(37, 99, 235, 0.35);
+  background: #eef5ff;
+}
+
+.chat-stage {
+  padding: 16px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 12px;
+  min-height: 0;
+}
+
+.stage-header {
   display: flex;
-  gap: var(--spacing-2);
-  align-items: center;
-  padding: var(--spacing-2) 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 4px;
 }
 
-.typing-indicator .dot {
+.stage-title {
+  margin: 0;
+  color: var(--text-title);
+  font-size: 1.25rem;
+  font-family: var(--font-display);
+}
+
+.stage-subtitle {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid #cef0d8;
+  background: #ecfdf3;
+  color: #0f8c42;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-pill.offline {
+  border-color: #f3dbc5;
+  background: #fff7ed;
+  color: #b45309;
+}
+
+.status-dot {
   width: 8px;
   height: 8px;
-  border-radius: var(--radius-full);
-  background: var(--gradient-success);
-  animation: typingDot 1.4s infinite ease-in-out;
+  border-radius: 999px;
+  background: currentColor;
 }
 
-.typing-indicator .dot:nth-child(1) { animation-delay: -0.32s; }
-.typing-indicator .dot:nth-child(2) { animation-delay: -0.16s; }
-
-.typing-message .message-content {
-  background: var(--bg-muted);
-  border: 2px dashed var(--border-color);
+.chat-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-@keyframes typingDot {
-  0%, 80%, 100% {
-    transform: scale(0.8);
-    opacity: 0.5;
+.chat-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #c8d6ea;
+}
+
+.empty-view {
+  min-height: 240px;
+  border: 1px dashed #d6e2f4;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.85);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 18px;
+}
+
+.empty-badge {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(130deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+.empty-view h3 {
+  margin: 0;
+  color: var(--text-title);
+  font-size: 20px;
+}
+
+.empty-view p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.chat-card {
+  max-width: min(82%, 760px);
+  border-radius: 16px;
+  border: 1px solid #dce6f3;
+  background: #ffffff;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  animation: riseIn 0.28s ease;
+}
+
+.chat-card.user {
+  margin-left: auto;
+  border-color: rgba(37, 99, 235, 0.25);
+  background: linear-gradient(135deg, #2f6ff0 0%, #2563eb 100%);
+  color: #ffffff;
+}
+
+.chat-card.assistant {
+  margin-right: auto;
+}
+
+.chat-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: #edf4ff;
+  color: #1d4ed8;
+}
+
+.chat-card.user .avatar {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.meta {
+  display: grid;
+  gap: 2px;
+}
+
+.meta strong {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.meta time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.chat-card.user .meta time {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.chat-card-body {
+  font-size: 14px;
+  line-height: 1.72;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+.chat-card.user .chat-card-body {
+  color: #ffffff;
+}
+
+.chat-card-body :deep(p) {
+  margin: 0 0 12px;
+}
+
+.chat-card-body :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.chat-card-body :deep(code) {
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+  font-size: 12px;
+  border-radius: 8px;
+  padding: 2px 6px;
+  background: #eef3fc;
+}
+
+.chat-card.user .chat-card-body :deep(code) {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.chat-card-body :deep(pre) {
+  margin: 12px 0;
+  border-radius: 12px;
+  padding: 12px;
+  background: #0b1220;
+  color: #e2e8f0;
+  overflow-x: auto;
+}
+
+.chat-card-body :deep(pre code) {
+  background: transparent;
+  padding: 0;
+}
+
+.chat-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px dashed #dce6f4;
+}
+
+.copy-btn {
+  height: 30px;
+  border-radius: 9px;
+  padding: 0 10px;
+  border: 1px solid #dbe7f7;
+  background: #f7faff;
+  color: #3f556f;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.copy-btn:hover {
+  border-color: rgba(37, 99, 235, 0.32);
+  color: #1e40af;
+}
+
+.loading-card {
+  border-style: dashed;
+}
+
+.typing-dots {
+  display: flex;
+  gap: 6px;
+  padding: 2px 0 4px;
+}
+
+.typing-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #2563eb;
+  animation: typing 1.2s infinite ease-in-out;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.composer {
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.composer-box {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.composer-box textarea {
+  flex: 1;
+  min-height: 56px;
+  max-height: 220px;
+  resize: none;
+  border-radius: 12px;
+  border: 1px solid #dbe7f7;
+  background: #f7faff;
+  padding: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-main);
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.composer-box textarea:focus {
+  outline: none;
+  border-color: rgba(37, 99, 235, 0.5);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
+}
+
+.composer-box textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.send-btn {
+  width: 84px;
+  height: 42px;
+  border: none;
+  border-radius: 11px;
+  background: linear-gradient(130deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.send-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.25);
+}
+
+.send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.composer-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.composer-hint.warn {
+  color: #b45309;
+  font-weight: 600;
+}
+
+@keyframes typing {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.45;
   }
   40% {
     transform: scale(1);
@@ -808,226 +1017,67 @@ onMounted(() => {
   }
 }
 
-/* 输入区域 */
-.input-container {
-  padding: var(--spacing-4) var(--spacing-5);
-  background: var(--bg-card);
-  border-top: 1px solid var(--border-light);
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.input-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-3);
-  margin-bottom: var(--spacing-3);
-}
-
-.input-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--spacing-3);
-}
-
-.input-label {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  color: var(--text-main);
-  font-weight: var(--font-semibold);
-  font-size: var(--text-sm);
-}
-
-.label-icon {
-  font-size: 1.1rem;
-}
-
-.input-hint {
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-}
-
-.message-input {
-  flex: 1;
-  padding: var(--spacing-4);
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-xl);
-  resize: vertical;
-  min-height: 80px;
-  height: 100px;
-  font-family: inherit;
-  font-size: var(--text-sm);
-  line-height: var(--leading-relaxed);
-  color: var(--text-main);
-  background: var(--bg-card);
-  transition: all var(--transition-normal);
-}
-
-.message-input:hover {
-  border-color: var(--gray-300);
-}
-
-.message-input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: var(--shadow-focus);
-}
-
-.message-input::placeholder {
-  color: var(--text-placeholder);
-}
-
-.input-footer {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.send-btn {
-  padding: var(--spacing-3) var(--spacing-6);
-  background: var(--gradient-primary);
-  color: var(--text-inverse);
-  border: none;
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
-  transition: all var(--transition-normal);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  box-shadow: var(--shadow-primary);
-  min-width: 130px;
-  justify-content: center;
-}
-
-.send-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-primary-lg);
-}
-
-.send-btn:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.send-btn:disabled {
-  background: var(--gray-300);
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-/* 操作按钮 */
-.input-actions {
-  display: flex;
-  gap: var(--spacing-3);
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.action-btn {
-  padding: var(--spacing-2) var(--spacing-4);
-  border: 1.5px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  background: var(--bg-card);
-  cursor: pointer;
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  transition: all var(--transition-normal);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  color: var(--text-secondary);
-}
-
-.action-btn:hover {
-  transform: translateY(-2px);
-  border-color: var(--primary-color);
-  color: var(--primary-color);
-  background: var(--primary-lighter);
-}
-
-.clear-btn:hover {
-  border-color: var(--danger-color);
-  color: var(--danger-color);
-  background: var(--danger-light);
-}
-
-.export-btn:hover {
-  border-color: var(--success-color);
-  color: var(--success-color);
-  background: var(--success-light);
-}
-
-/* 浮动动画 */
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-/* 响应式 */
-@media (max-width: 768px) {
-  .ai-chat-container {
-    padding: var(--spacing-3);
+@media (max-width: 1160px) {
+  .ai-chat-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: calc(100vh - 120px);
   }
 
-  .top-nav {
-    padding: var(--spacing-3);
+  .control-panel {
+    max-height: none;
   }
 
-  .nav-title {
-    font-size: var(--text-lg);
+  .chat-stage {
+    min-height: 620px;
+  }
+}
+
+@media (max-width: 760px) {
+  .ai-chat-page {
+    padding-top: 14px;
   }
 
-  .model-select {
-    min-width: 160px;
-    font-size: var(--text-xs);
-    padding: var(--spacing-2) var(--spacing-3);
+  .ai-chat-layout {
+    gap: 12px;
   }
 
-  .message {
-    max-width: 95%;
-    gap: var(--spacing-3);
+  .control-panel,
+  .chat-stage {
+    padding: 12px;
   }
 
-  .avatar-icon {
-    width: 36px;
-    height: 36px;
-    font-size: 16px;
+  .panel-title {
+    font-size: 1.45rem;
   }
 
-  .avatar-badge {
-    display: none;
+  .stats-grid,
+  .action-row {
+    grid-template-columns: 1fr;
   }
 
-  .message-content {
-    padding: var(--spacing-3) var(--spacing-4);
+  .chat-card {
+    max-width: 92%;
   }
 
-  .input-container {
-    padding: var(--spacing-3);
-  }
-
-  .input-header {
+  .composer-box {
     flex-direction: column;
-    align-items: flex-start;
-    gap: var(--spacing-2);
-  }
-
-  .message-input {
-    padding: var(--spacing-3);
-    min-height: 70px;
-    height: 80px;
+    align-items: stretch;
   }
 
   .send-btn {
-    min-width: 100px;
-    padding: var(--spacing-3) var(--spacing-4);
-  }
-
-  .action-btn {
-    padding: var(--spacing-2) var(--spacing-3);
-    font-size: var(--text-xs);
+    width: 100%;
   }
 }
 </style>
