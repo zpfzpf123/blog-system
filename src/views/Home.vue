@@ -3,12 +3,25 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElPagination, ElSkeleton, ElIcon, ElTooltip } from 'element-plus'
 import {
-  Search, RefreshLeft, Top, Plus, Folder, CollectionTag,
-  Setting, Monitor, Document, CopyDocument,
-  Delete, Edit, ArrowRight, Timer
+  Search,
+  RefreshLeft,
+  Top,
+  Plus,
+  Folder,
+  CollectionTag,
+  Setting,
+  Monitor,
+  Document,
+  CopyDocument,
+  Delete,
+  Edit,
+  ArrowRight,
+  Timer,
+  Check,
 } from '@element-plus/icons-vue'
 import axios from '@/utils/axios'
 import { copyEnhancedRichContent } from '@/utils/imageUtils'
+import { createHomeStateSnapshot, parseHomeStateSnapshot } from '@/views/homeState'
 
 // Components
 import GlobalSearch from '@/components/home/GlobalSearch.vue'
@@ -76,7 +89,7 @@ const mainContentRef = ref<HTMLElement | null>(null)
 
 // Actions
 const openThemeSettings = () => themeSettingsRef.value?.open()
-const openCategoryTagManager = () => showCategoryTagManager.value = true
+const openCategoryTagManager = () => (showCategoryTagManager.value = true)
 const openGlobalSearch = () => globalSearchRef.value?.open()
 
 const handleManagerRefresh = () => {
@@ -97,9 +110,11 @@ const greeting = computed(() => {
 })
 
 const hasActiveFilters = computed(() => {
-  return searchKeyword.value.trim() !== '' ||
-         selectedCategoryIds.value.length > 0 ||
-         selectedTagIds.value.length > 0
+  return (
+    searchKeyword.value.trim() !== '' ||
+    selectedCategoryIds.value.length > 0 ||
+    selectedTagIds.value.length > 0
+  )
 })
 
 // API Actions
@@ -128,7 +143,7 @@ const fetchBlogPosts = async (page = 1) => {
       page: page,
       limit: pageSize.value,
       sortBy: 'id',
-      sortOrder: 'desc'
+      sortOrder: 'desc',
     }
 
     if (selectedCategoryIds.value?.length > 0) {
@@ -188,14 +203,15 @@ const goToCreateBlog = () => router.push('/admin/posts/create?from=home')
 const goToBlogDetail = (id: number) => {
   if (mainContentRef.value) {
     // 保存状态以便返回时恢复
-    const state = {
+    const state = createHomeStateSnapshot({
       scrollTop: mainContentRef.value.scrollTop,
       page: currentPage.value,
       pageSize: pageSize.value,
       categoryIds: selectedCategoryIds.value,
       tagIds: selectedTagIds.value,
-      lastViewedId: id
-    }
+      searchKeyword: searchKeyword.value,
+      lastViewedId: id,
+    })
     localStorage.setItem('homeState', JSON.stringify(state))
   }
   router.push(`/blog/${id}`)
@@ -208,16 +224,12 @@ const handleEdit = (post: BlogPost, e: MouseEvent) => {
 
 const handleDelete = (post: BlogPost, e: MouseEvent) => {
   e.stopPropagation()
-  ElMessageBox.confirm(
-    `确定要删除文章《${post.title}》吗？此操作不可恢复。`,
-    '删除确认',
-    {
-      confirmButtonText: '确认删除',
-      cancelButtonText: '取消',
-      type: 'warning',
-      confirmButtonClass: 'el-button--danger',
-    }
-  ).then(async () => {
+  ElMessageBox.confirm(`确定要删除文章《${post.title}》吗？此操作不可恢复。`, '删除确认', {
+    confirmButtonText: '确认删除',
+    cancelButtonText: '取消',
+    type: 'warning',
+    confirmButtonClass: 'el-button--danger',
+  }).then(async () => {
     try {
       await axios.delete(`/api/posts/${post.id}`)
       ElMessage.success('文章已删除')
@@ -244,7 +256,7 @@ const handleCopy = async (post: BlogPost, e: MouseEvent) => {
 
 const toggleCategory = (id: number) => {
   if (selectedCategoryIds.value.includes(id)) {
-    selectedCategoryIds.value = selectedCategoryIds.value.filter(cid => cid !== id)
+    selectedCategoryIds.value = selectedCategoryIds.value.filter((cid) => cid !== id)
   } else {
     selectedCategoryIds.value = [...selectedCategoryIds.value, id]
   }
@@ -252,7 +264,7 @@ const toggleCategory = (id: number) => {
 
 const toggleTag = (id: number) => {
   if (selectedTagIds.value.includes(id)) {
-    selectedTagIds.value = selectedTagIds.value.filter(tid => tid !== id)
+    selectedTagIds.value = selectedTagIds.value.filter((tid) => tid !== id)
   } else {
     selectedTagIds.value = [...selectedTagIds.value, id]
   }
@@ -285,28 +297,34 @@ const handleGlobalKeydown = (e: KeyboardEvent) => {
 // Watchers
 let searchTimer: ReturnType<typeof setTimeout>
 watch(searchKeyword, () => {
+  if (isRestoring.value) return
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => handleSearch(), 300)
 })
 
-watch([selectedCategoryIds, selectedTagIds], () => {
-  if (!isRestoring.value) handleSearch()
-}, { deep: true })
+watch(
+  [selectedCategoryIds, selectedTagIds],
+  () => {
+    if (!isRestoring.value) handleSearch()
+  },
+  { deep: true },
+)
 
 // Lifecycle
 onMounted(async () => {
   const savedStateStr = localStorage.getItem('homeState')
+  const savedState = parseHomeStateSnapshot(savedStateStr)
 
-  if (savedStateStr) {
+  if (savedState) {
     try {
-      const state = JSON.parse(savedStateStr)
       isRestoring.value = true
 
-      currentPage.value = state.page || 1
-      pageSize.value = state.pageSize || 12
-      selectedCategoryIds.value = state.categoryIds || []
-      selectedTagIds.value = state.tagIds || []
-      lastViewedPostId.value = state.lastViewedId
+      currentPage.value = savedState.page
+      pageSize.value = savedState.pageSize
+      searchKeyword.value = savedState.searchKeyword
+      selectedCategoryIds.value = savedState.categoryIds
+      selectedTagIds.value = savedState.tagIds
+      lastViewedPostId.value = savedState.lastViewedId
 
       await Promise.all([fetchCategories(), fetchTags()])
       await fetchBlogPosts(currentPage.value)
@@ -314,9 +332,11 @@ onMounted(async () => {
       // Restore scroll position
       setTimeout(() => {
         if (mainContentRef.value) {
-          mainContentRef.value.scrollTop = state.scrollTop || 0
+          mainContentRef.value.scrollTop = savedState.scrollTop
         }
-        setTimeout(() => { isRestoring.value = false }, 300)
+        setTimeout(() => {
+          isRestoring.value = false
+        }, 300)
         localStorage.removeItem('homeState')
       }, 100)
     } catch (e) {
@@ -335,6 +355,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  clearTimeout(searchTimer)
   window.removeEventListener('keydown', handleGlobalKeydown)
 })
 </script>
@@ -343,6 +364,8 @@ onUnmounted(() => {
   <div class="home-light">
     <main class="main-scroll" ref="mainContentRef" @scroll="handleScroll">
       <header class="hero">
+        <div class="hero-orb hero-orb-left"></div>
+        <div class="hero-orb hero-orb-right"></div>
         <div class="hero-pattern"></div>
         <div class="hero-content">
           <div class="hero-copy">
@@ -355,8 +378,13 @@ onUnmounted(() => {
               <span class="hero-title-highlight">文章卡片</span>
             </h1>
             <p class="hero-subtitle">
-              以更清晰的信息层级与更轻盈的浅色设计，快速定位你感兴趣的内容。
+              用更通透的浅色阅读体验，帮你在更短时间里找到值得收藏和复读的内容。
             </p>
+            <div class="hero-command-line" aria-label="主页动态提示">
+              <span class="command-dot"></span>
+              <span class="command-text">LIVE / 知识流正在加载新的思路片段</span>
+              <span class="command-chip">CTRL + K 全局检索</span>
+            </div>
           </div>
           <div class="hero-metrics">
             <div class="metric-card">
@@ -433,7 +461,9 @@ onUnmounted(() => {
                   @click="toggleCategory(cat.id)"
                 >
                   <span>{{ cat.name }}</span>
-                  <span v-if="selectedCategoryIds.includes(cat.id)" class="chip-check">?</span>
+                  <span v-if="selectedCategoryIds.includes(cat.id)" class="chip-check">
+                    <el-icon><Check /></el-icon>
+                  </span>
                 </button>
               </div>
             </section>
@@ -456,11 +486,7 @@ onUnmounted(() => {
               </div>
             </section>
 
-            <button
-              v-if="hasActiveFilters"
-              class="btn-reset-filters"
-              @click="handleReset"
-            >
+            <button v-if="hasActiveFilters" class="btn-reset-filters" @click="handleReset">
               <el-icon><RefreshLeft /></el-icon>
               清除筛选
             </button>
@@ -475,8 +501,11 @@ onUnmounted(() => {
             </div>
             <div class="feed-pills">
               <span class="feed-pill">共 {{ total }} 篇</span>
-              <span class="feed-pill muted">{{ categories.length }} 分类 · {{ tags.length }} 标签</span>
+              <span class="feed-pill muted"
+                >{{ categories.length }} 分类 · {{ tags.length }} 标签</span
+              >
             </div>
+            <div class="feed-head-glow" aria-hidden="true"></div>
           </header>
 
           <div v-if="hasActiveFilters" class="active-strip">
@@ -503,6 +532,7 @@ onUnmounted(() => {
               :style="{ '--delay': `${index * 60}ms` }"
               @click="goToBlogDetail(post.id)"
             >
+              <span class="card-sheen" aria-hidden="true"></span>
               <div :class="['card-cover', `tone-${(index % 6) + 1}`]">
                 <span class="cover-serial">VOL.{{ String(index + 1).padStart(2, '0') }}</span>
                 <span class="cover-date">
@@ -517,14 +547,12 @@ onUnmounted(() => {
                 <p class="card-excerpt">{{ post.desc || '暂无简介，点击查看全文内容。' }}</p>
 
                 <div class="card-tags">
-                  <span
-                    v-for="tag in post.tags.slice(0, 3)"
-                    :key="tag.id"
-                    class="card-tag"
-                  >
+                  <span v-for="tag in post.tags.slice(0, 3)" :key="tag.id" class="card-tag">
                     #{{ tag.name }}
                   </span>
-                  <span v-if="post.tags.length === 0" class="card-tag card-tag-empty">未设置标签</span>
+                  <span v-if="post.tags.length === 0" class="card-tag card-tag-empty"
+                    >未设置标签</span
+                  >
                 </div>
 
                 <div class="card-bottom">
@@ -536,7 +564,11 @@ onUnmounted(() => {
                     <button class="action-btn" title="复制内容" @click="handleCopy(post, $event)">
                       <el-icon><CopyDocument /></el-icon>
                     </button>
-                    <button class="action-btn danger" title="删除" @click="handleDelete(post, $event)">
+                    <button
+                      class="action-btn danger"
+                      title="删除"
+                      @click="handleDelete(post, $event)"
+                    >
                       <el-icon><Delete /></el-icon>
                     </button>
                   </div>
@@ -554,14 +586,24 @@ onUnmounted(() => {
             <div v-for="n in 6" :key="n" class="skeleton-card">
               <el-skeleton animated>
                 <template #template>
-                  <el-skeleton-item variant="image" style="width: 100%; height: 98px; border-radius: 16px;" />
-                  <div style="margin-top: 16px; display: grid; gap: 10px;">
-                    <el-skeleton-item variant="h3" style="width: 82%; height: 24px;" />
-                    <el-skeleton-item variant="text" style="width: 100%; height: 16px;" />
-                    <el-skeleton-item variant="text" style="width: 88%; height: 16px;" />
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
-                      <el-skeleton-item variant="text" style="width: 84px; height: 24px;" />
-                      <el-skeleton-item variant="circle" style="width: 30px; height: 30px;" />
+                  <el-skeleton-item
+                    variant="image"
+                    style="width: 100%; height: 98px; border-radius: 16px"
+                  />
+                  <div style="margin-top: 16px; display: grid; gap: 10px">
+                    <el-skeleton-item variant="h3" style="width: 82%; height: 24px" />
+                    <el-skeleton-item variant="text" style="width: 100%; height: 16px" />
+                    <el-skeleton-item variant="text" style="width: 88%; height: 16px" />
+                    <div
+                      style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-top: 8px;
+                      "
+                    >
+                      <el-skeleton-item variant="text" style="width: 84px; height: 24px" />
+                      <el-skeleton-item variant="circle" style="width: 30px; height: 30px" />
                     </div>
                   </div>
                 </template>
@@ -603,52 +645,77 @@ onUnmounted(() => {
 
     <GlobalSearch ref="globalSearchRef" />
     <ThemeSettings ref="themeSettingsRef" />
-    <CategoryTagManager
-      v-model="showCategoryTagManager"
-      @refresh="handleManagerRefresh"
-    />
+    <CategoryTagManager v-model="showCategoryTagManager" @refresh="handleManagerRefresh" />
   </div>
 </template>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Serif+SC:wght@500;600;700&display=swap');
+
 .home-light {
-  --bg-page: #f5f7fb;
+  --bg-page: #f4f6fa;
   --bg-surface: #ffffff;
   --bg-surface-soft: #f8fbff;
-  --bg-panel: rgba(255, 255, 255, 0.86);
-  --text-title: #0f172a;
-  --text-main: #334155;
-  --text-secondary: #64748b;
-  --text-muted: #8fa2b8;
-  --border-soft: #dde7f3;
-  --border-strong: #c9daef;
-  --accent: #1d4ed8;
-  --accent-hover: #1e40af;
-  --accent-soft: #e3edff;
-  --accent-warm: #ea580c;
+  --bg-panel: rgba(255, 255, 255, 0.88);
+  --text-title: #1c2739;
+  --text-main: #34465f;
+  --text-secondary: #617592;
+  --text-muted: #92a3bc;
+  --border-soft: #d8e3f2;
+  --border-strong: #c4d4ea;
+  --accent: #2a66b7;
+  --accent-hover: #1f4f94;
+  --accent-soft: #e7f0ff;
+  --accent-warm: #d28a3f;
+  --accent-cyan: #0f7c96;
+  --accent-ink: #13253f;
   --danger: #dc2626;
   --danger-soft: #fee2e2;
   --radius-xl: 24px;
   --radius-lg: 16px;
   --radius-md: 12px;
-  --shadow-soft: 0 18px 44px rgba(30, 64, 175, 0.07);
-  --shadow-card: 0 20px 48px rgba(15, 23, 42, 0.08);
+  --shadow-soft: 0 15px 34px rgba(25, 49, 92, 0.09);
+  --shadow-card: 0 20px 42px rgba(21, 44, 84, 0.1);
   --content-max-width: 1880px;
   --content-gutter: clamp(14px, 1.6vw, 30px);
-  --font-display: "Fraunces", "STZhongsong", "Source Han Serif SC", serif;
-  --font-body: "Outfit", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display: 'Noto Serif SC', 'STZhongsong', 'Source Han Serif SC', serif;
+  --font-body: 'Manrope', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 
+  position: relative;
+  isolation: isolate;
   height: calc(100vh - 64px);
   overflow: hidden;
   color: var(--text-main);
   background:
-    radial-gradient(circle at 10% -20%, #deecff 0%, transparent 52%),
-    radial-gradient(circle at 88% -8%, #ffe6d4 0%, transparent 46%),
-    var(--bg-page);
+    radial-gradient(circle at 8% -10%, rgba(176, 208, 255, 0.5) 0%, transparent 44%),
+    radial-gradient(circle at 92% -4%, rgba(255, 220, 186, 0.44) 0%, transparent 42%),
+    linear-gradient(180deg, #fbfcff 0%, var(--bg-page) 100%);
   font-family: var(--font-body);
 }
 
+.home-light::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 0% 100%, rgba(220, 235, 255, 0.62) 0%, transparent 35%),
+    radial-gradient(circle at 100% 100%, rgba(255, 233, 211, 0.52) 0%, transparent 32%);
+  z-index: 0;
+}
+
+.home-light::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0));
+  z-index: 0;
+}
+
 .main-scroll {
+  position: relative;
+  z-index: 1;
   height: 100%;
   overflow-y: auto;
   scroll-behavior: smooth;
@@ -662,32 +729,105 @@ onUnmounted(() => {
   padding: 22px 0 14px;
 }
 
+.hero-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  filter: blur(2px);
+  opacity: 0.55;
+  animation: orbFloat 14s ease-in-out infinite;
+}
+
+.hero-orb-left {
+  width: 240px;
+  height: 240px;
+  left: -92px;
+  top: -104px;
+  background: radial-gradient(
+    circle at 35% 30%,
+    rgba(188, 206, 231, 0.78) 0%,
+    rgba(188, 206, 231, 0) 72%
+  );
+}
+
+.hero-orb-right {
+  width: 280px;
+  height: 280px;
+  right: -116px;
+  top: -134px;
+  background: radial-gradient(
+    circle at 45% 35%,
+    rgba(223, 197, 163, 0.78) 0%,
+    rgba(223, 197, 163, 0) 74%
+  );
+  animation-delay: -5s;
+}
+
 .hero-pattern {
   position: absolute;
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(148, 163, 184, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.1) 1px, transparent 1px);
-  background-size: 28px 28px;
+    linear-gradient(rgba(131, 151, 182, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(131, 151, 182, 0.1) 1px, transparent 1px);
+  background-size: 30px 30px;
   mask-image: linear-gradient(to bottom, black 0%, transparent 85%);
-  opacity: 0.24;
+  opacity: 0.22;
   z-index: -1;
 }
 
 .hero-content {
+  position: relative;
   max-width: var(--content-max-width);
+  width: calc(100% - (var(--content-gutter) * 2));
   margin: 0 auto;
-  padding: 0 var(--content-gutter);
+  padding: 20px clamp(16px, 1.8vw, 26px);
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 22px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.9) 0%, rgba(245, 250, 255, 0.82) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.96);
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(29, 62, 118, 0.14);
+  backdrop-filter: blur(6px);
+  transform-style: preserve-3d;
+}
+
+.hero-content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    110deg,
+    rgba(15, 124, 150, 0.42) 0%,
+    rgba(42, 102, 183, 0.28) 38%,
+    rgba(210, 138, 63, 0.28) 70%,
+    rgba(19, 37, 63, 0.4) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.hero-content::after {
+  content: '';
+  position: absolute;
+  inset: -36% -8% auto;
+  height: 180px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.68) 0%, rgba(255, 255, 255, 0) 68%);
+  pointer-events: none;
 }
 
 .hero-copy {
   display: grid;
-  gap: 10px;
+  gap: 11px;
   max-width: 700px;
 }
 
@@ -696,13 +836,13 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
+  padding: 7px 13px;
   border-radius: 999px;
   color: var(--accent-hover);
   font-size: 12px;
-  font-weight: 600;
-  background: rgba(227, 237, 255, 0.9);
-  border: 1px solid rgba(37, 99, 235, 0.2);
+  font-weight: 700;
+  background: rgba(232, 241, 255, 0.92);
+  border: 1px solid rgba(42, 102, 183, 0.22);
 }
 
 .greeting-dot {
@@ -710,7 +850,7 @@ onUnmounted(() => {
   height: 7px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 0 6px rgba(29, 78, 216, 0.12);
+  box-shadow: 0 0 0 6px rgba(47, 74, 114, 0.12);
   animation: dotPulse 2.4s infinite;
 }
 
@@ -726,6 +866,20 @@ onUnmounted(() => {
 
 .hero-title-highlight {
   color: var(--accent-hover);
+  position: relative;
+  display: inline-block;
+  padding-bottom: 2px;
+}
+
+.hero-title-highlight::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(42, 102, 183, 0.28), rgba(210, 138, 63, 0.3));
 }
 
 .hero-subtitle {
@@ -733,31 +887,108 @@ onUnmounted(() => {
   max-width: 580px;
   color: var(--text-secondary);
   font-size: 14px;
-  line-height: 1.65;
+  line-height: 1.7;
+}
+
+.hero-command-line {
+  width: fit-content;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(19, 37, 63, 0.14);
+  background: linear-gradient(125deg, rgba(19, 37, 63, 0.9) 0%, rgba(31, 79, 148, 0.9) 100%);
+  color: #eaf4ff;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  box-shadow: 0 12px 24px rgba(19, 37, 63, 0.24);
+}
+
+.command-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #67f0c5;
+  box-shadow: 0 0 0 5px rgba(103, 240, 197, 0.2);
+  animation: commandPulse 1.8s ease-in-out infinite;
+}
+
+.command-text {
+  position: relative;
+  max-width: 320px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.command-text::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.65);
+  animation: cursorBlink 1s steps(1) infinite;
+}
+
+.command-chip {
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-weight: 700;
+  color: #f6fbff;
 }
 
 .hero-metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(110px, 1fr));
+  grid-template-columns: repeat(3, minmax(112px, 1fr));
   gap: 10px;
-  min-width: 380px;
+  min-width: 366px;
 }
+
 .metric-card {
+  position: relative;
+  overflow: hidden;
   display: grid;
   justify-items: center;
   gap: 3px;
-  padding: 12px 8px;
-  background: var(--bg-panel);
+  padding: 13px 10px;
+  background: rgba(255, 255, 255, 0.84);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.95);
   border-radius: 14px;
-  box-shadow: 0 10px 24px rgba(148, 163, 184, 0.18);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: 0 10px 22px rgba(30, 64, 120, 0.14);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #2a66b7 0%, #5f95df 100%);
+}
+
+.metric-card:nth-child(2)::before {
+  background: linear-gradient(90deg, #3577c5 0%, #74afe8 100%);
+}
+
+.metric-card:nth-child(3)::before {
+  background: linear-gradient(90deg, #bf7b34 0%, #e3ac67 100%);
 }
 
 .metric-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 32px rgba(30, 64, 175, 0.14);
+  box-shadow: 0 12px 26px rgba(20, 28, 40, 0.12);
 }
 
 .metric-icon {
@@ -766,10 +997,9 @@ onUnmounted(() => {
   display: inline-flex;
 }
 
-
 .metric-value {
   color: var(--text-title);
-  font-size: 21px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1;
 }
@@ -782,25 +1012,25 @@ onUnmounted(() => {
 
 .page-layout {
   max-width: var(--content-max-width);
-  margin: 20px auto 0;
+  margin: 22px auto 0;
   padding: 0 var(--content-gutter);
   display: grid;
   grid-template-columns: 280px 1fr;
-  gap: 26px;
+  gap: 22px;
 }
 
 .left-panel-sticky {
   position: sticky;
-  top: 24px;
+  top: 20px;
   display: grid;
   gap: 14px;
 }
 
 .panel {
-  background: var(--bg-panel);
-  border: 1px solid rgba(255, 255, 255, 0.92);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(246, 251, 255, 0.86) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.96);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(8px);
   box-shadow: var(--shadow-soft);
   padding: 16px;
 }
@@ -823,14 +1053,16 @@ onUnmounted(() => {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  background: linear-gradient(120deg, #1d4ed8 0%, #2563eb 54%, #4f46e5 100%);
-  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.35);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  background: linear-gradient(122deg, #2a66b7 0%, #4b88d1 62%, #d28a3f 130%);
+  box-shadow: 0 12px 26px rgba(41, 101, 182, 0.32);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .btn-create:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 30px rgba(37, 99, 235, 0.4);
+  transform: translateY(-3px);
+  box-shadow: 0 18px 34px rgba(41, 101, 182, 0.36);
 }
 
 .quick-actions {
@@ -840,8 +1072,8 @@ onUnmounted(() => {
 }
 
 .icon-square {
-  border: 1px solid var(--border-soft);
-  background: var(--bg-surface);
+  border: 1px solid #dce7f6;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
   color: var(--text-secondary);
   height: 40px;
   border-radius: 11px;
@@ -853,8 +1085,8 @@ onUnmounted(() => {
 
 .icon-square:hover {
   color: var(--accent-hover);
-  border-color: rgba(37, 99, 235, 0.35);
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12);
+  border-color: rgba(42, 102, 183, 0.34);
+  box-shadow: 0 8px 18px rgba(42, 102, 183, 0.14);
   transform: translateY(-2px);
 }
 
@@ -888,12 +1120,14 @@ onUnmounted(() => {
   width: 100%;
   height: 42px;
   border-radius: 12px;
-  border: 1px solid var(--border-soft);
-  background: var(--bg-surface);
+  border: 1px solid #d9e6f7;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
   padding: 0 12px 0 36px;
   font-size: 14px;
   color: var(--text-main);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .search-input::placeholder {
@@ -902,8 +1136,8 @@ onUnmounted(() => {
 
 .search-input:focus {
   outline: none;
-  border-color: rgba(37, 99, 235, 0.45);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  border-color: rgba(42, 102, 183, 0.46);
+  box-shadow: 0 0 0 4px rgba(42, 102, 183, 0.12);
 }
 
 .panel-title {
@@ -931,23 +1165,34 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   color: var(--text-main);
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.86);
   cursor: pointer;
   font-size: 13px;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 
 .category-chip:hover {
-  background: rgba(227, 237, 255, 0.7);
+  transform: translateX(1px);
+  background: rgba(245, 248, 252, 0.9);
 }
 
 .category-chip.active {
   color: var(--accent-hover);
-  background: var(--accent-soft);
+  background: linear-gradient(120deg, rgba(231, 241, 255, 0.95) 0%, rgba(239, 247, 255, 0.92) 100%);
   font-weight: 600;
 }
 
 .chip-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(42, 102, 183, 0.16);
   color: var(--accent-hover);
   font-weight: 700;
 }
@@ -959,24 +1204,25 @@ onUnmounted(() => {
 }
 
 .tag-chip {
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 999px;
   padding: 6px 11px;
   font-size: 12px;
-  background: #edf3ff;
-  color: #35558d;
+  background: #eef4ff;
+  color: #3f5f8e;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.22s ease;
 }
 
 .tag-chip:hover {
-  background: #dfeafe;
+  background: #e2ecff;
+  border-color: rgba(42, 102, 183, 0.18);
   transform: translateY(-1px);
 }
 
 .tag-chip.active {
   color: #ffffff;
-  background: linear-gradient(120deg, #1d4ed8 0%, #2563eb 100%);
+  background: linear-gradient(120deg, #2a66b7 0%, #4b88d1 100%);
 }
 
 .btn-reset-filters {
@@ -996,27 +1242,48 @@ onUnmounted(() => {
 
 .btn-reset-filters:hover {
   color: var(--accent-hover);
-  border-color: rgba(37, 99, 235, 0.35);
-  background: rgba(227, 237, 255, 0.7);
+  border-color: rgba(47, 74, 114, 0.34);
+  background: rgba(243, 246, 251, 0.85);
 }
 
 .feed {
   display: grid;
-  gap: 16px;
+  gap: 18px;
   align-content: start;
 }
 
 .feed-head {
+  position: relative;
+  overflow: hidden;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 14px;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: linear-gradient(132deg, rgba(255, 255, 255, 0.96) 0%, rgba(244, 250, 255, 0.9) 70%);
+  border: 1px solid rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 28px rgba(31, 68, 128, 0.12);
+}
+
+.feed-head-glow {
+  position: absolute;
+  width: 360px;
+  height: 360px;
+  right: -140px;
+  top: -220px;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, rgba(42, 102, 183, 0.25) 0%, rgba(42, 102, 183, 0) 62%),
+    radial-gradient(circle at 58% 60%, rgba(210, 138, 63, 0.2) 0%, rgba(210, 138, 63, 0) 70%);
+  animation: feedGlowFloat 8s ease-in-out infinite;
 }
 
 .feed-title {
   margin: 0;
   color: var(--text-title);
-  font-size: 28px;
+  font-size: 29px;
   line-height: 1.12;
   letter-spacing: -0.015em;
   font-family: var(--font-display);
@@ -1026,6 +1293,7 @@ onUnmounted(() => {
   margin: 7px 0 0;
   color: var(--text-secondary);
   font-size: 14px;
+  max-width: 640px;
 }
 
 .feed-pills {
@@ -1038,22 +1306,24 @@ onUnmounted(() => {
 .feed-pill {
   padding: 7px 12px;
   border-radius: 999px;
-  background: var(--accent-soft);
+  background: linear-gradient(130deg, #e6f0ff 0%, #eff6ff 100%);
   color: var(--accent-hover);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
+  border: 1px solid rgba(42, 102, 183, 0.16);
 }
 
 .feed-pill.muted {
   color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.84);
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(130, 141, 158, 0.22);
 }
 
 .active-strip {
-  border: 1px solid #d8e3f6;
+  border: 1px solid #d1e0f6;
   border-radius: 14px;
-  padding: 10px 12px;
-  background: linear-gradient(120deg, rgba(227, 237, 255, 0.68) 0%, rgba(255, 255, 255, 0.86) 100%);
+  padding: 10px 13px;
+  background: linear-gradient(120deg, rgba(232, 242, 255, 0.74) 0%, rgba(255, 255, 255, 0.9) 100%);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1063,8 +1333,8 @@ onUnmounted(() => {
 
 .active-result {
   font-size: 13px;
-  color: #35558d;
-  font-weight: 600;
+  color: #2d4f83;
+  font-weight: 700;
 }
 
 .active-strip-tags {
@@ -1081,7 +1351,7 @@ onUnmounted(() => {
   border-radius: 999px;
   background: #ffffff;
   color: var(--text-secondary);
-  border: 1px solid #d9e3f3;
+  border: 1px solid #d5e2f4;
   font-size: 12px;
   font-weight: 600;
 }
@@ -1101,35 +1371,39 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   border-radius: 24px;
-  border: 1px solid rgba(150, 177, 221, 0.42);
-  background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
-  box-shadow: 0 18px 40px rgba(26, 43, 77, 0.11);
+  border: 1px solid rgba(154, 182, 225, 0.36);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  box-shadow: 0 14px 32px rgba(28, 62, 122, 0.12);
   cursor: pointer;
   display: flex;
   flex-direction: column;
   min-height: 0;
   animation: cardIn 0.55s ease backwards;
   animation-delay: var(--delay, 0ms);
-  transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+  transition:
+    transform 0.28s ease,
+    box-shadow 0.28s ease,
+    border-color 0.28s ease;
+  transform-origin: center;
 }
 
 .article-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 26px 56px rgba(26, 61, 128, 0.18);
-  border-color: rgba(49, 104, 201, 0.45);
+  transform: translateY(-7px) rotateX(1.2deg) rotateY(-1.2deg);
+  box-shadow: 0 22px 44px rgba(28, 62, 122, 0.18);
+  border-color: rgba(42, 102, 183, 0.42);
 }
 
 .article-card::before {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
   background: linear-gradient(
     165deg,
-    rgba(118, 153, 216, 0.15) 0%,
+    rgba(108, 153, 218, 0.16) 0%,
     rgba(255, 255, 255, 0) 35%,
-    rgba(246, 171, 116, 0.12) 100%
+    rgba(210, 138, 63, 0.15) 100%
   );
   opacity: 0;
   transition: opacity 0.25s ease;
@@ -1139,18 +1413,36 @@ onUnmounted(() => {
   opacity: 1;
 }
 
+.card-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0) 20%,
+    rgba(255, 255, 255, 0.44) 48%,
+    rgba(255, 255, 255, 0) 72%
+  );
+  transform: translateX(-130%);
+  z-index: 1;
+}
+
+.article-card:hover .card-sheen {
+  animation: cardSheen 0.75s ease;
+}
+
 .article-card.is-viewed {
-  border-color: rgba(16, 185, 129, 0.38);
+  border-color: rgba(63, 135, 110, 0.35);
 }
 
 .article-card.is-viewed::after {
-  content: "最近阅读";
+  content: '最近阅读';
   position: absolute;
   right: 14px;
   top: 14px;
-  background: #e7f7ef;
-  color: #047857;
-  border: 1px solid rgba(4, 120, 87, 0.2);
+  background: #edf8f2;
+  color: #206b52;
+  border: 1px solid rgba(32, 107, 82, 0.22);
   border-radius: 999px;
   font-size: 11px;
   padding: 4px 9px;
@@ -1160,24 +1452,24 @@ onUnmounted(() => {
 
 .card-cover {
   position: relative;
-  min-height: 78px;
-  padding: 11px 14px 9px;
+  min-height: 86px;
+  padding: 12px 14px 10px;
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid rgba(201, 216, 239, 0.95);
+  border-bottom: 1px solid rgba(198, 217, 246, 0.9);
 }
 
 .card-cover::before {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   z-index: 0;
 }
 
 .card-cover::after {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   background:
@@ -1192,27 +1484,27 @@ onUnmounted(() => {
 }
 
 .tone-1::before {
-  background: linear-gradient(120deg, #e5edff 0%, #dbe7ff 100%);
+  background: linear-gradient(120deg, #e6efff 0%, #dbe8ff 100%);
 }
 
 .tone-2::before {
-  background: linear-gradient(120deg, #ffeede 0%, #ffe3cb 100%);
+  background: linear-gradient(120deg, #fff1e3 0%, #ffe6cf 100%);
 }
 
 .tone-3::before {
-  background: linear-gradient(120deg, #e6f6f0 0%, #d9f1e8 100%);
+  background: linear-gradient(120deg, #e6f8f1 0%, #dcf0e7 100%);
 }
 
 .tone-4::before {
-  background: linear-gradient(120deg, #f3ebff 0%, #ece1ff 100%);
+  background: linear-gradient(120deg, #eaf2ff 0%, #e2ebff 100%);
 }
 
 .tone-5::before {
-  background: linear-gradient(120deg, #fde7ef 0%, #fddde8 100%);
+  background: linear-gradient(120deg, #ffeef4 0%, #ffe4eb 100%);
 }
 
 .tone-6::before {
-  background: linear-gradient(120deg, #e7f4ff 0%, #dff0ff 100%);
+  background: linear-gradient(120deg, #e8f4ff 0%, #e0efff 100%);
 }
 
 .cover-serial {
@@ -1221,12 +1513,12 @@ onUnmounted(() => {
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #2f4f86;
+  color: #3f5579;
   font-weight: 800;
   border-radius: 999px;
   padding: 4px 9px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.93);
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .cover-category {
@@ -1236,7 +1528,7 @@ onUnmounted(() => {
   padding: 4px 11px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.86);
-  color: var(--accent-hover);
+  color: #2f4a72;
   font-weight: 700;
   border: 1px solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 4px 10px rgba(20, 58, 122, 0.08);
@@ -1250,21 +1542,21 @@ onUnmounted(() => {
   align-items: center;
   gap: 5px;
   font-size: 12px;
-  color: #4c6388;
+  color: #5a6780;
   font-weight: 600;
 }
 
 .card-body {
   display: flex;
   flex-direction: column;
-  gap: 11px;
-  padding: 14px 14px 11px;
+  gap: 12px;
+  padding: 15px 15px 12px;
 }
 
 .card-title {
   margin: 0;
   color: var(--text-title);
-  font-size: clamp(19px, 1.2vw, 22px);
+  font-size: clamp(20px, 1.26vw, 23px);
   line-height: 1.32;
   letter-spacing: -0.018em;
   font-family: var(--font-display);
@@ -1276,7 +1568,7 @@ onUnmounted(() => {
 
 .card-excerpt {
   margin: 0;
-  color: #556b8f;
+  color: #63728b;
   font-size: 14px;
   line-height: 1.62;
   display: -webkit-box;
@@ -1290,36 +1582,36 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 6px;
-  min-height: 30px;
-  max-height: 30px;
+  gap: 7px;
+  min-height: 32px;
+  max-height: 32px;
   overflow: hidden;
 }
 
 .card-tag {
   flex: 0 1 auto;
-  max-width: 120px;
+  max-width: 126px;
   font-size: 11px;
-  color: #314f82;
-  background: #eef3fc;
+  color: #395985;
+  background: #eef4ff;
   padding: 4px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(49, 79, 130, 0.14);
+  border: 1px solid rgba(57, 89, 133, 0.18);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .card-tag-empty {
-  color: #627da7;
-  background: #f3f6fc;
+  color: #647f9f;
+  background: #f2f6fd;
   border-style: dashed;
 }
 
 .card-bottom {
   margin-top: 1px;
-  padding-top: 9px;
-  border-top: 1px dashed #d6e2f4;
+  padding-top: 10px;
+  border-top: 1px dashed #dfd7cb;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1328,11 +1620,11 @@ onUnmounted(() => {
 
 .author-chip {
   font-size: 12px;
-  color: #5d7191;
+  color: #4f6889;
   border-radius: 999px;
   padding: 5px 11px;
-  background: #f4f7fd;
-  border: 1px solid rgba(140, 162, 198, 0.3);
+  background: #f2f6fd;
+  border: 1px solid rgba(104, 138, 184, 0.22);
 }
 
 .card-actions {
@@ -1348,15 +1640,15 @@ onUnmounted(() => {
   border-radius: 9px;
   display: grid;
   place-items: center;
-  background: #f1f5fc;
-  color: #5b6f91;
+  background: #edf4ff;
+  color: #4f6f95;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .action-btn:hover {
-  color: #1d4fb5;
-  background: #e5edff;
+  color: #1f4f94;
+  background: #e2ecff;
   transform: translateY(-1px);
 }
 
@@ -1371,25 +1663,27 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  color: #1f4fc2;
+  color: #2459a5;
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.01em;
-  background: linear-gradient(112deg, rgba(228, 237, 252, 0.82) 0%, rgba(255, 250, 245, 0.8) 100%);
-  border-top: 1px solid rgba(201, 216, 239, 0.9);
-  transition: gap 0.2s ease, background 0.2s ease;
+  background: linear-gradient(112deg, rgba(230, 241, 255, 0.86) 0%, rgba(255, 243, 231, 0.8) 100%);
+  border-top: 1px solid rgba(198, 217, 246, 0.88);
+  transition:
+    gap 0.2s ease,
+    background 0.2s ease;
 }
 
 .article-card:hover .card-read-more {
   gap: 11px;
-  background: linear-gradient(112deg, rgba(213, 228, 252, 0.95) 0%, rgba(255, 245, 236, 0.9) 100%);
+  background: linear-gradient(112deg, rgba(214, 231, 255, 0.94) 0%, rgba(255, 236, 216, 0.9) 100%);
 }
 
 .skeleton-card {
   border-radius: var(--radius-xl);
   padding: 14px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-soft);
+  border: 1px solid #e8dfd4;
   box-shadow: var(--shadow-card);
 }
 
@@ -1397,14 +1691,14 @@ onUnmounted(() => {
   padding: 70px 16px;
   text-align: center;
   border-radius: var(--radius-xl);
-  border: 1px dashed var(--border-strong);
-  background: rgba(255, 255, 255, 0.7);
+  border: 1px dashed #d5ccc0;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.9) 0%, rgba(251, 246, 239, 0.82) 100%);
 }
 
 .empty-icon {
   margin-bottom: 16px;
   font-size: 56px;
-  color: #c2d3ea;
+  color: #c3b9ab;
 }
 
 .empty-title {
@@ -1424,7 +1718,7 @@ onUnmounted(() => {
   margin-top: 18px;
   border: 0;
   border-radius: 11px;
-  background: linear-gradient(120deg, #1d4ed8 0%, #2563eb 100%);
+  background: linear-gradient(120deg, #2a66b7 0%, #4b88d1 100%);
   color: #ffffff;
   height: 40px;
   padding: 0 16px;
@@ -1449,17 +1743,17 @@ onUnmounted(() => {
 
 :deep(.el-pagination) {
   --el-pagination-button-bg-color: #ffffff;
-  --el-pagination-hover-color: #1e40af;
+  --el-pagination-hover-color: #1f4f94;
 }
 
 :deep(.el-pagination .el-pager li) {
   border-radius: 10px;
-  border: 1px solid #e4ebf7;
+  border: 1px solid #d9e5f6;
 }
 
 :deep(.el-pagination .el-pager li.is-active) {
   border-color: transparent;
-  background: linear-gradient(120deg, #1d4ed8 0%, #2563eb 100%);
+  background: linear-gradient(120deg, #2a66b7 0%, #4b88d1 100%);
 }
 
 .back-top-btn {
@@ -1473,17 +1767,19 @@ onUnmounted(() => {
   display: grid;
   place-items: center;
   color: var(--accent-hover);
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(37, 99, 235, 0.18);
-  box-shadow: 0 14px 30px rgba(30, 64, 175, 0.2);
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(42, 102, 183, 0.18);
+  box-shadow: 0 14px 30px rgba(27, 63, 121, 0.2);
   cursor: pointer;
   z-index: 100;
-  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease;
 }
 
 .back-top-btn:hover {
   transform: translateY(-3px);
-  box-shadow: 0 18px 34px rgba(30, 64, 175, 0.28);
+  box-shadow: 0 18px 36px rgba(27, 63, 121, 0.28);
 }
 
 .fade-slide-enter-active,
@@ -1497,6 +1793,16 @@ onUnmounted(() => {
   transform: translateY(16px);
 }
 
+@keyframes orbFloat {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(8px) scale(1.04);
+  }
+}
+
 @keyframes dotPulse {
   0%,
   100% {
@@ -1506,6 +1812,48 @@ onUnmounted(() => {
   50% {
     transform: scale(1.12);
     opacity: 0.7;
+  }
+}
+
+@keyframes commandPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.7;
+  }
+}
+
+@keyframes cursorBlink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes feedGlowFloat {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-14px, 10px, 0);
+  }
+}
+
+@keyframes cardSheen {
+  from {
+    transform: translateX(-130%);
+  }
+  to {
+    transform: translateX(130%);
   }
 }
 
@@ -1537,11 +1885,16 @@ onUnmounted(() => {
 @media (max-width: 1040px) {
   .hero-content {
     flex-direction: column;
+    padding: 18px;
   }
 
   .hero-metrics {
     width: 100%;
     min-width: 0;
+  }
+
+  .hero-command-line {
+    flex-wrap: wrap;
   }
 
   .page-layout {
@@ -1555,10 +1908,19 @@ onUnmounted(() => {
 }
 
 @media (max-width: 760px) {
-  .hero-content,
   .page-layout {
     padding-left: 14px;
     padding-right: 14px;
+  }
+
+  .hero-content {
+    width: calc(100% - 28px);
+    padding: 16px 14px;
+    border-radius: 20px;
+  }
+
+  .hero-orb {
+    opacity: 0.55;
   }
 
   .hero {
@@ -1567,6 +1929,17 @@ onUnmounted(() => {
 
   .feed-head {
     flex-direction: column;
+    padding: 14px;
+  }
+
+  .hero-command-line {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .command-chip {
+    font-size: 11px;
   }
 
   .feed-pills {
@@ -1576,6 +1949,10 @@ onUnmounted(() => {
   .posts-grid {
     grid-template-columns: 1fr;
     gap: 14px;
+  }
+
+  .article-card:hover {
+    transform: translateY(-4px);
   }
 
   .card-read-more {

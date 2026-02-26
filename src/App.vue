@@ -9,7 +9,7 @@
 -->
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
-import { HomeFilled, Setting, ChatDotRound, Link, ArrowUpBold, MagicStick, FolderOpened, Key, Tools, Document } from '@element-plus/icons-vue'
+import { HomeFilled, ChatDotRound, Link, ArrowUpBold, MagicStick, FolderOpened, Key, Tools, Document, Monitor } from '@element-plus/icons-vue'
 import { ElIcon } from 'element-plus'
 import { ref, onMounted, onUnmounted } from 'vue'
 
@@ -86,6 +86,10 @@ onUnmounted(() => {
           <RouterLink to="/dev-tools" class="nav-item">
             <el-icon class="nav-icon"><Tools /></el-icon>
             <span class="nav-text">工具</span>
+          </RouterLink>
+          <RouterLink to="/statistics" class="nav-item">
+            <el-icon class="nav-icon"><Monitor /></el-icon>
+            <span class="nav-text">统计</span>
           </RouterLink>
           <RouterLink to="/page-templates" class="nav-item">
             <el-icon class="nav-icon"><Document /></el-icon>
@@ -305,7 +309,8 @@ onUnmounted(() => {
 .nav-item:nth-child(5) .nav-icon { color: #ec4899; }
 .nav-item:nth-child(6) .nav-icon { color: #14b8a6; }
 .nav-item:nth-child(7) .nav-icon { color: #eab308; }
-.nav-item:nth-child(8) .nav-icon { color: #8b5cf6; }
+.nav-item:nth-child(8) .nav-icon { color: #0ea5e9; }
+.nav-item:nth-child(9) .nav-icon { color: #8b5cf6; }
 
 .nav-item.router-link-exact-active .nav-icon,
 .nav-item:hover .nav-icon {

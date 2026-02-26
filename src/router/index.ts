@@ -21,6 +21,7 @@ import WebsiteCollection from '../views/WebsiteCollection.vue'
 import DevTools from '../views/DevTools.vue'
 import PageTemplates from '../views/PageTemplates.vue'
 import TemplatePreview from '../views/TemplatePreview.vue'
+import StatisticsDashboard from '../views/StatisticsDashboard.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -89,6 +90,11 @@ const router = createRouter({
       path: '/dev-tools',
       name: 'DevTools',
       component: DevTools,
+    },
+    {
+      path: '/statistics',
+      name: 'StatisticsDashboard',
+      component: StatisticsDashboard,
     },
     {
       path: '/page-templates',
