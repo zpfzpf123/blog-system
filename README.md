@@ -2,7 +2,7 @@
 
 ## 📖 项目介绍
 
-这是一个基于 Vue 3 + TypeScript + Element Plus 构建的现代化AI博客管理系统前端项目，提供了项目管理、文件管理、Git智能提交等功能。
+这是一个基于 Vue 3 + TypeScript + Element Plus 构建的现代化 AI 博客管理系统前端项目，提供博客管理、网站收藏、AI 对话、页面模板与统计分析等功能。
 
 ## 🚀 技术栈
 
@@ -17,54 +17,34 @@
 
 ## ✨ 核心功能特性
 
-### 1. 项目管理
-- 项目列表展示
-- 项目信息编辑
-- 项目快速操作
+### 1. 博客管理
 
-### 2. 文件系统管理
-- 文件浏览和目录导航
-- 文件/文件夹创建、删除、重命名
-- 文件内容查看和编辑
+- 文章列表与详情查看
+- 文章创建与编辑
+- 分类与标签管理
 
-### 3. Git智能提交（亮点功能）⭐
-完整的Git多人协作智能提交流程，包含：
+### 2. 网站收藏管理
 
-#### 流程步骤
-1. **环境检查** - 检查工作区状态
-2. **本地提交** - 自动暂存并提交更改
-3. **智能同步** - 获取远程更新并变基拉取
-4. **冲突检测** - 自动检测代码冲突
-5. **推送代码** - 推送到远程仓库
+- 网站与分类维护
+- 收藏状态与快捷筛选
+- 统计数据联动展示
 
-#### 特色功能
-- ✅ **可视化步骤展示** - 实时显示当前执行步骤
-- ✅ **终端日志输出** - 模拟终端的命令执行日志
-- ✅ **冲突智能处理** - 检测到冲突时暂停，提示用户解决
-- ✅ **网络重试机制** - fetch/pull/push失败时提供重试按钮（新增）
-- ✅ **分支选择** - 支持选择本地分支和远程分支
-- ✅ **友好的错误提示** - 清晰的错误信息和操作引导
+### 3. AI 与效率工具
 
-#### 网络重试功能说明 🔄
-针对网络不稳定情况，为以下需要联网的步骤添加了智能重试：
-
-- **git fetch** - 获取远程更新
-- **git pull --rebase** - 变基拉取
-- **git push** - 推送代码
-
-**使用方式：**
-1. 当网络请求失败时，系统会在日志中提示："网络请求失败，可点击下方'重试'按钮重新执行"
-2. 底部会显示橙色的"重试"按钮（带刷新图标）
-3. 点击重试按钮，系统会从失败的步骤继续执行
-4. 重试成功后自动完成后续步骤
+- AI 对话页面
+- CSS 动画实验室
+- 开发工具页
+- 页面模板与统计看板
 
 ## 📦 安装与运行
 
 ### 环境要求
+
 - Node.js >= 16.0.0
 - npm >= 8.0.0 或 yarn >= 1.22.0
 
 ### 安装依赖
+
 ```bash
 npm install
 # 或
@@ -72,6 +52,7 @@ yarn install
 ```
 
 ### 开发环境运行
+
 ```bash
 npm run dev
 # 或
@@ -81,6 +62,7 @@ yarn dev
 访问: http://localhost:5173
 
 ### 生产环境构建
+
 ```bash
 npm run build
 # 或
@@ -88,6 +70,7 @@ yarn build
 ```
 
 ### 预览生产构建
+
 ```bash
 npm run preview
 # 或
@@ -100,7 +83,6 @@ yarn preview
 blog/
 ├── src/
 │   ├── components/          # 组件目录
-│   │   ├── GitCommitModal.vue    # Git智能提交弹窗组件
 │   │   └── ...
 │   ├── utils/              # 工具函数
 │   │   └── axios.ts        # Axios配置
@@ -115,69 +97,21 @@ blog/
 └── README.md               # 项目说明文档
 ```
 
-## 🔧 核心组件说明
-
-### GitCommitModal 组件
-
-**位置**: `src/components/GitCommitModal.vue`
-
-**功能**: Git智能提交对话框
-
-**主要Props**:
-- `modelValue: boolean` - 控制弹窗显示/隐藏
-- `projectId?: number` - 项目ID
-
-**主要Events**:
-- `update:modelValue` - 更新弹窗状态
-- `success` - 提交成功事件
-
-**使用示例**:
-```vue
-<template>
-  <GitCommitModal 
-    v-model="showGitModal" 
-    :project-id="currentProjectId"
-    @success="handleGitSuccess"
-  />
-</template>
-
-<script setup>
-import { ref } from 'vue'
-import GitCommitModal from '@/components/GitCommitModal.vue'
-
-const showGitModal = ref(false)
-const currentProjectId = ref(1)
-
-const handleGitSuccess = () => {
-  console.log('Git提交成功！')
-}
-</script>
-```
-
 ## 🌐 API接口说明
 
-### Git相关接口
-
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/projects/{id}/git/check-status` | POST | 检查Git工作区状态 |
-| `/api/projects/{id}/git/add` | POST | 暂存所有更改 |
-| `/api/projects/{id}/git/commit` | POST | 提交到本地仓库 |
-| `/api/projects/{id}/git/fetch` | POST | 获取远程更新 |
-| `/api/projects/{id}/git/pull-rebase` | POST | 变基拉取 |
-| `/api/projects/{id}/git/push` | POST | 推送到远程 |
-| `/api/projects/{id}/git/continue-push` | POST | 继续推送（解决冲突后） |
-| `/api/projects/{id}/git/branches` | GET | 获取分支列表 |
+- 当前接口以博客、网站收藏、AI 对话、模板与统计模块为主。
 
 ## 📝 开发规范
 
 ### 代码风格
+
 - 使用 TypeScript 严格模式
 - 遵循 Vue 3 Composition API 最佳实践
 - 组件采用 `<script setup>` 语法
 - 使用 ESLint 进行代码检查
 
 ### Git提交规范
+
 ```
 feat: 新功能
 fix: 修复bug
@@ -192,12 +126,14 @@ chore: 构建/工具链相关
 ## 🎨 UI设计说明
 
 ### 色彩方案
+
 - 主色: Element Plus 默认蓝色 (#409EFF)
 - 成功色: 绿色 (#67C23A)
 - 警告色: 橙色 (#E6A23C)
 - 错误色: 红色 (#F56C6C)
 
 ### 终端日志样式
+
 - 背景: 深色主题 (#1e1e1e)
 - 命令: 蓝色 (#4fc1ff)
 - 成功: 绿色 (#4caf50)
@@ -205,18 +141,14 @@ chore: 构建/工具链相关
 
 ## 🔥 最近更新
 
-### v1.1.0 (2025-12-01)
-- ✨ 新增Git智能提交网络重试功能
-  - fetch/pull/push失败时支持重试
-  - 智能从失败步骤继续执行
-  - 友好的重试按钮UI（橙色+刷新图标）
-  - 详细的重试日志输出
+### v1.2.0 (2026-02-28)
+
+- 🧹 移除项目管理与 Git 相关前后端模块
+- 🗂️ 清理对应数据库迁移脚本
 
 ### v1.0.0
+
 - 🎉 初始版本发布
-- ✅ 项目管理功能
-- ✅ 文件系统管理
-- ✅ Git智能提交基础功能
 
 ## 🤝 贡献指南
 

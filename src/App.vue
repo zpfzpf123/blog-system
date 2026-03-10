@@ -1,4 +1,3 @@
-
 <!--
  * @Author: 18582297328 zpfzpf123@example.com
  * @Date: 2025-08-04 12:55:14
@@ -9,7 +8,15 @@
 -->
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
-import { HomeFilled, ChatDotRound, Link, ArrowUpBold, MagicStick, FolderOpened, Key, Tools, Document, Monitor } from '@element-plus/icons-vue'
+import {
+  HomeFilled,
+  Link,
+  ArrowUpBold,
+  MagicStick,
+  Tools,
+  Document,
+  Monitor,
+} from '@element-plus/icons-vue'
 import { ElIcon } from 'element-plus'
 import { ref, onMounted, onUnmounted } from 'vue'
 
@@ -56,7 +63,7 @@ onUnmounted(() => {
             <span class="brand-text">DevHub</span>
           </RouterLink>
         </div>
-        
+
         <!-- 导航菜单 -->
         <nav class="main-nav">
           <RouterLink to="/" class="nav-item">
@@ -67,21 +74,9 @@ onUnmounted(() => {
             <el-icon class="nav-icon"><Link /></el-icon>
             <span class="nav-text">网站</span>
           </RouterLink>
-          <RouterLink to="/ai-chat" class="nav-item">
-            <el-icon class="nav-icon"><ChatDotRound /></el-icon>
-            <span class="nav-text">AI</span>
-          </RouterLink>
           <RouterLink to="/css-animations" class="nav-item">
             <el-icon class="nav-icon"><MagicStick /></el-icon>
             <span class="nav-text">动画</span>
-          </RouterLink>
-          <RouterLink to="/project-manager" class="nav-item">
-            <el-icon class="nav-icon"><FolderOpened /></el-icon>
-            <span class="nav-text">项目</span>
-          </RouterLink>
-          <RouterLink to="/git-users" class="nav-item">
-            <el-icon class="nav-icon"><Key /></el-icon>
-            <span class="nav-text">Git</span>
           </RouterLink>
           <RouterLink to="/dev-tools" class="nav-item">
             <el-icon class="nav-icon"><Tools /></el-icon>
@@ -96,7 +91,7 @@ onUnmounted(() => {
             <span class="nav-text">模板</span>
           </RouterLink>
         </nav>
-        
+
         <!-- 右侧操作区 -->
         <div class="header-actions">
           <div class="theme-indicator" title="当前主题">
@@ -168,7 +163,9 @@ onUnmounted(() => {
   background: var(--bg-glass-strong);
   backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 1px solid rgba(99, 102, 241, 0.08);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 4px 12px rgba(99, 102, 241, 0.04);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.02),
+    0 4px 12px rgba(99, 102, 241, 0.04);
   animation: slideDown 0.5s var(--ease-out);
 }
 
@@ -302,15 +299,24 @@ onUnmounted(() => {
 }
 
 /* 为不同导航项设置图标颜色 */
-.nav-item:nth-child(1) .nav-icon { color: var(--primary-color); }
-.nav-item:nth-child(2) .nav-icon { color: #06b6d4; }
-.nav-item:nth-child(3) .nav-icon { color: #10b981; }
-.nav-item:nth-child(4) .nav-icon { color: #f97316; }
-.nav-item:nth-child(5) .nav-icon { color: #ec4899; }
-.nav-item:nth-child(6) .nav-icon { color: #14b8a6; }
-.nav-item:nth-child(7) .nav-icon { color: #eab308; }
-.nav-item:nth-child(8) .nav-icon { color: #0ea5e9; }
-.nav-item:nth-child(9) .nav-icon { color: #8b5cf6; }
+.nav-item:nth-child(1) .nav-icon {
+  color: var(--primary-color);
+}
+.nav-item:nth-child(2) .nav-icon {
+  color: #06b6d4;
+}
+.nav-item:nth-child(3) .nav-icon {
+  color: #f97316;
+}
+.nav-item:nth-child(4) .nav-icon {
+  color: #eab308;
+}
+.nav-item:nth-child(5) .nav-icon {
+  color: #0ea5e9;
+}
+.nav-item:nth-child(6) .nav-icon {
+  color: #8b5cf6;
+}
 
 .nav-item.router-link-exact-active .nav-icon,
 .nav-item:hover .nav-icon {
@@ -367,23 +373,23 @@ main {
     padding: 0 var(--spacing-4);
     gap: var(--spacing-4);
   }
-  
+
   .main-nav {
     gap: 0;
   }
-  
+
   .nav-item {
     padding: var(--spacing-2) var(--spacing-3);
   }
-  
+
   .nav-text {
     display: none;
   }
-  
+
   .nav-icon {
     font-size: 1.3rem;
   }
-  
+
   .brand-text {
     display: none;
   }
@@ -394,20 +400,20 @@ main {
     height: 56px;
     padding: 0 var(--spacing-3);
   }
-  
+
   .brand-logo {
     width: 36px;
     height: 36px;
   }
-  
+
   .nav-item {
     padding: var(--spacing-2);
   }
-  
+
   .nav-icon {
     font-size: 1.2rem;
   }
-  
+
   .header-actions {
     display: none;
   }
@@ -427,7 +433,9 @@ main {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(99, 102, 241, 0.1);
+  box-shadow:
+    var(--shadow-lg),
+    0 0 0 1px rgba(99, 102, 241, 0.1);
   transition: all var(--transition-spring);
   z-index: var(--z-fixed);
   overflow: hidden;
@@ -513,8 +521,16 @@ main {
 }
 
 @keyframes rippleEffect {
-  0% { width: 0; height: 0; opacity: 1; }
-  100% { width: 100px; height: 100px; opacity: 0; }
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 1;
+  }
+  100% {
+    width: 100px;
+    height: 100px;
+    opacity: 0;
+  }
 }
 
 /* 滚动按钮动画 */

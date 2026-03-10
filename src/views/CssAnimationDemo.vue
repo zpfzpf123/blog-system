@@ -1178,7 +1178,6 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  max-width: 1600px;
   margin: 0 auto;
   padding-bottom: 30px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -1322,7 +1321,6 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 32px;
-  max-width: 1600px;
   margin: 0 auto;
 }
 
@@ -6980,7 +6978,6 @@ onMounted(async () => {
 }
 
 .light-lab .lab-header {
-  max-width: 1520px;
   margin: 0 auto 18px;
 }
 
@@ -7074,7 +7071,6 @@ onMounted(async () => {
 }
 
 .light-lab .lab-overview {
-  max-width: 1520px;
   margin: 0 auto 18px;
   display: grid;
   grid-template-columns: 1.15fr 1fr 1fr 1.3fr;
@@ -7130,7 +7126,6 @@ onMounted(async () => {
   position: sticky;
   top: 10px;
   z-index: 6;
-  max-width: 1520px;
   margin: 0 auto 16px;
   justify-content: flex-start;
   padding: 10px 12px;
@@ -7171,7 +7166,6 @@ onMounted(async () => {
 }
 
 .light-lab .animation-grid {
-  max-width: 1520px;
   margin: 0 auto;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 18px;

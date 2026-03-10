@@ -11,11 +11,6 @@ import HomeView from '../views/Home.vue'
 import BlogDetail from '../views/BlogDetail.vue'
 import PostCreate from '../views/PostCreate.vue'
 import PostEdit from '../views/PostEdit.vue'
-import AIChat from '../views/AIChat.vue'
-import GitUserManager from '../views/GitUserManager.vue'
-import projectManager from '../views/ProjectManager.vue'
-import ProjectDetail from '../views/ProjectDetail.vue'
-import CommitDetail from '../views/CommitDetail.vue'
 import cssAnimations from '../views/CssAnimationDemo.vue'
 import WebsiteCollection from '../views/WebsiteCollection.vue'
 import DevTools from '../views/DevTools.vue'
@@ -49,37 +44,9 @@ const router = createRouter({
       props: true,
     },
     {
-      path: '/ai-chat',
-      name: 'AIChat',
-      component: AIChat,
-    },
-
-    {
       path: '/websites',
       name: 'WebsiteCollection',
       component: WebsiteCollection,
-    },
-    {
-      path: '/git-users',
-      name: 'GitUserManager',
-      component: GitUserManager,
-    },
-    {
-      path: '/project-manager',
-      name: 'ProjectManager',
-      component: projectManager,
-    },
-    {
-      path: '/project-manager/:id',
-      name: 'ProjectDetail',
-      component: ProjectDetail,
-      props: true,
-    },
-    {
-      path: '/project-manager/:id/commit',
-      name: 'CommitDetail',
-      component: CommitDetail,
-      props: true,
     },
     {
       path: '/css-animations',

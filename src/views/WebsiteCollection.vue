@@ -1,186 +1,161 @@
 <template>
   <div class="website-collection">
-    <!-- 页面头部 -->
-    <div class="page-header">
-      <div class="header-content">
-        <h1 class="page-title">
-          <el-icon class="title-icon">
-            <Link />
-          </el-icon>
-          网站合集
-        </h1>
-        <p class="page-description">收集和整理您喜欢的网站，按分类管理</p>
-      </div>
-      <div class="header-actions">
-        <el-button type="primary" @click="showAddWebsiteDialog">
-          <el-icon>
-            <Plus />
-          </el-icon>
-          添加网站
-        </el-button>
-        <el-button @click="showAddCategoryDialog">
-          <el-icon>
-            <FolderAdd />
-          </el-icon>
-          添加分类
-        </el-button>
-        <el-button type="success" @click="showAIGenerateCategoryDialog">
-          <el-icon>
-            <Star />
-          </el-icon>
-          AI一键生成分类
-        </el-button>
-
-        <el-button type="primary" @click="showAICreateWebsiteDialog">
-          <el-icon>
-            <Plus />
-          </el-icon>
-          AI一键新增网站
-        </el-button>
-
-        <el-button type="warning" @click="showBatchImportDialog">
-          <el-icon>
-            <Upload />
-          </el-icon>
-          批量导入
-        </el-button>
-
-        <el-button type="info" @click="showStatusMonitorDialog">
-          <el-icon>
-            <Monitor />
-          </el-icon>
-          状态监控
-        </el-button>
-      </div>
-    </div>
-
-    <!-- 分类筛选 -->
-    <div class="category-filter">
-      <div class="category-header">
-        <div class="header-left">
-          <div class="title-container">
+    <!-- 合并头部与分类筛选，减少顶部占高，让网站卡片区域展示更多 -->
+    <div class="collection-top-panel">
+      <div class="page-header">
+        <div class="header-content">
+          <h1 class="page-title">
             <el-icon class="title-icon">
-              <Menu />
+              <Link />
             </el-icon>
-            <span class="category-title">分类筛选</span>
-            <div class="title-decoration"></div>
+            网站合集
+          </h1>
+          <p class="page-description">收集和整理您喜欢的网站，按分类管理</p>
+        </div>
+        <div class="header-actions">
+          <el-button type="primary" @click="showAddWebsiteDialog">
+            <el-icon>
+              <Plus />
+            </el-icon>
+            添加网站
+          </el-button>
+          <el-button @click="showAddCategoryDialog">
+            <el-icon>
+              <FolderAdd />
+            </el-icon>
+            添加分类
+          </el-button>
+          <el-button type="warning" @click="showBatchImportDialog">
+            <el-icon>
+              <Upload />
+            </el-icon>
+            批量导入
+          </el-button>
+        </div>
+      </div>
+
+      <!-- 紧凑搜索区：与头部、分类放在同一控制面板，优先给卡片区让位 -->
+      <div class="search-section compact-search">
+        <div class="search-container">
+          <div class="search-header">
+            <div class="search-title-container">
+              <el-icon class="search-title-icon">
+                <Search />
+              </el-icon>
+              <span class="search-title">智能搜索</span>
+              <div class="search-title-decoration"></div>
+            </div>
+            <span class="search-subtitle">快速定位网站资源</span>
           </div>
-          <span class="category-subtitle">按分类浏览和管理您的网站收藏</span>
-          <div class="category-tips">
-            <el-icon class="tip-icon">
-              <InfoFilled />
-            </el-icon>
-            <span class="tip-text">右键点击分类项可进行编辑或删除操作</span>
+          <div class="search-input-wrapper">
+            <el-input v-model="searchKeyword" placeholder="搜索网站名称、描述或URL..." clearable @input="handleSearch"
+              @focus="handleSearchFocus" @blur="handleSearchBlur" class="search-input"
+              :class="{ focused: isSearchFocused }">
+              <template #prefix>
+                <el-icon class="search-icon">
+                  <Search />
+                </el-icon>
+              </template>
+            </el-input>
           </div>
         </div>
-        <el-tooltip content="点击进入编辑模式，拖拽分类项目可调整顺序" placement="top" :show-after="300">
-          <el-button size="small" type="primary" text @click="toggleEditMode" class="edit-mode-btn"
-            :class="{ active: isEditMode }">
-            <el-icon>
-              <Edit />
-            </el-icon>
-            {{ isEditMode ? '完成排序' : '调整顺序' }}
-          </el-button>
-        </el-tooltip>
       </div>
 
-      <div class="categories-container" :class="{ 'edit-mode': isEditMode }">
-        <el-radio-group v-model="selectedCategory" @change="handleCategoryChange">
-          <!-- 全部分类（不可拖拽） -->
-          <div class="category-item all-category" :class="{ selected: selectedCategory === '' }">
-            <el-tooltip content="显示所有分类的网站" placement="top" :show-after="300">
-              <el-radio-button label="" class="all-category-btn">
-                <div class="btn-content">
-                  <el-icon class="category-icon">
-                    <Grid />
-                  </el-icon>
-                  <span class="category-text">全部</span>
-                  <el-tag size="small" type="info" class="count-tag" :class="{ pulse: selectedCategory === '' }">
-                    {{ getTotalCount() }}
-                  </el-tag>
-                </div>
-              </el-radio-button>
-            </el-tooltip>
+      <!-- 分类筛选 -->
+      <div class="category-filter">
+        <div class="category-header">
+          <div class="category-header-main">
+            <div class="title-container">
+              <el-icon class="title-icon">
+                <Menu />
+              </el-icon>
+              <span class="category-title">分类筛选</span>
+            </div>
+            <span class="category-subtitle">右键编辑分类，拖拽调整顺序</span>
           </div>
-
-          <!-- 可拖拽的分类 -->
-          <div v-for="(category, index) in sortedCategories" :key="category.id" class="category-item" :class="{
-            selected: selectedCategory === category.id,
-            dragging: draggedIndex === index,
-            'drag-over': draggedIndex !== -1 && draggedIndex !== index,
-          }" draggable="true" @dragstart="handleDragStart(index)" @dragover.prevent @drop="handleDrop(index)"
-            @dragenter.prevent @dragend="handleDragEnd" @contextmenu.prevent="showActionButtons(category, $event)"
-            @mouseleave="hideActionButtons(category.id)">
-            <el-tooltip :content="category.description || '暂无描述'" placement="top" :show-after="300"
-              :disabled="!category.description">
-              <el-radio-button :label="category.id" class="category-btn">
-                <div class="btn-content">
-                  <div class="category-color-dot" :style="{ backgroundColor: category.color }"></div>
-                  <span class="category-text">{{ category.name }}</span>
-                  <el-tag size="small" type="info" class="count-tag"
-                    :class="{ pulse: selectedCategory === category.id }">
-                    {{ category.websiteCount ?? 0 }}
-                  </el-tag>
-                </div>
-              </el-radio-button>
-            </el-tooltip>
-
-            <!-- 修改按钮 -->
-            <el-button v-if="showEditButtons[category.id]" size="small" type="primary" circle class="edit-category-btn"
-              @click.stop="editCategory(category)" @mouseenter="showEditButtons[category.id] = true">
+          <el-tooltip content="点击进入编辑模式，拖拽分类项目可调整顺序" placement="top" :show-after="300">
+            <el-button size="small" type="primary" text @click="toggleEditMode" class="edit-mode-btn"
+              :class="{ active: isEditMode }">
               <el-icon>
                 <Edit />
               </el-icon>
+              {{ isEditMode ? '完成排序' : '调整顺序' }}
             </el-button>
+          </el-tooltip>
+        </div>
 
-            <!-- 删除按钮 -->
-            <el-button v-if="showDeleteButtons[category.id]" size="small" type="danger" circle
-              class="delete-category-btn" @click.stop="deleteCategory(category)"
-              @mouseenter="showDeleteButtons[category.id] = true">
-              <el-icon>
-                <Delete />
-              </el-icon>
-            </el-button>
+        <div class="categories-container" :class="{ 'edit-mode': isEditMode }">
+          <el-radio-group v-model="selectedCategory" @change="handleCategoryChange">
+            <!-- 全部分类（不可拖拽） -->
+            <div class="category-item all-category" :class="{ selected: selectedCategory === '' }">
+              <el-tooltip content="显示所有分类的网站" placement="top" :show-after="300">
+                <el-radio-button label="" class="all-category-btn">
+                  <div class="btn-content">
+                    <el-icon class="category-icon">
+                      <Grid />
+                    </el-icon>
+                    <span class="category-text">全部</span>
+                    <el-tag size="small" type="info" class="count-tag" :class="{ pulse: selectedCategory === '' }">
+                      {{ getTotalCount() }}
+                    </el-tag>
+                  </div>
+                </el-radio-button>
+              </el-tooltip>
+            </div>
 
-            <!-- 拖拽手柄 -->
-            <el-tooltip content="拖拽调整分类顺序" placement="top" :show-after="300">
-              <div v-if="isEditMode" class="drag-handle" :class="{ visible: isEditMode }">
+            <!-- 可拖拽的分类 -->
+            <div v-for="(category, index) in sortedCategories" :key="category.id" class="category-item" :class="{
+              selected: selectedCategory === category.id,
+              dragging: draggedIndex === index,
+              'drag-over': draggedIndex !== -1 && draggedIndex !== index,
+            }" draggable="true" @dragstart="handleDragStart(index)" @dragover.prevent @drop="handleDrop(index)"
+              @dragenter.prevent @dragend="handleDragEnd" @contextmenu.prevent="showActionButtons(category, $event)"
+              @mouseleave="hideActionButtons(category.id)">
+              <el-tooltip :content="category.description || '暂无描述'" placement="top" :show-after="300"
+                :disabled="!category.description">
+                <el-radio-button :label="category.id" class="category-btn">
+                  <div class="btn-content">
+                    <div class="category-color-dot" :style="{ backgroundColor: category.color }"></div>
+                    <span class="category-text">{{ category.name }}</span>
+                    <el-tag size="small" type="info" class="count-tag"
+                      :class="{ pulse: selectedCategory === category.id }">
+                      {{ category.websiteCount ?? 0 }}
+                    </el-tag>
+                  </div>
+                </el-radio-button>
+              </el-tooltip>
+
+              <!-- 修改按钮 -->
+              <el-button v-if="showEditButtons[category.id]" size="small" type="primary" circle class="edit-category-btn"
+                @click.stop="editCategory(category)" @mouseenter="showEditButtons[category.id] = true">
                 <el-icon>
-                  <Rank />
+                  <Edit />
                 </el-icon>
-              </div>
-            </el-tooltip>
-          </div>
-        </el-radio-group>
-      </div>
-    </div>
+              </el-button>
 
-    <!-- 搜索框 -->
-    <div class="search-section">
-      <div class="search-container">
-        <div class="search-header">
-          <div class="search-title-container">
-            <el-icon class="search-title-icon">
-              <Search />
-            </el-icon>
-            <span class="search-title">智能搜索</span>
-            <div class="search-title-decoration"></div>
-          </div>
-          <span class="search-subtitle">快速找到您需要的网站资源</span>
-        </div>
-        <div class="search-input-wrapper">
-          <el-input v-model="searchKeyword" placeholder="搜索网站名称、描述或URL..." clearable @input="handleSearch"
-            @focus="handleSearchFocus" @blur="handleSearchBlur" class="search-input"
-            :class="{ focused: isSearchFocused }">
-            <template #prefix>
-              <el-icon class="search-icon">
-                <Search />
-              </el-icon>
-            </template>
-          </el-input>
+              <!-- 删除按钮 -->
+              <el-button v-if="showDeleteButtons[category.id]" size="small" type="danger" circle
+                class="delete-category-btn" @click.stop="deleteCategory(category)"
+                @mouseenter="showDeleteButtons[category.id] = true">
+                <el-icon>
+                  <Delete />
+                </el-icon>
+              </el-button>
+
+              <!-- 拖拽手柄 -->
+              <el-tooltip content="拖拽调整分类顺序" placement="top" :show-after="300">
+                <div v-if="isEditMode" class="drag-handle" :class="{ visible: isEditMode }">
+                  <el-icon>
+                    <Rank />
+                  </el-icon>
+                </div>
+              </el-tooltip>
+            </div>
+          </el-radio-group>
         </div>
       </div>
     </div>
+    <!-- 顶部控制区结束 -->
 
     <!-- 网站列表 -->
     <div class="websites-container">
@@ -368,252 +343,6 @@
       </template>
     </el-dialog>
 
-    <!-- AI生成分类对话框 -->
-    <el-dialog v-model="aiGenerateCategoryDialogVisible" title="" width="600px" :close-on-click-modal="false"
-      class="ai-category-dialog">
-      <!-- 自定义标题栏 -->
-      <template #header>
-        <div class="ai-dialog-header">
-          <div class="ai-header-content">
-            <div class="ai-header-icon">
-              <el-icon class="ai-icon">
-                <Star />
-              </el-icon>
-              <div class="ai-icon-glow"></div>
-            </div>
-            <div class="ai-header-text">
-              <h3 class="ai-title">AI一键生成分类</h3>
-              <p class="ai-subtitle">让AI为您智能生成分类描述和颜色</p>
-            </div>
-          </div>
-          <div class="ai-header-decoration">
-            <div class="decoration-dot"></div>
-            <div class="decoration-dot"></div>
-            <div class="decoration-dot"></div>
-          </div>
-        </div>
-      </template>
-
-      <!-- 对话框内容 -->
-      <div class="ai-dialog-content">
-        <!-- AI生成状态指示器 -->
-        <div class="ai-status-indicator" v-if="aiGenerating">
-          <div class="ai-loading-animation">
-            <div class="ai-loading-circle"></div>
-            <div class="ai-loading-circle"></div>
-            <div class="ai-loading-circle"></div>
-          </div>
-          <p class="ai-loading-text">AI正在思考中...</p>
-        </div>
-
-        <!-- 表单内容 -->
-        <div class="ai-form-container" :class="{ 'ai-form-hidden': aiGenerating }">
-          <el-form ref="aiCategoryFormRef" :model="aiCategoryForm" :rules="aiCategoryRules" label-width="100px"
-            class="ai-category-form">
-            <!-- 分类名称输入 -->
-            <el-form-item label="分类名称" prop="name" class="ai-form-item">
-              <div class="ai-input-wrapper">
-                <el-input v-model="aiCategoryForm.name" placeholder="请输入分类名称" class="ai-input" :disabled="aiGenerating">
-                  <template #prefix>
-                    <el-icon class="input-icon">
-                      <FolderAdd />
-                    </el-icon>
-                  </template>
-                </el-input>
-                <div class="ai-input-focus-border"></div>
-              </div>
-            </el-form-item>
-
-            <!-- 分类描述 -->
-            <el-form-item label="分类描述" prop="description" class="ai-form-item">
-              <div class="ai-input-wrapper">
-                <el-input v-model="aiCategoryForm.description" type="textarea" :rows="3" placeholder="请输入分类描述"
-                  class="ai-textarea" v-if="aiGeneratedResult" :disabled="aiGenerating">
-                  <template #prefix>
-                    <el-icon class="input-icon">
-                      <Document />
-                    </el-icon>
-                  </template>
-                </el-input>
-                <div v-else class="ai-placeholder-container">
-                  <div class="ai-placeholder-content">
-                    <el-icon class="placeholder-icon">
-                      <MagicStick />
-                    </el-icon>
-                    <p class="placeholder-text">点击"AI生成"按钮后可以编辑描述</p>
-                    <div class="placeholder-decoration"></div>
-                  </div>
-                </div>
-                <div class="ai-input-focus-border"></div>
-              </div>
-            </el-form-item>
-
-            <!-- 分类颜色 -->
-            <el-form-item label="分类颜色" prop="color" class="ai-form-item">
-              <div class="ai-input-wrapper">
-                <el-color-picker v-model="aiCategoryForm.color" v-if="aiGeneratedResult" show-alpha
-                  class="ai-color-picker" :disabled="aiGenerating" />
-                <div v-else class="ai-placeholder-container">
-                  <div class="ai-placeholder-content">
-                    <el-icon class="placeholder-icon">
-                      <Brush />
-                    </el-icon>
-                    <p class="placeholder-text">点击"AI生成"按钮后可以选择颜色</p>
-                    <div class="placeholder-decoration"></div>
-                  </div>
-                </div>
-                <div class="ai-input-focus-border"></div>
-              </div>
-            </el-form-item>
-          </el-form>
-        </div>
-
-        <!-- AI生成结果展示 -->
-        <div v-if="aiGeneratedResult" class="ai-result-showcase">
-          <div class="ai-result-header">
-            <el-icon class="result-icon">
-              <Check />
-            </el-icon>
-            <span class="result-title">AI生成完成</span>
-          </div>
-          <div class="ai-result-content">
-            <div class="result-item">
-              <span class="result-label">描述：</span>
-              <span class="result-value">{{ aiGeneratedResult.description }}</span>
-            </div>
-            <div class="result-item">
-              <span class="result-label">颜色：</span>
-              <div class="result-color" :style="{ backgroundColor: aiGeneratedResult.color }"></div>
-              <span class="result-color-code">{{ aiGeneratedResult.color }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 自定义底部按钮 -->
-      <template #footer>
-        <div class="ai-dialog-footer">
-          <el-button @click="aiGenerateCategoryDialogVisible = false" class="ai-cancel-btn" :disabled="aiGenerating">
-            <el-icon>
-              <Close />
-            </el-icon>
-            取消
-          </el-button>
-          <el-button type="primary" @click="generateCategoryWithAI" :loading="aiGenerating" v-if="!aiGeneratedResult"
-            class="ai-generate-btn">
-            <el-icon>
-              <Star />
-            </el-icon>
-            <span v-if="!aiGenerating">AI生成</span>
-            <span v-else>生成中...</span>
-          </el-button>
-          <el-button type="success" @click="saveAIGeneratedCategory" :loading="savingAICategory"
-            v-if="aiGeneratedResult" class="ai-save-btn">
-            <el-icon>
-              <Check />
-            </el-icon>
-            保存分类
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
-
-    <!-- AI新增网站对话框 -->
-    <el-dialog v-model="aiCreateWebsiteDialogVisible" title="AI一键新增网站" width="700px" :close-on-click-modal="false">
-      <!-- 第一步：输入网站地址 -->
-      <div v-if="!aiWebsiteResult" class="ai-step">
-        <div class="step-header">
-          <el-icon class="step-icon">
-            <Link />
-          </el-icon>
-          <span class="step-title">第一步：输入网站地址</span>
-        </div>
-        <el-form ref="aiWebsiteFormRef" :model="aiWebsiteForm" :rules="aiWebsiteRules">
-          <el-form-item label="网站地址" prop="url">
-            <el-input v-model="aiWebsiteForm.url" placeholder="请输入网站地址（如：https://github.com）" size="large" />
-          </el-form-item>
-        </el-form>
-      </div>
-
-      <!-- 第二步：AI生成结果和手动编辑 -->
-      <div v-if="aiWebsiteResult" class="ai-step">
-        <div class="step-header">
-          <el-icon class="step-icon">
-            <Edit />
-          </el-icon>
-          <span class="step-title">第二步：编辑网站信息</span>
-          <el-tag type="success" size="small">AI已生成，可手动修改</el-tag>
-        </div>
-
-        <el-form ref="aiWebsiteEditFormRef" :model="aiWebsiteEditForm" :rules="aiWebsiteEditRules" label-width="100px">
-          <el-form-item label="网站名称" prop="name">
-            <el-input v-model="aiWebsiteEditForm.name" placeholder="请输入网站名称" show-word-limit maxlength="50" />
-          </el-form-item>
-
-          <el-form-item label="网站描述" prop="description">
-            <el-input v-model="aiWebsiteEditForm.description" type="textarea" :rows="3" placeholder="请输入网站描述"
-              show-word-limit maxlength="200" />
-          </el-form-item>
-
-          <el-form-item label="所属分类" prop="categoryIds">
-            <el-select v-model="aiWebsiteEditForm.categoryIds" multiple collapse-tags collapse-tags-tooltip
-              placeholder="请选择分类" style="width: 100%">
-              <el-option v-for="category in categories" :key="category.id" :label="category.name" :value="category.id">
-                <div class="category-option">
-                  <div class="category-color-dot" :style="{ backgroundColor: category.color }"></div>
-                  <span>{{ category.name }}</span>
-                </div>
-              </el-option>
-            </el-select>
-          </el-form-item>
-
-          <el-form-item label="网站图标">
-            <div class="icon-preview">
-              <img v-if="lastScrapedInfo?.favicon" :src="lastScrapedInfo.favicon" :alt="aiWebsiteEditForm.name"
-                class="favicon-preview" @error="handleFaviconError" />
-              <el-icon v-else class="favicon-placeholder">
-                <Link />
-              </el-icon>
-              <span class="icon-info">{{ lastScrapedInfo?.favicon || '未抓取到图标' }}</span>
-            </div>
-          </el-form-item>
-        </el-form>
-      </div>
-
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="aiCreateWebsiteDialogVisible = false">取消</el-button>
-
-          <!-- 第一步按钮 -->
-          <template v-if="!aiWebsiteResult">
-            <el-button type="primary" :loading="aiGeneratingWebsite" :disabled="aiGeneratingWebsite"
-              @click="generateWebsiteWithAI">
-              <el-icon>
-                <Star />
-              </el-icon>
-              AI生成
-            </el-button>
-          </template>
-
-          <!-- 第二步按钮 -->
-          <template v-if="aiWebsiteResult">
-            <el-button @click="regenerateWebsiteWithAI" :loading="aiGeneratingWebsite">
-              <el-icon>
-                <Refresh />
-              </el-icon>
-              重新生成
-            </el-button>
-            <el-button type="success" :loading="savingAIWebsite" @click="saveAIGeneratedWebsite">
-              <el-icon>
-                <Check />
-              </el-icon>
-              保存网站
-            </el-button>
-          </template>
-        </div>
-      </template>
-    </el-dialog>
-
     <!-- 删除确认对话框 -->
     <el-dialog v-model="deleteDialogVisible" title="确认删除" width="400px" :close-on-click-modal="false">
       <div class="delete-confirm">
@@ -671,250 +400,6 @@
           <el-button @click="deleteCategoryDialogVisible = false">取消</el-button>
           <el-button type="danger" @click="confirmDeleteCategory" :loading="deletingCategory">
             确定删除
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
-
-    <!-- 网站状态监控对话框 -->
-    <el-dialog v-model="statusMonitorDialogVisible" title="网站状态监控" width="900px" :close-on-click-modal="false">
-      <div class="status-monitor-content">
-        <!-- 监控控制面板 -->
-        <div class="monitor-control-panel">
-          <div class="control-header">
-            <h3 class="control-title">
-              <el-icon class="control-icon">
-                <Monitor />
-              </el-icon>
-              监控控制
-            </h3>
-            <div class="control-actions">
-              <el-button type="primary" @click="startBatchStatusCheck" :loading="checkingStatus"
-                :disabled="checkingStatus">
-                <el-icon>
-                  <Refresh />
-                </el-icon>
-                开始批量检查
-              </el-button>
-              <el-button type="success" @click="toggleAutoMonitoring" :class="{ 'monitoring-active': autoMonitoring }">
-                <el-icon>
-                  <VideoPlay />
-                </el-icon>
-                {{ autoMonitoring ? '停止自动监控' : '启动自动监控' }}
-              </el-button>
-            </div>
-          </div>
-
-          <div class="monitor-settings">
-            <div class="settings-grid">
-              <div class="setting-item">
-                <label class="setting-label">检查间隔</label>
-                <div class="setting-control">
-                  <el-select v-model="monitorSettings.checkInterval" :disabled="autoMonitoring" placeholder="选择检查间隔"
-                    class="setting-select">
-                    <el-option label="5分钟" value="5" />
-                    <el-option label="15分钟" value="15" />
-                    <el-option label="30分钟" value="30" />
-                    <el-option label="1小时" value="60" />
-                    <el-option label="6小时" value="360" />
-                    <el-option label="12小时" value="720" />
-                    <el-option label="24小时" value="1440" />
-                  </el-select>
-                  <span class="setting-unit">分钟</span>
-                </div>
-              </div>
-
-              <div class="setting-item">
-                <label class="setting-label">超时时间</label>
-                <div class="setting-control">
-                  <el-input-number v-model="monitorSettings.timeout" :min="5" :max="60" :disabled="autoMonitoring"
-                    placeholder="超时时间" class="setting-input" />
-                  <span class="setting-unit">秒</span>
-                </div>
-              </div>
-
-              <div class="setting-item">
-                <label class="setting-label">重试次数</label>
-                <div class="setting-control">
-                  <el-input-number v-model="monitorSettings.retryCount" :min="1" :max="5" :disabled="autoMonitoring"
-                    placeholder="重试次数" class="setting-input" />
-                  <span class="setting-unit">次</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 状态统计 -->
-        <div class="status-statistics">
-          <div class="statistics-header">
-            <h3 class="statistics-title">
-              <el-icon class="statistics-icon">
-                <DataAnalysis />
-              </el-icon>
-              状态统计
-            </h3>
-            <el-button size="small" @click="refreshStatistics">
-              <el-icon>
-                <Refresh />
-              </el-icon>
-              刷新统计
-            </el-button>
-          </div>
-
-          <div class="statistics-cards">
-            <div class="stat-card total">
-              <div class="stat-icon">
-                <el-icon>
-                  <Link />
-                </el-icon>
-              </div>
-              <div class="stat-content">
-                <div class="stat-number">{{ statusStatistics.total }}</div>
-                <div class="stat-label">总网站数</div>
-              </div>
-            </div>
-
-            <div class="stat-card active">
-              <div class="stat-icon">
-                <el-icon>
-                  <Check />
-                </el-icon>
-              </div>
-              <div class="stat-content">
-                <div class="stat-number">{{ statusStatistics.active }}</div>
-                <div class="stat-label">正常</div>
-              </div>
-            </div>
-
-            <div class="stat-card inactive">
-              <div class="stat-icon">
-                <el-icon>
-                  <Warning />
-                </el-icon>
-              </div>
-              <div class="stat-content">
-                <div class="stat-number">{{ statusStatistics.inactive }}</div>
-                <div class="stat-label">异常</div>
-              </div>
-            </div>
-
-            <div class="stat-card broken">
-              <div class="stat-icon">
-                <el-icon>
-                  <Close />
-                </el-icon>
-              </div>
-              <div class="stat-content">
-                <div class="stat-number">{{ statusStatistics.broken }}</div>
-                <div class="stat-label">失效</div>
-              </div>
-            </div>
-
-            <div class="stat-card unknown">
-              <div class="stat-icon">
-                <el-icon>
-                  <QuestionFilled />
-                </el-icon>
-              </div>
-              <div class="stat-content">
-                <div class="stat-number">{{ statusStatistics.unknown }}</div>
-                <div class="stat-label">未知</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 状态列表 -->
-        <div class="status-list">
-          <div class="list-header">
-            <h3 class="list-title">
-              <el-icon class="list-icon">
-                <List />
-              </el-icon>
-              网站状态列表
-            </h3>
-            <div class="list-filters">
-              <el-select v-model="statusFilter" placeholder="状态筛选" size="small">
-                <el-option label="全部状态" value="" />
-                <el-option label="正常" value="active" />
-                <el-option label="异常" value="inactive" />
-                <el-option label="失效" value="broken" />
-                <el-option label="未知" value="unknown" />
-              </el-select>
-              <el-input v-model="statusSearchKeyword" placeholder="搜索网站名称或URL" size="small" clearable
-                style="width: 200px">
-                <template #prefix>
-                  <el-icon>
-                    <Search />
-                  </el-icon>
-                </template>
-              </el-input>
-            </div>
-          </div>
-
-          <div class="status-table">
-            <el-table :data="filteredStatusList" style="width: 100%" :row-class-name="getStatusRowClass"
-              v-loading="loadingStatusList">
-              <el-table-column prop="name" label="网站名称" min-width="150">
-                <template #default="{ row }">
-                  <div class="website-name-cell">
-                    <span class="website-name">{{ row.name }}</span>
-                    <el-tag :type="getStatusTagType(row.status)" size="small" class="status-tag">
-                      {{ getStatusText(row.status) }}
-                    </el-tag>
-                  </div>
-                </template>
-              </el-table-column>
-
-              <el-table-column prop="url" label="URL" min-width="200">
-                <template #default="{ row }">
-                  <div class="url-cell">
-                    <span class="url-text">{{ row.url }}</span>
-                    <el-button size="small" type="primary" text @click="testWebsite(row)" :loading="row.testing">
-                      <el-icon>
-                        <Link />
-                      </el-icon>
-                      测试
-                    </el-button>
-                  </div>
-                </template>
-              </el-table-column>
-
-              <el-table-column prop="lastCheckTime" label="最后检查" width="150">
-                <template #default="{ row }">
-                  <span class="check-time">
-                    {{ row.lastCheckTime ? formatDateTime(row.lastCheckTime) : '从未检查' }}
-                  </span>
-                </template>
-              </el-table-column>
-
-              <el-table-column prop="responseTime" label="响应时间" width="100">
-                <template #default="{ row }">
-                  <span v-if="row.responseTime" class="response-time">
-                    {{ row.responseTime }}ms
-                  </span>
-                  <span v-else class="no-response">-</span>
-                </template>
-              </el-table-column>
-
-              <el-table-column prop="status" label="操作" width="120">
-                <template #default="{ row }">
-                  <el-button size="small" type="primary" @click="checkSingleWebsite(row)" :loading="row.checking">
-                    检查
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="statusMonitorDialogVisible = false">关闭</el-button>
-          <el-button type="primary" @click="exportStatusReport" :disabled="!statusList.length">
-            导出状态报告
           </el-button>
         </div>
       </template>
@@ -1077,7 +562,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, type FormInstance } from 'element-plus'
 import {
   Link,
@@ -1088,22 +573,10 @@ import {
   Edit,
   Delete,
   Rank,
-  Star,
   Menu,
   Grid,
-  Refresh,
-  Check,
-  InfoFilled,
   Upload,
   Document,
-  Monitor,
-  VideoPlay,
-  DataAnalysis,
-  List,
-  QuestionFilled,
-  Close,
-  MagicStick,
-  Brush,
   DocumentCopy,
 } from '@element-plus/icons-vue'
 import {
@@ -1114,7 +587,6 @@ import {
   type WebsiteCreateRequest,
   type CategoryCreateRequest,
 } from '../utils/websiteApi'
-import { generateCategoryWithOllama, generateWebsiteInfoWithOllama } from '../utils/aiService'
 
 // 响应式数据
 const websites = ref<Website[]>([])
@@ -1140,7 +612,6 @@ const websiteDialogVisible = ref(false)
 const categoryDialogVisible = ref(false)
 const deleteDialogVisible = ref(false)
 const deleteCategoryDialogVisible = ref(false)
-const aiGenerateCategoryDialogVisible = ref(false)
 const editingWebsite = ref<Website | null>(null)
 const deletingWebsite = ref<Website | null>(null)
 const saving = ref(false)
@@ -1173,89 +644,16 @@ const manualInputText = ref('')
 const importing = ref(false)
 const canImport = ref(false)
 
-// 网站状态监控相关状态
-const statusMonitorDialogVisible = ref(false)
-const autoMonitoring = ref(false)
-const checkingStatus = ref(false)
-const loadingStatusList = ref(false)
-const statusFilter = ref('')
-const statusSearchKeyword = ref('')
-
-const monitorSettings = ref({
-  checkInterval: '30',
-  timeout: 10,
-  retryCount: 2,
-})
-
-const statusStatistics = ref({
-  total: 0,
-  active: 0,
-  inactive: 0,
-  broken: 0,
-  unknown: 0,
-})
-
-const statusList = ref<
-  Array<{
-    id: number
-    name: string
-    url: string
-    status: string
-    lastCheckTime?: string
-    responseTime?: number
-    checking?: boolean
-    testing?: boolean
-  }>
->([])
-
-let monitoringTimer: NodeJS.Timeout | null = null
-
 // 占位图（当网站图标加载失败时使用）
 const FALLBACK_ICON_DATA_URL =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="%23667eea" offset="0%"/><stop stop-color="%23764ba2" offset="100%"/></linearGradient></defs><rect rx="12" ry="12" width="64" height="64" fill="url(%23g)"/><g fill="white" opacity="0.95"><circle cx="32" cy="32" r="16" fill="none" stroke="white" stroke-width="3"/><path d="M16 32h32M32 16v32" stroke="white" stroke-width="3" stroke-linecap="round"/></g></svg>'
 const savingCategory = ref(false)
 const deleting = ref(false)
-const aiGenerating = ref(false)
-const savingAICategory = ref(false)
-
-// AI新增网站相关状态
-const aiCreateWebsiteDialogVisible = ref(false)
-const aiGeneratingWebsite = ref(false)
-const savingAIWebsite = ref(false)
-const aiWebsiteForm = ref({
-  url: '',
-})
-const aiWebsiteResult = ref<{
-  name: string
-  description: string
-  categoryId: number
-  icon: string
-} | null>(null)
-
-// AI网站编辑表单
-const aiWebsiteEditForm = ref({
-  name: '',
-  description: '',
-  categoryIds: [] as number[],
-})
-
-// AI网站编辑表单引用
-const aiWebsiteEditFormRef = ref<FormInstance>()
-
-// 保存最近一次从后端抓取的网站信息（包含 favicon）
-const lastScrapedInfo = ref<{
-  title?: string
-  description?: string
-  keywords?: string
-  favicon?: string
-} | null>(null)
 
 // 表单引用
 const websiteFormRef = ref<FormInstance>()
 const categoryFormRef = ref<FormInstance>()
 const editCategoryFormRef = ref<FormInstance>()
-const aiCategoryFormRef = ref<FormInstance>()
-const aiWebsiteFormRef = ref<FormInstance>()
 
 // 表单数据
 const websiteForm = ref<WebsiteCreateRequest>({
@@ -1272,18 +670,6 @@ const categoryForm = ref<CategoryCreateRequest>({
   color: '#409EFF',
   sortOrder: 0,
 })
-
-const aiCategoryForm = ref({
-  name: '',
-  description: '',
-  color: '#409EFF',
-  sortOrder: 0,
-})
-
-const aiGeneratedResult = ref<{
-  description: string
-  color: string
-} | null>(null)
 
 // 表单验证规则
 const websiteRules = {
@@ -1312,23 +698,7 @@ const websiteRules = {
   categoryIds: [{ required: true, message: '请选择分类', trigger: 'change' }],
 }
 
-const aiWebsiteRules = {
-  url: [{ required: true, message: '请输入网站地址', trigger: 'blur' }],
-}
-
-const aiWebsiteEditRules = {
-  name: [{ required: true, message: '请输入网站名称', trigger: 'blur' }],
-  description: [{ required: true, message: '请输入网站描述', trigger: 'blur' }],
-  categoryIds: [{ required: true, message: '请选择分类', trigger: 'change' }],
-}
-
 const categoryRules = {
-  name: [{ required: true, message: '请输入分类名称', trigger: 'blur' }],
-  description: [{ required: true, message: '请输入分类描述', trigger: 'blur' }],
-  color: [{ required: true, message: '请选择分类颜色', trigger: 'change' }],
-}
-
-const aiCategoryRules = {
   name: [{ required: true, message: '请输入分类名称', trigger: 'blur' }],
   description: [{ required: true, message: '请输入分类描述', trigger: 'blur' }],
   color: [{ required: true, message: '请选择分类颜色', trigger: 'change' }],
@@ -1486,111 +856,6 @@ const handleCategoryChange = async () => {
   currentPage.value = 1
   jumpPage.value = 1
   await loadWebsites()
-}
-
-// AI新增网站相关方法
-const showAICreateWebsiteDialog = () => {
-  aiCreateWebsiteDialogVisible.value = true
-  aiWebsiteForm.value.url = ''
-  aiWebsiteResult.value = null
-}
-
-const generateWebsiteWithAI = async () => {
-  if (!aiWebsiteFormRef.value) return
-
-  // 并发防护：避免重复触发
-  if (aiGeneratingWebsite.value) return
-
-  try {
-    await aiWebsiteFormRef.value.validate()
-    aiGeneratingWebsite.value = true
-
-    // 抓取网站信息（API内部已经处理了重试逻辑）
-    let scrapedInfo: {
-      title?: string
-      description?: string
-      keywords?: string
-      favicon?: string
-    } | null = null
-
-    try {
-      scrapedInfo = await websiteApi.scrapeWebsiteInfo(aiWebsiteForm.value.url)
-      console.log('网站信息抓取成功:', scrapedInfo)
-    } catch (error) {
-      console.error('网站信息抓取失败:', error)
-      ElMessage.error('网站信息抓取失败，请检查网址后重试')
-      throw error
-    }
-
-    lastScrapedInfo.value = scrapedInfo
-
-    // 调用AI生成网站信息，传递完整的抓取信息
-    const result = await generateWebsiteInfoWithOllama(
-      aiWebsiteForm.value.url,
-      scrapedInfo || {},
-      categories.value,
-    )
-
-    aiWebsiteResult.value = result
-
-    // 将AI生成的结果填充到编辑表单中
-    aiWebsiteEditForm.value = {
-      name: result.name,
-      description: result.description,
-      categoryIds: [result.categoryId],
-    }
-
-    ElMessage.success('AI生成完成，请检查并编辑信息')
-  } catch (error) {
-    ElMessage.error('AI生成失败，请重试')
-    console.error('AI生成失败:', error)
-  } finally {
-    aiGeneratingWebsite.value = false
-  }
-}
-
-const regenerateWebsiteWithAI = async () => {
-  await generateWebsiteWithAI()
-}
-
-const handleFaviconError = (event: Event) => {
-  const img = event.target as HTMLImageElement
-  img.style.display = 'none'
-}
-
-const saveAIGeneratedWebsite = async () => {
-  if (!aiWebsiteEditFormRef.value) return
-
-  try {
-    await aiWebsiteEditFormRef.value.validate()
-    savingAIWebsite.value = true
-
-    // 准备网站创建请求，使用编辑表单的数据
-    const websiteRequest: WebsiteCreateRequest = {
-      name: aiWebsiteEditForm.value.name,
-      url: aiWebsiteForm.value.url,
-      description: aiWebsiteEditForm.value.description,
-      categoryIds: aiWebsiteEditForm.value.categoryIds,
-      // 仅使用后端抓取到的 favicon（网络链接），不使用 AI 返回的占位图标名
-      icon: lastScrapedInfo.value?.favicon || '',
-      favicon: lastScrapedInfo.value?.favicon,
-    }
-
-    // 创建网站
-    await websiteApi.createWebsite(websiteRequest)
-
-    ElMessage.success('网站创建成功')
-    aiCreateWebsiteDialogVisible.value = false
-
-    // 重新加载数据
-    await loadWebsites()
-    await loadCategories()
-  } catch (error) {
-    ElMessage.error('保存网站失败')
-    console.error('保存网站失败:', error)
-  } finally {
-    savingAIWebsite.value = false
-  }
 }
 
 const getCategoryName = (categoryId: number) => {
@@ -1776,17 +1041,6 @@ const showAddCategoryDialog = () => {
   categoryDialogVisible.value = true
 }
 
-const showAIGenerateCategoryDialog = () => {
-  aiCategoryForm.value = {
-    name: '',
-    description: '',
-    color: '#409EFF',
-    sortOrder: 0,
-  }
-  aiGeneratedResult.value = null
-  aiGenerateCategoryDialogVisible.value = true
-}
-
 const saveCategory = async () => {
   if (!categoryFormRef.value) return
 
@@ -1804,72 +1058,6 @@ const saveCategory = async () => {
     console.error('保存失败:', error)
   } finally {
     savingCategory.value = false
-  }
-}
-
-const generateCategoryWithAI = async () => {
-  if (!aiCategoryFormRef.value) return
-
-  try {
-    // 只验证分类名称字段，其他字段在AI生成后填充
-    await aiCategoryFormRef.value.validateField('name')
-    aiGenerating.value = true
-
-    // 调用AI服务生成分类描述和颜色
-    console.log('开始调用AI服务，分类名称:', aiCategoryForm.value.name)
-    const result = await generateCategoryWithOllama(aiCategoryForm.value.name)
-    console.log('AI服务返回结果:', result)
-
-    // 将AI生成的结果填充到表单中，用户可以进一步编辑
-    aiCategoryForm.value.description = result.description
-    aiCategoryForm.value.color = result.color
-    console.log('表单字段已填充:', {
-      description: aiCategoryForm.value.description,
-      color: aiCategoryForm.value.color,
-    })
-
-    // 标记AI生成完成，显示编辑字段
-    aiGeneratedResult.value = {
-      description: result.description,
-      color: result.color,
-    }
-
-    ElMessage.success('AI生成完成，您可以进一步编辑内容')
-  } catch (error) {
-    ElMessage.error('AI生成失败，请重试')
-    console.error('AI生成失败:', error)
-  } finally {
-    aiGenerating.value = false
-  }
-}
-
-const saveAIGeneratedCategory = async () => {
-  if (!aiGeneratedResult.value) return
-
-  // 验证表单
-  if (!aiCategoryFormRef.value) return
-
-  try {
-    await aiCategoryFormRef.value.validate()
-    savingAICategory.value = true
-
-    const categoryData = {
-      name: aiCategoryForm.value.name,
-      description: aiCategoryForm.value.description,
-      color: aiCategoryForm.value.color,
-      sortOrder: aiCategoryForm.value.sortOrder,
-    }
-
-    await categoryApi.createCategory(categoryData)
-
-    ElMessage.success('AI生成分类保存成功')
-    aiGenerateCategoryDialogVisible.value = false
-    loadCategories() // 重新加载分类
-  } catch (error) {
-    ElMessage.error('保存失败，请重试')
-    console.error('保存失败:', error)
-  } finally {
-    savingAICategory.value = false
   }
 }
 
@@ -1897,7 +1085,7 @@ watch([selectedCategory, searchKeyword], () => {
 })
 
 // 监听手动输入文本变化，延迟解析
-let manualInputTimer: NodeJS.Timeout | null = null
+let manualInputTimer: ReturnType<typeof setTimeout> | null = null
 watch(manualInputText, (newValue) => {
   if (manualInputTimer) {
     clearTimeout(manualInputTimer)
@@ -1907,6 +1095,13 @@ watch(manualInputText, (newValue) => {
     manualInputTimer = setTimeout(() => {
       parseManualInput()
     }, 1000) // 1秒后自动解析
+  }
+})
+
+onUnmounted(() => {
+  if (manualInputTimer) {
+    clearTimeout(manualInputTimer)
+    manualInputTimer = null
   }
 })
 
@@ -2278,270 +1473,6 @@ const startImport = async () => {
   }
 }
 
-// 网站状态监控相关方法
-const showStatusMonitorDialog = async () => {
-  statusMonitorDialogVisible.value = true
-  await loadStatusList()
-  await refreshStatistics()
-}
-
-const loadStatusList = async () => {
-  loadingStatusList.value = true
-  try {
-    // 使用新的API端点获取所有网站
-    const allWebsites = await websiteApi.getAllWebsites()
-
-    statusList.value = allWebsites.map((website) => ({
-      id: website.id,
-      name: website.name,
-      url: website.url,
-      status: website.status || 'unknown',
-      lastCheckTime: website.lastCheckTime,
-      responseTime: website.responseTime,
-      checking: false,
-      testing: false,
-    }))
-  } catch (error) {
-    ElMessage.error('加载状态列表失败')
-    console.error('加载状态列表失败:', error)
-  } finally {
-    loadingStatusList.value = false
-  }
-}
-
-const refreshStatistics = () => {
-  const total = statusList.value.length
-  const active = statusList.value.filter((w) => w.status === 'active').length
-  const inactive = statusList.value.filter((w) => w.status === 'inactive').length
-  const broken = statusList.value.filter((w) => w.status === 'broken').length
-  const unknown = statusList.value.filter((w) => w.status === 'unknown' || !w.status).length
-
-  statusStatistics.value = { total, active, inactive, broken, unknown }
-}
-
-const startBatchStatusCheck = async () => {
-  if (checkingStatus.value) return
-
-  checkingStatus.value = true
-  try {
-    // 调用后端批量检查接口
-    await websiteApi.batchCheckWebsiteStatus()
-
-    // 重新加载状态列表
-    await loadStatusList()
-    await refreshStatistics()
-
-    ElMessage.success('批量状态检查完成')
-  } catch (error) {
-    ElMessage.error('批量状态检查失败')
-    console.error('批量状态检查失败:', error)
-  } finally {
-    checkingStatus.value = false
-  }
-}
-
-const checkSingleWebsite = async (website: any) => {
-  if (website.checking) return
-
-  website.checking = true
-  try {
-    // 调用后端单个检查接口
-    await websiteApi.checkWebsiteStatus(website.id)
-
-    // 重新加载状态列表
-    await loadStatusList()
-    await refreshStatistics()
-
-    ElMessage.success(`网站 "${website.name}" 状态检查完成`)
-  } catch (error) {
-    ElMessage.error(`网站 "${website.name}" 状态检查失败`)
-    console.error('单个网站状态检查失败:', error)
-  } finally {
-    website.checking = false
-  }
-}
-
-const testWebsite = async (website: any) => {
-  if (website.testing) return
-
-  website.testing = true
-  try {
-    const startTime = Date.now()
-
-    // 创建一个图片请求来测试网站可用性
-    const img = new Image()
-    img.onload = () => {
-      const responseTime = Date.now() - startTime
-      website.responseTime = responseTime
-      website.status = 'active'
-      website.lastCheckTime = new Date().toISOString()
-      website.testing = false
-      refreshStatistics()
-      ElMessage.success(`网站 "${website.name}" 测试成功，响应时间: ${responseTime}ms`)
-    }
-
-    img.onerror = () => {
-      website.status = 'broken'
-      website.lastCheckTime = new Date().toISOString()
-      website.testing = false
-      refreshStatistics()
-      ElMessage.warning(`网站 "${website.name}" 测试失败，可能已失效`)
-    }
-
-    // 设置超时
-    setTimeout(() => {
-      if (website.testing) {
-        website.testing = false
-        ElMessage.error(`网站 "${website.name}" 测试超时`)
-      }
-    }, monitorSettings.value.timeout * 1000)
-
-    // 开始测试
-    img.src = `${website.url}/favicon.ico?t=${Date.now()}`
-  } catch (error) {
-    website.testing = false
-    ElMessage.error(`网站 "${website.name}" 测试失败`)
-    console.error('网站测试失败:', error)
-  }
-}
-
-const toggleAutoMonitoring = () => {
-  if (autoMonitoring.value) {
-    // 停止自动监控
-    if (monitoringTimer) {
-      clearInterval(monitoringTimer)
-      monitoringTimer = null
-    }
-    autoMonitoring.value = false
-    ElMessage.info('自动监控已停止')
-  } else {
-    // 启动自动监控
-    const intervalMinutes = parseInt(monitorSettings.value.checkInterval)
-    const intervalMs = intervalMinutes * 60 * 1000
-
-    monitoringTimer = setInterval(async () => {
-      if (statusMonitorDialogVisible.value) {
-        await startBatchStatusCheck()
-      }
-    }, intervalMs)
-
-    autoMonitoring.value = true
-    ElMessage.success(`自动监控已启动，每${intervalMinutes}分钟检查一次`)
-  }
-}
-
-const getStatusText = (status: string) => {
-  switch (status) {
-    case 'active':
-      return '正常'
-    case 'inactive':
-      return '异常'
-    case 'broken':
-      return '失效'
-    default:
-      return '未知'
-  }
-}
-
-const getStatusTagType = (status: string) => {
-  switch (status) {
-    case 'active':
-      return 'success'
-    case 'inactive':
-      return 'warning'
-    case 'broken':
-      return 'danger'
-    default:
-      return 'info'
-  }
-}
-
-const getStatusRowClass = ({ row }: { row: any }) => {
-  switch (row.status) {
-    case 'active':
-      return 'status-row-active'
-    case 'inactive':
-      return 'status-row-inactive'
-    case 'broken':
-      return 'status-row-broken'
-    default:
-      return 'status-row-unknown'
-  }
-}
-
-const filteredStatusList = computed(() => {
-  let filtered = statusList.value
-
-  // 状态筛选
-  if (statusFilter.value) {
-    filtered = filtered.filter((w) => w.status === statusFilter.value)
-  }
-
-  // 关键词搜索
-  if (statusSearchKeyword.value) {
-    const keyword = statusSearchKeyword.value.toLowerCase()
-    filtered = filtered.filter(
-      (w) => w.name.toLowerCase().includes(keyword) || w.url.toLowerCase().includes(keyword),
-    )
-  }
-
-  return filtered
-})
-
-const formatDateTime = (dateString: string) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-const exportStatusReport = () => {
-  try {
-    const reportData = statusList.value.map((website) => ({
-      网站名称: website.name,
-      URL: website.url,
-      状态: getStatusText(website.status),
-      最后检查时间: website.lastCheckTime ? formatDateTime(website.lastCheckTime) : '从未检查',
-      响应时间: website.responseTime ? `${website.responseTime}ms` : '-',
-    }))
-
-    // 创建CSV内容
-    const headers = Object.keys(reportData[0])
-    const csvContent = [
-      headers.join(','),
-      ...reportData.map((row) => headers.map((header) => `"${row[header]}"`).join(',')),
-    ].join('\n')
-
-    // 下载文件
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `网站状态报告_${new Date().toISOString().split('T')[0]}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    ElMessage.success('状态报告导出成功')
-  } catch (error) {
-    ElMessage.error('状态报告导出失败')
-    console.error('导出状态报告失败:', error)
-  }
-}
-
-// 组件卸载时清理定时器
-onUnmounted(() => {
-  if (monitoringTimer) {
-    clearInterval(monitoringTimer)
-    monitoringTimer = null
-  }
-})
 </script>
 
 <style scoped>
@@ -2573,9 +1504,11 @@ onUnmounted(() => {
 
   position: relative;
   display: grid;
-  gap: 20px;
+  /* 限制根网格始终使用可收缩单列，避免子内容把整页横向撑爆 */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
   min-height: 100%;
-  padding: 28px;
+  padding: 18px;
   color: var(--text-main);
   font-family: var(--font-body);
   background:
@@ -2599,25 +1532,39 @@ onUnmounted(() => {
 .website-collection > * {
   position: relative;
   z-index: 1;
+  /* 允许网格子项在可用宽度内收缩，避免右侧被裁切 */
+  min-width: 0;
+}
+
+.collection-top-panel {
+  display: grid;
+  /* 顶部面板保持单列可收缩，防止内部分类条目把面板撑出视口 */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  border-radius: 22px;
+  border: 1px solid rgba(201, 217, 239, 0.82);
+  background:
+    linear-gradient(
+      140deg,
+      rgba(255, 255, 255, 0.94) 0%,
+      rgba(246, 250, 255, 0.94) 58%,
+      rgba(255, 247, 238, 0.86) 100%
+    );
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.08);
+  padding: clamp(12px, 2vw, 18px);
+  backdrop-filter: blur(8px);
 }
 
 .page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 18px;
-  border-radius: var(--radius-xl);
-  border: 1px solid rgba(201, 217, 239, 0.76);
-  background:
-    linear-gradient(130deg, rgba(255, 255, 255, 0.95) 0%, rgba(247, 251, 255, 0.95) 54%, rgba(255, 247, 238, 0.9) 100%);
-  box-shadow: var(--shadow-soft);
-  padding: clamp(20px, 3vw, 30px);
-  backdrop-filter: blur(12px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px 14px;
 }
 
 .header-content {
   display: grid;
-  gap: 10px;
+  gap: 4px;
 }
 
 .page-title {
@@ -2627,7 +1574,7 @@ onUnmounted(() => {
   gap: 10px;
   color: var(--text-title);
   font-family: var(--font-display);
-  font-size: clamp(1.7rem, 2.8vw, 2.45rem);
+  font-size: clamp(1.36rem, 2vw, 1.86rem);
   line-height: 1.1;
   letter-spacing: -0.01em;
 }
@@ -2635,34 +1582,47 @@ onUnmounted(() => {
 .title-icon {
   display: inline-grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
   color: #1f4cc2;
+}
+
+.page-title .title-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: linear-gradient(145deg, #ebf2ff 0%, #ffffff 100%);
+  box-shadow: inset 0 0 0 1px #d7e3f9;
+}
+
+.title-container .title-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
   background: linear-gradient(145deg, #ebf2ff 0%, #ffffff 100%);
   box-shadow: inset 0 0 0 1px #d7e3f9;
 }
 
 .page-description {
   margin: 0;
-  max-width: 680px;
+  max-width: 100%;
   color: var(--text-secondary);
-  line-height: 1.75;
+  line-height: 1.45;
+  font-size: 13px;
 }
 
 .header-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 6px;
   max-width: 640px;
 }
 
 .header-actions :deep(.el-button) {
-  height: 42px;
-  border-radius: 12px;
-  padding: 0 16px;
+  height: 34px;
+  border-radius: 10px;
+  padding: 0 12px;
   font-weight: 600;
+  font-size: 13px;
   border-width: 1px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -2688,82 +1648,59 @@ onUnmounted(() => {
   color: #fff;
 }
 
-.header-actions :deep(.el-button--info) {
-  border-color: transparent;
-  background: linear-gradient(120deg, #64748b 0%, #475569 100%);
-}
-
 .category-filter {
   display: grid;
-  gap: 16px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--line-soft);
-  background: var(--bg-panel);
-  box-shadow: var(--shadow-soft);
-  padding: clamp(16px, 2.4vw, 24px);
+  /* 分类区同样固定为可收缩单列，配合标签换行避免页面整体溢出 */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
 }
 
 .category-header {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
-.header-left {
-  display: grid;
-  gap: 8px;
+.category-header-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
 }
 
 .title-container {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .category-title {
   color: var(--text-title);
-  font-family: var(--font-display);
-  font-size: clamp(1.2rem, 2.1vw, 1.45rem);
+  font-family: var(--font-body);
+  font-size: clamp(1rem, 1.6vw, 1.12rem);
+  font-weight: 700;
   letter-spacing: 0.01em;
 }
 
-.title-decoration {
-  width: 70px;
-  height: 8px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #2563eb 0%, rgba(37, 99, 235, 0) 100%);
-}
-
 .category-subtitle {
-  color: var(--text-secondary);
-  line-height: 1.65;
-  font-size: 14px;
-}
-
-.category-tips {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: fit-content;
-  border-radius: 999px;
-  border: 1px solid #d8e6fc;
-  background: #f3f8ff;
-  color: #4b6da8;
-  padding: 6px 12px;
+  color: #6c7f97;
+  line-height: 1.3;
   font-size: 12px;
-}
-
-.tip-icon {
-  color: var(--accent-strong);
+  white-space: nowrap;
 }
 
 .edit-mode-btn {
-  align-self: flex-start;
+  align-self: center;
   border-radius: 999px;
   border: 1px solid #c5d6f2;
   background: #f7faff;
   color: #456495;
   font-weight: 600;
+  height: 30px;
+  padding: 0 10px;
 }
 
 .edit-mode-btn.active {
@@ -2773,33 +1710,37 @@ onUnmounted(() => {
 }
 
 .categories-container {
-  border-radius: 16px;
-  border: 1px dashed #d0def4;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.84) 0%, rgba(246, 250, 255, 0.84) 100%);
-  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #d5e2f7;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.82) 0%, rgba(246, 250, 255, 0.82) 100%);
+  padding: 8px 10px;
 }
 
 .categories-container :deep(.el-radio-group) {
   width: 100%;
   display: flex;
+  /* 分类标签超出容器时自动换行，避免出现横向滚动条 */
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
+  overflow: visible;
 }
 
 .category-item {
   position: relative;
+  flex: 0 0 auto;
 }
 
 .category-item :deep(.el-radio-button__inner) {
   border: 1px solid #d6e3f8 !important;
-  border-radius: 12px !important;
+  border-radius: 10px !important;
   background: #ffffff !important;
   color: #334963 !important;
-  min-height: 40px;
-  padding: 9px 14px;
+  min-height: 34px;
+  padding: 6px 10px;
   line-height: 1;
   box-shadow: none !important;
   transition: all 0.2s ease;
+  font-size: 13px;
 }
 
 .category-item :deep(.el-radio-button__inner:hover) {
@@ -2813,7 +1754,7 @@ onUnmounted(() => {
   border-color: transparent !important;
   color: #ffffff !important;
   background: linear-gradient(125deg, #2563eb 0%, #4f46e5 100%) !important;
-  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.28) !important;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.22) !important;
 }
 
 .category-item.dragging {
@@ -2831,7 +1772,7 @@ onUnmounted(() => {
 }
 
 .category-text {
-  max-width: 140px;
+  max-width: 90px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2848,7 +1789,7 @@ onUnmounted(() => {
   border: none;
   border-radius: 999px;
   font-weight: 700;
-  padding: 0 8px;
+  padding: 0 7px;
   color: #45618f;
   background: rgba(225, 236, 255, 0.92);
 }
@@ -2865,9 +1806,9 @@ onUnmounted(() => {
 .edit-category-btn,
 .delete-category-btn {
   position: absolute;
-  top: -8px;
-  width: 24px;
-  height: 24px;
+  top: -6px;
+  width: 22px;
+  height: 22px;
   border: none;
   box-shadow: 0 8px 16px rgba(15, 23, 42, 0.15);
 }
@@ -2883,10 +1824,10 @@ onUnmounted(() => {
 .drag-handle {
   position: absolute;
   right: 8px;
-  bottom: -7px;
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
+  bottom: -5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
   display: grid;
   place-items: center;
   color: #4f6ea0;
@@ -2901,69 +1842,80 @@ onUnmounted(() => {
 }
 
 .search-section {
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--line-soft);
-  background: var(--bg-panel);
-  box-shadow: var(--shadow-soft);
-  padding: clamp(16px, 2.4vw, 24px);
+  border-radius: 12px;
+  border: 1px solid #d5e2f7;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.82) 0%, rgba(247, 250, 255, 0.82) 100%);
+  box-shadow: none;
+  padding: 8px 10px;
+}
+
+.search-section.compact-search {
+  margin-top: 2px;
 }
 
 .search-container {
   display: grid;
-  gap: 12px;
+  grid-template-columns: auto minmax(240px, 1fr);
+  align-items: center;
+  gap: 8px 14px;
 }
 
 .search-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .search-title-container {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .search-title {
   color: var(--text-title);
-  font-family: var(--font-display);
-  font-size: clamp(1.16rem, 2vw, 1.36rem);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .search-title-decoration {
-  width: 72px;
-  height: 8px;
+  width: 40px;
+  height: 5px;
   border-radius: 999px;
   background: linear-gradient(90deg, #f97316 0%, rgba(249, 115, 22, 0) 100%);
 }
 
 .search-subtitle {
-  color: var(--text-secondary);
-  font-size: 13px;
+  color: #6c7f97;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .search-input-wrapper {
   position: relative;
+  width: 100%;
+  min-width: 0;
 }
 
 .search-input :deep(.el-input__wrapper) {
-  border-radius: 14px;
+  border-radius: 10px;
   border: 1px solid #d3e1f7;
   background: #ffffff;
   box-shadow: 0 1px 0 rgba(148, 163, 184, 0.08);
   transition: all 0.2s ease;
-  min-height: 46px;
+  min-height: 38px;
 }
 
 .search-input.focused :deep(.el-input__wrapper),
 .search-input :deep(.el-input__wrapper.is-focus) {
   border-color: #74a0ea;
   box-shadow:
-    0 0 0 4px rgba(37, 99, 235, 0.12),
-    0 10px 22px rgba(37, 99, 235, 0.12);
+    0 0 0 3px rgba(37, 99, 235, 0.12),
+    0 6px 16px rgba(37, 99, 235, 0.1);
 }
 
 .search-input :deep(.el-input__inner) {
@@ -4055,11 +3007,15 @@ onUnmounted(() => {
 
 @media (max-width: 1200px) {
   .website-collection {
-    padding: 20px;
+    padding: 16px;
+  }
+
+  .collection-top-panel {
+    gap: 10px;
   }
 
   .page-header {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 
   .header-actions {
@@ -4067,16 +3023,31 @@ onUnmounted(() => {
     justify-content: flex-start;
     max-width: none;
   }
+
+  .search-container {
+    grid-template-columns: 1fr;
+  }
+
+  .search-header {
+    justify-content: space-between;
+  }
 }
 
 @media (max-width: 900px) {
   .category-header,
-  .search-header,
   .control-header,
   .statistics-header,
   .list-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .category-subtitle {
+    white-space: normal;
+  }
+
+  .search-subtitle {
+    display: none;
   }
 
   .pagination-controls {
@@ -4109,27 +3080,30 @@ onUnmounted(() => {
 
 @media (max-width: 680px) {
   .website-collection {
-    padding: 12px;
-    gap: 14px;
+    padding: 10px;
+    gap: 10px;
   }
 
-  .page-header,
-  .category-filter,
-  .search-section,
+  .collection-top-panel,
   .pagination-container,
   .monitor-control-panel,
   .status-statistics,
   .status-list {
-    border-radius: 14px;
-    padding: 12px;
+    border-radius: 12px;
+    padding: 10px;
+  }
+
+  .search-section {
+    padding: 8px;
   }
 
   .page-title {
-    font-size: 1.45rem;
+    font-size: 1.24rem;
   }
 
   .header-actions :deep(.el-button) {
-    flex: 1 1 calc(50% - 6px);
+    flex: 1 1 calc(33.333% - 4px);
+    min-width: 108px;
   }
 
   .websites-grid {

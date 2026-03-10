@@ -22,9 +22,6 @@ const api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   (config) => {
-    // 在发送请求之前做些什么
-    console.log('Request:', config.method?.toUpperCase(), config.url)
-    
     // 为Git相关操作设置更长的超时时间（5分钟）
     // 包括: /git-*, /smart-commit, /continue-commit, /abort-commit
     if (config.url?.includes('/git-') || 
@@ -48,7 +45,6 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => {
     // 对响应数据做点什么
-    console.log('Response:', response.status, response.config.url)
     return response
   },
   (error) => {

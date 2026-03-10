@@ -1,0 +1,1836 @@
+<template>
+  <div class="stats-page">
+    <div class="stats-aurora stats-aurora--violet"></div>
+    <div class="stats-aurora stats-aurora--peach"></div>
+    <div class="stats-grid-overlay"></div>
+
+    <div class="stats-shell">
+      <section class="hero-panel">
+        <div class="hero-copy">
+          <div class="hero-badges">
+            <p class="hero-eyebrow">Data Atelier</p>
+            <span class="hero-mode">浅色主题</span>
+          </div>
+
+          <div class="hero-heading">
+            <h1 class="hero-title">内容统计中心</h1>
+            <p class="hero-description">
+              聚焦内容结构与更新质量，从标签密度、内容深度、新鲜度和发布节奏快速洞察站点状态。
+            </p>
+          </div>
+
+          <div class="hero-tags">
+            <span class="hero-tag">主导分类 · {{ mergedCategoryShare[0]?.name || '暂无数据' }}</span>
+            <span class="hero-tag">最热标签 · {{ topTags[0]?.name || '暂无数据' }}</span>
+            <span class="hero-tag">近 30 天 · {{ freshPostsCount }} 篇新内容</span>
+          </div>
+        </div>
+
+        <div class="hero-command">
+          <div class="command-card command-card--action">
+            <div class="command-head">
+              <div>
+                <span class="command-label">数据同步</span>
+                <strong class="command-title">实时刷新统计快照</strong>
+              </div>
+              <span class="command-badge">Live</span>
+            </div>
+
+            <button class="refresh-button" :disabled="loading" @click="refresh">
+              <el-icon class="refresh-icon" :class="{ 'is-spinning': loading }">
+                <RefreshLeft />
+              </el-icon>
+              <span>{{ loading ? '正在同步...' : '刷新数据' }}</span>
+            </button>
+
+            <p class="updated-at">最近同步：{{ formattedUpdatedAt }}</p>
+          </div>
+
+          <div class="hero-status-grid">
+            <article class="status-tile">
+              <span class="status-label">本月变化</span>
+              <strong class="status-value" :class="{ 'is-negative': monthlyGrowth < 0 }">
+                {{ monthlyGrowth >= 0 ? '+' : '' }}{{ monthlyGrowth }}%
+              </strong>
+            </article>
+            <article class="status-tile">
+              <span class="status-label">内容健康分</span>
+              <strong class="status-value">{{ contentScore }}</strong>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="insight-strip">
+        <article class="insight-chip">
+          <span class="insight-index">01</span>
+          <span class="insight-label">主导分类</span>
+          <strong class="insight-value">{{ mergedCategoryShare[0]?.name || '暂无数据' }}</strong>
+          <span class="insight-sub">{{ mergedCategoryShare[0]?.percentage ?? 0 }}% 占比</span>
+        </article>
+        <article class="insight-chip">
+          <span class="insight-index">02</span>
+          <span class="insight-label">最热标签</span>
+          <strong class="insight-value">{{ topTags[0]?.name || '暂无数据' }}</strong>
+          <span class="insight-sub">{{ topTags[0]?.count ?? 0 }} 次触达</span>
+        </article>
+        <article class="insight-chip">
+          <span class="insight-index">03</span>
+          <span class="insight-label">新鲜内容占比</span>
+          <strong class="insight-value">{{ freshPostsRate }}%</strong>
+          <span class="insight-sub">近 30 天 {{ freshPostsCount }} 篇</span>
+        </article>
+      </section>
+
+      <section class="metric-grid">
+        <article
+          v-for="(card, index) in summaryCards"
+          :key="card.key"
+          class="metric-card"
+          :style="{ '--delay': `${index * 70}ms`, '--accent': card.accent }"
+        >
+          <div class="metric-topline">
+            <p class="metric-label">{{ card.label }}</p>
+            <span class="metric-accent-dot"></span>
+          </div>
+          <p class="metric-value-row">
+            <span class="metric-value">{{ formatValue(card.value, card.format) }}</span>
+            <span class="metric-unit">{{ card.unit }}</span>
+          </p>
+          <p class="metric-helper">{{ card.helper }}</p>
+          <div class="metric-ribbon"></div>
+          <div class="metric-glow"></div>
+        </article>
+      </section>
+
+      <div v-if="errorMessage" class="error-banner">
+        <p>{{ errorMessage }}</p>
+        <button class="error-action" @click="refresh">重试加载</button>
+      </div>
+
+      <section v-if="loading" class="loading-board">
+        <div class="loading-line" v-for="index in 8" :key="index"></div>
+      </section>
+
+      <section v-else-if="hasNoData" class="empty-board">
+        <h2>暂无统计数据</h2>
+        <p>当前项目还没有可用文章，请先在首页创建或导入内容。</p>
+      </section>
+
+      <section v-else class="chart-grid">
+        <article class="chart-card chart-card--interactive trend-card">
+          <header class="chart-header">
+            <div>
+              <p class="chart-kicker">Publishing Rhythm</p>
+              <h3>发布趋势（近 6 个月）</h3>
+            </div>
+            <span>{{ stats.monthlyTrend.reduce((sum, item) => sum + item.count, 0) }} 篇</span>
+          </header>
+
+          <div class="trend-panel">
+            <svg
+              class="trend-svg"
+              :viewBox="`0 0 ${TREND_WIDTH} ${TREND_HEIGHT}`"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id="trendAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="rgba(99, 102, 241, 0.32)" />
+                  <stop offset="60%" stop-color="rgba(139, 92, 246, 0.12)" />
+                  <stop offset="100%" stop-color="rgba(255, 255, 255, 0.02)" />
+                </linearGradient>
+              </defs>
+
+              <line
+                v-for="tick in trendGrid"
+                :key="`line-${tick.y}`"
+                :x1="TREND_PADDING_X"
+                :x2="TREND_WIDTH - TREND_PADDING_X"
+                :y1="tick.y"
+                :y2="tick.y"
+                class="trend-grid-line"
+              />
+
+              <text
+                v-for="tick in trendGrid"
+                :key="`label-${tick.y}`"
+                :x="12"
+                :y="tick.y + 4"
+                class="trend-grid-text"
+              >
+                {{ tick.value }}
+              </text>
+
+              <line
+                v-if="activeTrendPoint"
+                class="trend-focus-line"
+                :x1="activeTrendPoint.x"
+                :x2="activeTrendPoint.x"
+                :y1="TREND_PADDING_Y"
+                :y2="TREND_HEIGHT - TREND_PADDING_Y"
+              />
+
+              <path class="trend-area" :d="trendArea"></path>
+              <polyline
+                class="trend-line"
+                :class="{ 'is-focused': Boolean(activeTrendPoint) }"
+                :points="trendPath"
+              ></polyline>
+
+              <g
+                v-for="point in trendPoints"
+                :key="point.label"
+                class="trend-point-group"
+                :class="{
+                  'is-active': isHoveredItem('trend', point.label),
+                  'is-dimmed': isDimmedItem('trend', point.label),
+                }"
+                @mouseenter="setHoveredItem('trend', point.label)"
+                @mouseleave="clearHoveredItem('trend')"
+              >
+                <circle
+                  class="trend-point-halo"
+                  :cx="point.x"
+                  :cy="point.y"
+                  :r="isHoveredItem('trend', point.label) ? 18 : 11"
+                />
+                <circle
+                  class="trend-point"
+                  :cx="point.x"
+                  :cy="point.y"
+                  :r="isHoveredItem('trend', point.label) ? 7 : 5"
+                />
+                <text
+                  class="trend-point-value"
+                  :x="point.x"
+                  :y="isHoveredItem('trend', point.label) ? point.y - 18 : point.y - 11"
+                >
+                  {{ point.count }}
+                </text>
+              </g>
+            </svg>
+          </div>
+
+          <div class="trend-label-row">
+            <span
+              v-for="point in trendPoints"
+              :key="point.label"
+              class="trend-month"
+              :class="{ 'is-active': isHoveredItem('trend', point.label) }"
+              tabindex="0"
+              @mouseenter="setHoveredItem('trend', point.label)"
+              @mouseleave="clearHoveredItem('trend')"
+              @focus="setHoveredItem('trend', point.label)"
+              @blur="clearHoveredItem('trend')"
+            >
+              {{ point.label.slice(5) }}
+            </span>
+          </div>
+        </article>
+
+        <article class="chart-card chart-card--interactive donut-card">
+          <header class="chart-header">
+            <div>
+              <p class="chart-kicker">Category Blend</p>
+              <h3>分类占比</h3>
+            </div>
+            <span>总文章 {{ formatInteger(stats.summary.totalPosts) }}</span>
+          </header>
+
+          <div class="donut-content">
+            <div class="donut-shell">
+              <svg viewBox="0 0 220 220">
+                <circle class="donut-track" cx="110" cy="110" :r="DONUT_RADIUS" />
+                <circle
+                  v-for="segment in donutSegments"
+                  :key="segment.name"
+                  class="donut-segment"
+                  :class="{
+                    'is-active': isHoveredItem('donut', segment.name),
+                    'is-dimmed': isDimmedItem('donut', segment.name),
+                  }"
+                  cx="110"
+                  cy="110"
+                  :r="DONUT_RADIUS"
+                  :stroke="segment.color"
+                  :stroke-dasharray="segment.dashArray"
+                  :stroke-dashoffset="segment.dashOffset"
+                  @mouseenter="setHoveredItem('donut', segment.name)"
+                  @mouseleave="clearHoveredItem('donut')"
+                />
+              </svg>
+              <div class="donut-center">
+                <strong>{{ donutCenterValue }}</strong>
+                <span>{{ donutCenterLabel }}</span>
+              </div>
+            </div>
+
+            <ul class="legend-list">
+              <li
+                v-for="segment in donutSegments"
+                :key="`legend-${segment.name}`"
+                class="legend-item"
+                :class="{
+                  'is-active': isHoveredItem('donut', segment.name),
+                  'is-dimmed': isDimmedItem('donut', segment.name),
+                }"
+                tabindex="0"
+                @mouseenter="setHoveredItem('donut', segment.name)"
+                @mouseleave="clearHoveredItem('donut')"
+                @focus="setHoveredItem('donut', segment.name)"
+                @blur="clearHoveredItem('donut')"
+              >
+                <span class="legend-dot" :style="{ backgroundColor: segment.color }"></span>
+                <span class="legend-name">{{ segment.name }}</span>
+                <span class="legend-value">{{ segment.count }} / {{ segment.percentage }}%</span>
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="chart-card chart-card--interactive small-card">
+          <header class="chart-header">
+            <div>
+              <p class="chart-kicker">Tag Attention</p>
+              <h3>标签热度 Top 8</h3>
+            </div>
+            <span>主题曝光</span>
+          </header>
+          <div class="bars-list">
+            <article
+              v-for="(tag, index) in topTagBars"
+              :key="tag.name"
+              class="bars-row bars-row--interactive"
+              :class="{
+                'is-active': isHoveredItem('tagHeat', tag.name),
+                'is-dimmed': isDimmedItem('tagHeat', tag.name),
+              }"
+              :style="{ '--delay': `${index * 60}ms`, '--bar-color': tag.color }"
+              tabindex="0"
+              @mouseenter="setHoveredItem('tagHeat', tag.name)"
+              @mouseleave="clearHoveredItem('tagHeat')"
+              @focus="setHoveredItem('tagHeat', tag.name)"
+              @blur="clearHoveredItem('tagHeat')"
+            >
+              <div class="bars-head">
+                <span>{{ tag.name }}</span>
+                <strong>{{ tag.count }}</strong>
+              </div>
+              <div class="bars-track">
+                <span class="bars-fill" :style="{ width: `${tag.ratio * 100}%` }"></span>
+              </div>
+            </article>
+          </div>
+        </article>
+
+        <article class="chart-card chart-card--interactive small-card">
+          <header class="chart-header">
+            <div>
+              <p class="chart-kicker">Tag Density</p>
+              <h3>标签密度结构</h3>
+            </div>
+            <span>每篇标签数</span>
+          </header>
+          <div class="bars-list">
+            <article
+              v-for="(bar, index) in tagDensityBars"
+              :key="bar.label"
+              class="bars-row bars-row--interactive"
+              :class="{
+                'is-active': isHoveredItem('tagDensity', bar.label),
+                'is-dimmed': isDimmedItem('tagDensity', bar.label),
+              }"
+              :style="{ '--delay': `${index * 50}ms`, '--bar-color': bar.color }"
+              tabindex="0"
+              @mouseenter="setHoveredItem('tagDensity', bar.label)"
+              @mouseleave="clearHoveredItem('tagDensity')"
+              @focus="setHoveredItem('tagDensity', bar.label)"
+              @blur="clearHoveredItem('tagDensity')"
+            >
+              <div class="bars-head">
+                <span>{{ bar.label }}</span>
+                <strong>{{ bar.count }}</strong>
+              </div>
+              <div class="bars-track">
+                <span class="bars-fill" :style="{ width: `${bar.ratio * 100}%` }"></span>
+              </div>
+            </article>
+          </div>
+        </article>
+
+        <article class="chart-card chart-card--interactive small-card">
+          <header class="chart-header">
+            <div>
+              <p class="chart-kicker">Content Depth</p>
+              <h3>内容深度分布</h3>
+            </div>
+            <span>按长度估算</span>
+          </header>
+          <div class="depth-columns">
+            <article
+              v-for="bar in contentDepthBars"
+              :key="bar.label"
+              class="depth-column chart-column"
+              :class="{
+                'is-active': isHoveredItem('contentDepth', bar.label),
+                'is-dimmed': isDimmedItem('contentDepth', bar.label),
+              }"
+              :style="{ '--column-color': bar.color }"
+              tabindex="0"
+              @mouseenter="setHoveredItem('contentDepth', bar.label)"
+              @mouseleave="clearHoveredItem('contentDepth')"
+              @focus="setHoveredItem('contentDepth', bar.label)"
+              @blur="clearHoveredItem('contentDepth')"
+            >
+              <span class="depth-count">{{ bar.count }}</span>
+              <div class="depth-track">
+                <span class="depth-fill" :style="{ height: `${Math.max(bar.ratio * 100, 5)}%` }"></span>
+              </div>
+              <span class="depth-label">{{ bar.label }}</span>
+            </article>
+          </div>
+        </article>
+
+        <article class="chart-card chart-card--interactive small-card">
+          <header class="chart-header">
+            <div>
+              <p class="chart-kicker">Freshness Pulse</p>
+              <h3>内容新鲜度</h3>
+            </div>
+            <span>时间分层</span>
+          </header>
+          <div class="bars-list">
+            <article
+              v-for="(bar, index) in recencyBars"
+              :key="bar.label"
+              class="bars-row bars-row--interactive"
+              :class="{
+                'is-active': isHoveredItem('recency', bar.label),
+                'is-dimmed': isDimmedItem('recency', bar.label),
+              }"
+              :style="{ '--delay': `${index * 50}ms`, '--bar-color': bar.color }"
+              tabindex="0"
+              @mouseenter="setHoveredItem('recency', bar.label)"
+              @mouseleave="clearHoveredItem('recency')"
+              @focus="setHoveredItem('recency', bar.label)"
+              @blur="clearHoveredItem('recency')"
+            >
+              <div class="bars-head">
+                <span>{{ bar.label }}</span>
+                <strong>{{ (bar.ratio * 100).toFixed(1) }}%</strong>
+              </div>
+              <div class="bars-track">
+                <span class="bars-fill" :style="{ width: `${bar.ratio * 100}%` }"></span>
+              </div>
+            </article>
+          </div>
+        </article>
+
+        <article class="chart-card chart-card--interactive small-card">
+          <header class="chart-header">
+            <div>
+              <p class="chart-kicker">Time Distribution</p>
+              <h3>发布时间段分布</h3>
+            </div>
+            <span>UTC</span>
+          </header>
+          <div class="hour-columns">
+            <article
+              v-for="bar in hourBars"
+              :key="bar.label"
+              class="hour-column chart-column"
+              :class="{
+                'is-active': isHoveredItem('hour', bar.label),
+                'is-dimmed': isDimmedItem('hour', bar.label),
+              }"
+              :style="{ '--column-color': bar.color }"
+              tabindex="0"
+              @mouseenter="setHoveredItem('hour', bar.label)"
+              @mouseleave="clearHoveredItem('hour')"
+              @focus="setHoveredItem('hour', bar.label)"
+              @blur="clearHoveredItem('hour')"
+            >
+              <span class="hour-count">{{ bar.count }}</span>
+              <div class="hour-track">
+                <span class="hour-fill" :style="{ height: `${Math.max(bar.ratio * 100, 5)}%` }"></span>
+              </div>
+              <span class="hour-label">{{ bar.label }}</span>
+            </article>
+          </div>
+        </article>
+
+        <article class="chart-card chart-card--interactive small-card">
+          <header class="chart-header">
+            <div>
+              <p class="chart-kicker">Weekly Heat</p>
+              <h3>周内活跃热度</h3>
+            </div>
+            <span>Mon-Sun</span>
+          </header>
+          <div class="weekday-grid">
+            <article
+              v-for="cell in weekdayCells"
+              :key="cell.label"
+              class="weekday-cell"
+              :class="{
+                'is-active': isHoveredItem('weekday', cell.label),
+                'is-dimmed': isDimmedItem('weekday', cell.label),
+              }"
+              :style="{ '--heat': `${0.2 + cell.ratio * 0.8}` }"
+              tabindex="0"
+              @mouseenter="setHoveredItem('weekday', cell.label)"
+              @mouseleave="clearHoveredItem('weekday')"
+              @focus="setHoveredItem('weekday', cell.label)"
+              @blur="clearHoveredItem('weekday')"
+            >
+              <span class="weekday-name">{{ cell.label }}</span>
+              <strong class="weekday-count">{{ cell.count }}</strong>
+            </article>
+          </div>
+        </article>
+      </section>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap');
+
+/* 视觉基座：沿用全站浅色 token，并为统计页叠加更轻盈的未来感背景。 */
+.stats-page {
+  --stats-ink: var(--text-main);
+  --stats-ink-soft: var(--text-secondary);
+  --stats-ink-soft-strong: #5b648b;
+  --stats-border: rgba(99, 102, 241, 0.12);
+  --stats-border-strong: rgba(99, 102, 241, 0.22);
+  --stats-surface: rgba(255, 255, 255, 0.76);
+  --stats-surface-strong: rgba(255, 255, 255, 0.94);
+  --stats-shadow: 0 34px 80px rgba(99, 102, 241, 0.12), 0 18px 34px rgba(15, 23, 42, 0.07);
+  --stats-card-shadow: 0 22px 48px rgba(99, 102, 241, 0.1), 0 12px 22px rgba(15, 23, 42, 0.05);
+  position: relative;
+  min-height: calc(100vh - 64px);
+  padding: 28px clamp(14px, 2vw, 34px) 48px;
+  overflow: hidden;
+  background:
+    radial-gradient(1200px 620px at -10% -12%, rgba(99, 102, 241, 0.18) 0%, transparent 70%),
+    radial-gradient(840px 520px at 105% 4%, rgba(236, 72, 153, 0.14) 0%, transparent 72%),
+    radial-gradient(680px 420px at 55% 100%, rgba(14, 165, 233, 0.12) 0%, transparent 76%),
+    linear-gradient(180deg, #fdfdff 0%, #f6f8ff 38%, #f4f7ff 100%);
+  color: var(--stats-ink);
+}
+
+.stats-grid-overlay {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(99, 102, 241, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0));
+  pointer-events: none;
+}
+
+.stats-aurora {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(14px);
+  opacity: 0.72;
+  animation: auroraFloat 16s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.stats-aurora--violet {
+  width: 360px;
+  height: 360px;
+  left: -120px;
+  top: -80px;
+  background: radial-gradient(circle, rgba(129, 140, 248, 0.3) 0%, rgba(129, 140, 248, 0) 72%);
+}
+
+.stats-aurora--peach {
+  width: 320px;
+  height: 320px;
+  right: -86px;
+  top: 120px;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.26) 0%, rgba(251, 191, 36, 0) 72%);
+  animation-delay: -4s;
+}
+
+.stats-shell {
+  position: relative;
+  z-index: 2;
+  max-width: 1680px;
+  margin: 0 auto;
+  display: grid;
+  gap: 16px;
+}
+
+/* 英雄区：保留原有入口信息，仅重组层级和版式，让首屏更有舞台感。 */
+.hero-panel,
+.command-card,
+.status-tile,
+.insight-chip,
+.metric-card,
+.chart-card,
+.legend-item,
+.bars-row--interactive,
+.chart-column,
+.weekday-cell,
+.refresh-button,
+.error-action,
+.trend-month {
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    border-color var(--transition-normal),
+    background var(--transition-normal),
+    opacity var(--transition-fast),
+    color var(--transition-fast),
+    filter var(--transition-fast);
+}
+
+.hero-panel {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.92fr);
+  gap: clamp(16px, 2vw, 22px);
+  padding: clamp(20px, 2.2vw, 28px);
+  border-radius: 34px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.66));
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: var(--stats-shadow);
+  backdrop-filter: blur(22px) saturate(165%);
+  overflow: hidden;
+  animation: riseIn 0.65s var(--ease-out);
+}
+
+.hero-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(99, 102, 241, 0.08), transparent 34%),
+    radial-gradient(circle at 82% 18%, rgba(236, 72, 153, 0.12), transparent 26%);
+  pointer-events: none;
+}
+
+.hero-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-panel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 42px 90px rgba(99, 102, 241, 0.15), 0 18px 32px rgba(15, 23, 42, 0.06);
+}
+
+.hero-copy {
+  display: grid;
+  align-content: space-between;
+  gap: 22px;
+}
+
+.hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hero-eyebrow,
+.hero-mode {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-family: 'Outfit', var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hero-eyebrow {
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--primary-color);
+}
+
+.hero-mode {
+  background: rgba(236, 72, 153, 0.12);
+  color: var(--accent-color);
+}
+
+.hero-heading {
+  display: grid;
+  gap: 16px;
+}
+
+.hero-title {
+  margin: 0;
+  max-width: 8.4ch;
+  font-family: 'Outfit', 'Noto Sans SC', var(--font-sans);
+  font-size: clamp(36px, 5vw, 68px);
+  line-height: 0.96;
+  letter-spacing: -0.06em;
+}
+
+.hero-description {
+  margin: 0;
+  max-width: 56ch;
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--stats-ink-soft);
+}
+
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hero-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(99, 102, 241, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88), 0 10px 18px rgba(15, 23, 42, 0.05);
+  font-size: 13px;
+  color: var(--stats-ink-soft-strong);
+}
+
+.hero-command {
+  display: grid;
+  gap: 14px;
+  align-content: stretch;
+}
+
+.command-card {
+  padding: 18px;
+  border-radius: 28px;
+  background: linear-gradient(145deg, rgba(99, 102, 241, 0.14), rgba(236, 72, 153, 0.08) 55%, rgba(255, 255, 255, 0.78));
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76), 0 20px 34px rgba(99, 102, 241, 0.08);
+}
+
+.command-card--action:hover {
+  transform: translateY(-3px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84), 0 24px 40px rgba(99, 102, 241, 0.12);
+}
+
+.command-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.command-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--stats-ink-soft-strong);
+}
+
+.command-title {
+  display: block;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.command-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(99, 102, 241, 0.14);
+  font-family: 'Outfit', var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.refresh-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  width: 100%;
+  border-radius: 18px;
+  border: none;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 58%, #ec4899 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 18px 36px rgba(99, 102, 241, 0.24);
+}
+
+.refresh-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 44px rgba(99, 102, 241, 0.3);
+}
+
+.refresh-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.82;
+}
+
+.refresh-icon.is-spinning {
+  animation: rotate360 0.9s linear infinite;
+}
+
+.updated-at {
+  margin: 14px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--stats-ink-soft-strong);
+}
+
+.hero-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.status-tile {
+  position: relative;
+  overflow: hidden;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.72));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88), 0 18px 28px rgba(99, 102, 241, 0.08);
+}
+
+.status-tile::after {
+  content: '';
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  right: -42px;
+  bottom: -70px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(129, 140, 248, 0.18) 0%, rgba(129, 140, 248, 0) 72%);
+}
+
+.status-tile:hover {
+  transform: translateY(-4px);
+  border-color: var(--stats-border-strong);
+  box-shadow: 0 24px 34px rgba(99, 102, 241, 0.12);
+}
+
+.status-label {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--stats-ink-soft-strong);
+}
+
+.status-value {
+  position: relative;
+  z-index: 1;
+  font-family: 'Outfit', var(--font-sans);
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, #4f46e5 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.status-value.is-negative {
+  background: none;
+  -webkit-text-fill-color: initial;
+  color: var(--danger-color);
+}
+
+/* 洞察卡和指标卡：继续使用原有数据，只在视觉上强化主次和节奏。 */
+.insight-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.insight-chip {
+  position: relative;
+  overflow: hidden;
+  padding: 20px 18px 18px 74px;
+  border-radius: 26px;
+  border: 1px solid var(--stats-border);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.68));
+  box-shadow: var(--stats-card-shadow);
+}
+
+.insight-chip::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06), transparent 42%, rgba(236, 72, 153, 0.08));
+  pointer-events: none;
+}
+
+.insight-chip:hover {
+  transform: translateY(-4px);
+  border-color: var(--stats-border-strong);
+  box-shadow: 0 28px 48px rgba(99, 102, 241, 0.14), 0 12px 20px rgba(15, 23, 42, 0.05);
+}
+
+.insight-index {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-family: 'Outfit', var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  box-shadow: 0 12px 22px rgba(99, 102, 241, 0.24);
+}
+
+.insight-label,
+.insight-value,
+.insight-sub {
+  position: relative;
+  z-index: 1;
+}
+
+.insight-label {
+  font-size: 12px;
+  color: var(--stats-ink-soft-strong);
+}
+
+.insight-value {
+  display: block;
+  margin-top: 10px;
+  font-size: 24px;
+  line-height: 1.3;
+}
+
+.insight-sub {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--stats-ink-soft);
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.metric-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 176px;
+  padding: 18px 18px 20px;
+  border-radius: 26px;
+  border: 1px solid var(--stats-border);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.72));
+  box-shadow: var(--stats-card-shadow);
+  animation: riseIn 0.6s var(--ease-out) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 18px;
+  right: 18px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), rgba(255, 255, 255, 0.94));
+}
+
+.metric-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--stats-border-strong);
+  box-shadow: 0 30px 52px rgba(99, 102, 241, 0.14), 0 12px 20px rgba(15, 23, 42, 0.05);
+}
+
+.metric-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.metric-label {
+  margin: 0;
+  font-size: 13px;
+  color: var(--stats-ink-soft-strong);
+}
+
+.metric-accent-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 8px rgba(99, 102, 241, 0.06);
+}
+
+.metric-value-row {
+  margin: 28px 0 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.metric-value {
+  font-family: 'Outfit', var(--font-sans);
+  font-size: clamp(34px, 3vw, 48px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.metric-unit {
+  font-size: 13px;
+  color: var(--stats-ink-soft-strong);
+}
+
+.metric-helper {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--stats-ink-soft);
+}
+
+.metric-ribbon {
+  position: absolute;
+  width: 86px;
+  height: 86px;
+  right: 18px;
+  bottom: 14px;
+  border-radius: 26px;
+  background: linear-gradient(135deg, var(--accent), rgba(255, 255, 255, 0.98));
+  opacity: 0.16;
+  transform: rotate(12deg);
+}
+
+.metric-glow {
+  position: absolute;
+  width: 170px;
+  height: 170px;
+  right: -72px;
+  top: -70px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent) 0%, rgba(255, 255, 255, 0) 72%);
+  opacity: 0.14;
+}
+
+.error-banner,
+.loading-board,
+.empty-board {
+  border-radius: 26px;
+  border: 1px solid var(--stats-border);
+  background: var(--stats-surface-strong);
+  box-shadow: var(--stats-card-shadow);
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  color: var(--danger-color);
+}
+
+.error-action {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+  color: #fff;
+  font-weight: 700;
+}
+
+.error-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 28px rgba(239, 68, 68, 0.24);
+}
+
+.loading-board {
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.loading-line {
+  height: 16px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(226, 232, 240, 0.45) 0%, rgba(165, 180, 252, 0.52) 45%, rgba(226, 232, 240, 0.45) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.empty-board {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.empty-board h2 {
+  margin: 0 0 10px;
+  font-size: 28px;
+}
+
+.empty-board p {
+  margin: 0;
+  color: var(--stats-ink-soft);
+}
+
+/* 图表区域：统一卡片语言，再通过 hover / focus 强化可读性和点击反馈。 */
+.chart-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.chart-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 30px;
+  border: 1px solid var(--stats-border);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.72));
+  box-shadow: var(--stats-card-shadow);
+  backdrop-filter: blur(18px) saturate(160%);
+  padding: 20px;
+}
+
+.chart-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.9), rgba(139, 92, 246, 0.84), rgba(236, 72, 153, 0.74));
+}
+
+.chart-card::after {
+  content: '';
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  right: -82px;
+  top: -92px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.16) 0%, rgba(99, 102, 241, 0) 74%);
+  pointer-events: none;
+}
+
+.chart-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.chart-card--interactive:hover {
+  transform: translateY(-6px);
+  border-color: var(--stats-border-strong);
+  box-shadow: 0 34px 64px rgba(99, 102, 241, 0.16), 0 18px 28px rgba(15, 23, 42, 0.08);
+}
+
+.chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.chart-header > div {
+  display: grid;
+  gap: 4px;
+}
+
+.chart-kicker {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--stats-ink-soft-strong);
+}
+
+.chart-header h3 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.3;
+}
+
+.chart-header span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.1);
+  font-size: 12px;
+  color: var(--stats-ink-soft-strong);
+}
+
+.trend-card {
+  grid-column: span 7;
+}
+
+.donut-card {
+  grid-column: span 5;
+}
+
+.small-card {
+  grid-column: span 4;
+}
+
+.trend-panel {
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(247, 248, 255, 0.9), rgba(255, 255, 255, 0.62));
+  border: 1px solid rgba(99, 102, 241, 0.08);
+  padding: 8px 0 4px;
+}
+
+.trend-svg {
+  width: 100%;
+  height: 280px;
+  overflow: visible;
+}
+
+.trend-grid-line {
+  stroke: rgba(148, 163, 184, 0.3);
+}
+
+.trend-grid-text {
+  fill: rgba(91, 100, 139, 0.72);
+  font-size: 10px;
+}
+
+.trend-area {
+  fill: url(#trendAreaGradient);
+}
+
+.trend-focus-line {
+  stroke: rgba(99, 102, 241, 0.24);
+  stroke-width: 2;
+  stroke-dasharray: 5 6;
+}
+
+.trend-line {
+  fill: none;
+  stroke: #6366f1;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 12px 22px rgba(99, 102, 241, 0.2));
+}
+
+.trend-line.is-focused {
+  filter: drop-shadow(0 16px 28px rgba(99, 102, 241, 0.28));
+}
+
+.trend-point-group {
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.trend-point-group.is-dimmed {
+  opacity: 0.36;
+}
+
+.trend-point-halo {
+  fill: rgba(99, 102, 241, 0.1);
+  transition: r var(--transition-fast), fill var(--transition-fast), opacity var(--transition-fast);
+}
+
+.trend-point-group.is-active .trend-point-halo {
+  fill: rgba(99, 102, 241, 0.18);
+}
+
+.trend-point {
+  fill: #fff;
+  stroke: #6366f1;
+  stroke-width: 3;
+  transition: r var(--transition-fast), filter var(--transition-fast), fill var(--transition-fast);
+}
+
+.trend-point-group.is-active .trend-point {
+  fill: #eef2ff;
+  filter: drop-shadow(0 8px 16px rgba(99, 102, 241, 0.22));
+}
+
+.trend-point-value {
+  fill: #4f46e5;
+  font-size: 11px;
+  text-anchor: middle;
+  font-weight: 700;
+  transition: fill var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
+}
+
+.trend-point-group.is-active .trend-point-value {
+  fill: #312e81;
+}
+
+.trend-label-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 14px;
+  padding: 6px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(99, 102, 241, 0.08);
+}
+
+.trend-month {
+  padding: 10px 8px;
+  border-radius: 14px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--stats-ink-soft);
+  cursor: pointer;
+  outline: none;
+}
+
+.trend-month:hover,
+.trend-month.is-active,
+.trend-month:focus-visible {
+  color: #4f46e5;
+  background: rgba(99, 102, 241, 0.12);
+  transform: translateY(-1px);
+}
+
+.donut-content {
+  display: grid;
+  grid-template-columns: minmax(0, 250px) minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+
+.donut-shell {
+  position: relative;
+  width: min(240px, 100%);
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+
+.donut-shell svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.donut-shell::after {
+  content: '';
+  position: absolute;
+  inset: 28px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.14) 72%, transparent 100%);
+  pointer-events: none;
+}
+
+.donut-track,
+.donut-segment {
+  fill: none;
+  stroke-width: 24;
+}
+
+.donut-track {
+  stroke: rgba(148, 163, 184, 0.18);
+}
+
+.donut-segment {
+  stroke-linecap: round;
+  cursor: pointer;
+  transition: stroke-width var(--transition-fast), opacity var(--transition-fast), filter var(--transition-fast);
+}
+
+.donut-segment.is-active {
+  stroke-width: 28;
+  filter: drop-shadow(0 10px 16px rgba(15, 23, 42, 0.14));
+}
+
+.donut-segment.is-dimmed {
+  opacity: 0.34;
+}
+
+.donut-center {
+  position: absolute;
+  inset: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.72));
+  border: 1px solid rgba(99, 102, 241, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84), 0 16px 30px rgba(99, 102, 241, 0.08);
+}
+
+.donut-center strong {
+  font-family: 'Outfit', var(--font-sans);
+  font-size: 42px;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 52%, #ec4899 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.donut-center span {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--stats-ink-soft);
+}
+
+.legend-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.legend-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  outline: none;
+}
+
+.legend-item:hover,
+.legend-item.is-active,
+.legend-item:focus-visible {
+  transform: translateX(4px);
+  border-color: var(--stats-border-strong);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 16px 24px rgba(99, 102, 241, 0.12);
+}
+
+.legend-item.is-dimmed {
+  opacity: 0.5;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.legend-name,
+.legend-value {
+  font-size: 13px;
+}
+
+.legend-value {
+  color: var(--stats-ink-soft);
+}
+
+.bars-list {
+  display: grid;
+  gap: 12px;
+}
+
+.bars-row {
+  display: grid;
+  gap: 8px;
+}
+
+.bars-row--interactive {
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid transparent;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(247, 248, 255, 0.6));
+  cursor: pointer;
+  outline: none;
+}
+
+.bars-row--interactive:hover,
+.bars-row--interactive.is-active,
+.bars-row--interactive:focus-visible {
+  transform: translateX(4px);
+  border-color: var(--stats-border-strong);
+  box-shadow: 0 16px 26px rgba(99, 102, 241, 0.12);
+}
+
+.bars-row--interactive.is-dimmed {
+  opacity: 0.52;
+}
+
+.bars-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 13px;
+}
+
+.bars-head strong {
+  font-family: 'Outfit', var(--font-sans);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--stats-ink);
+}
+
+.bars-track {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.8);
+  overflow: hidden;
+}
+
+.bars-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--bar-color), rgba(255, 255, 255, 0.98));
+  box-shadow: 0 10px 18px rgba(99, 102, 241, 0.12);
+  transform-origin: left center;
+  animation: growX 0.72s var(--ease-out) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+.depth-columns,
+.hour-columns {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.hour-columns {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.depth-column,
+.hour-column {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 14px 10px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 248, 255, 0.58));
+}
+
+.chart-column {
+  border: 1px solid transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+.chart-column:hover,
+.chart-column.is-active,
+.chart-column:focus-visible {
+  transform: translateY(-4px);
+  border-color: var(--stats-border-strong);
+  box-shadow: 0 16px 28px rgba(99, 102, 241, 0.12);
+}
+
+.chart-column.is-dimmed {
+  opacity: 0.5;
+}
+
+.depth-track,
+.hour-track {
+  width: 100%;
+  max-width: 58px;
+  height: 160px;
+  padding: 6px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(226, 232, 240, 0.86), rgba(255, 255, 255, 0.52));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
+  display: flex;
+  align-items: flex-end;
+}
+
+.depth-fill,
+.hour-fill {
+  width: 100%;
+  min-height: 12px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), var(--column-color));
+  box-shadow: 0 12px 20px rgba(99, 102, 241, 0.12);
+  animation: growY 0.76s var(--ease-out) both;
+  transform-origin: bottom center;
+}
+
+.depth-count,
+.hour-count {
+  font-family: 'Outfit', var(--font-sans);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--stats-ink);
+}
+
+.depth-label,
+.hour-label {
+  font-size: 12px;
+  color: var(--stats-ink-soft);
+}
+
+.weekday-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.weekday-cell {
+  position: relative;
+  overflow: hidden;
+  padding: 18px 10px;
+  border-radius: 22px;
+  text-align: center;
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(99, 102, 241, calc(var(--heat) * 0.24)));
+  cursor: pointer;
+  outline: none;
+}
+
+.weekday-cell::after {
+  content: '';
+  position: absolute;
+  width: 92px;
+  height: 92px;
+  right: -18px;
+  top: -26px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 72%);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.weekday-cell:hover,
+.weekday-cell.is-active,
+.weekday-cell:focus-visible {
+  transform: translateY(-4px);
+  border-color: var(--stats-border-strong);
+  box-shadow: 0 18px 30px rgba(99, 102, 241, 0.12);
+}
+
+.weekday-cell:hover::after,
+.weekday-cell.is-active::after,
+.weekday-cell:focus-visible::after {
+  opacity: 1;
+}
+
+.weekday-cell.is-dimmed {
+  opacity: 0.52;
+}
+
+.weekday-name,
+.weekday-count {
+  position: relative;
+  z-index: 1;
+}
+
+.weekday-name {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--stats-ink-soft-strong);
+}
+
+.weekday-count {
+  font-family: 'Outfit', var(--font-sans);
+  font-size: clamp(22px, 2.3vw, 34px);
+  line-height: 1;
+}
+
+@media (max-width: 1320px) {
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .small-card {
+    grid-column: span 6;
+  }
+}
+
+@media (max-width: 1120px) {
+  .hero-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .trend-card,
+  .donut-card,
+  .small-card {
+    grid-column: span 12;
+  }
+
+  .donut-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .insight-strip,
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hour-columns {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .weekday-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .stats-page {
+    padding: 16px 12px 30px;
+  }
+
+  .hero-title {
+    max-width: none;
+  }
+
+  .hero-status-grid,
+  .command-head {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-header,
+  .command-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .trend-label-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .hour-columns,
+  .depth-columns,
+  .weekday-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .insight-chip {
+    padding-left: 70px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stats-aurora,
+  .metric-card,
+  .bars-fill,
+  .depth-fill,
+  .hour-fill,
+  .loading-line,
+  .refresh-icon.is-spinning {
+    animation: none !important;
+  }
+
+  .hero-panel,
+  .command-card,
+  .status-tile,
+  .insight-chip,
+  .metric-card,
+  .chart-card,
+  .legend-item,
+  .bars-row--interactive,
+  .chart-column,
+  .weekday-cell,
+  .refresh-button,
+  .error-action,
+  .trend-month {
+    transition-duration: 1ms !important;
+  }
+}
+
+@keyframes auroraFloat {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(0, -16px, 0) scale(1.06);
+  }
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes growX {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes growY {
+  from {
+    transform: scaleY(0.18);
+  }
+
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes rotate360 {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+</style>
